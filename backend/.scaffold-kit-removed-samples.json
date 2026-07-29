@@ -1,0 +1,9 @@
+{
+  "removed": [
+    "src/custom_data_toolkit/services/hero_service.py",
+    "src/custom_data_toolkit/routers/heroes.py",
+    "src/custom_data_toolkit/repositories/hero_repository.py",
+    "src/custom_data_toolkit/models/hero.py"
+  ],
+  "note": "请检查 main.py / deps.py / __init__.py 是否仍引用 hero"
+}

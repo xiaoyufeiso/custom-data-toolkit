@@ -1,0 +1,21 @@
+.gradle/
+build/
+dist/
+.tendata-project-tmp/
+.DS_Store
+.env
+.env.*
+!.env.example
+node_modules/
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+.scaffold-out/
+
+# accidental quoted env filename
+.env'
+**/.env'
+

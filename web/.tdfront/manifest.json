@@ -1,0 +1,23 @@
+{
+  "name": "web",
+  "template": "react-vite",
+  "templateVersion": "1.0.0",
+  "cliVersion": "0.3.1",
+  "minCliVersion": "0.3.1",
+  "framework": "react",
+  "builder": "vite",
+  "language": "typescript",
+  "packageManager": "pnpm",
+  "node": ">=20.0.0 <21.0.0 || >=22.12.0",
+  "stack": {
+    "uiLibrary": "tendata-ui",
+    "router": "react-router-dom",
+    "state": "zustand",
+    "style": "less",
+    "i18n": "react-intl"
+  },
+  "cli": {
+    "version": "0.3.1",
+    "createdAt": "2026-07-29T02:39:14.717Z"
+  }
+}

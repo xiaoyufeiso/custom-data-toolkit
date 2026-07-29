@@ -1,0 +1,35 @@
+---
+description: Custom Data Toolkit 项目级 AI Coding 硬约束
+globs:
+alwaysApply: true
+---
+
+# Custom Data Toolkit Rules
+
+## 必读
+
+编码前阅读 `docs/spec.md`、`docs/api.md`、`docs/database.md` 与 `docs/ai-coding.md`。
+实现首个 MVP 时同时遵循 `openspec/changes/add-currency-rate-mgmt/`。
+
+## MUST
+
+- 每个切片严格：`plan → implement → verify → test → review → document`；**Plan 须用户确认后才能写业务代码**
+- 管理端鉴权：Session Cookie + CSRF；对外查询：`X-API-Key`
+- 复用 MySQL 表 `currency`、`rate`，不要擅自改列语义（`data` 为字符串汇率）
+- 后端分层：routers → services → repositories → models
+- 行为/API/表变更同步更新 `docs/`（必要时更新 openspec）
+- Verify 必须对照 Spec Scenario / Checklist 逐条；Test 必须实跑
+
+## MUST NOT
+
+- 跳过 Plan 门禁或自说自话扩大范围
+- 实现海关字典业务（见 `openspec/specs/customs-dict/spec.md`）
+- 添加自助注册或 Casdoor/Casbin（MVP）
+- 提交 `.env`、密码或 API Key 明文
+- 在对外 `/public/*` 提供写接口
+- 用 PostgreSQL 替换已决定的 MySQL 复用方案（除非新增 ADR）
+- 以“代码看起来正确”代替 Verify/Test
+
+## 验证
+
+完成后对照 `docs/testing.md` 与相关 Verification Checklist；实际跑测试，不以“看起来对”代替。

@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Tendata Fullstack Smoke</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 48px 24px;
+        font-family: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+        background: #f5f6f8;
+        color: #1f2329;
+      }
+      main {
+        max-width: 720px;
+        margin: 0 auto;
+        background: #fff;
+        border-radius: 12px;
+        padding: 32px;
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+      }
+      h1 {
+        margin: 0 0 8px;
+        font-size: 20px;
+      }
+      p.subtitle {
+        margin: 0 0 24px;
+        color: #646a73;
+        font-size: 14px;
+      }
+      dl {
+        display: grid;
+        grid-template-columns: 140px 1fr;
+        gap: 8px 16px;
+        margin: 0 0 24px;
+        font-size: 14px;
+      }
+      dt {
+        color: #646a73;
+      }
+      dd {
+        margin: 0;
+        word-break: break-all;
+      }
+      .status {
+        display: inline-block;
+        padding: 4px 12px;
+        border-radius: 999px;
+        font-size: 13px;
+        font-weight: 600;
+      }
+      .pending { background: #fff4e6; color: #b25e09; }
+      .ok { background: #e6f4ea; color: #1a7f37; }
+      .fail { background: #fdeceb; color: #c0392b; }
+      pre {
+        background: #f5f6f8;
+        border-radius: 8px;
+        padding: 16px;
+        overflow: auto;
+        font-size: 13px;
+        margin: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Tendata Fullstack Smoke</h1>
+      <p class="subtitle">该页面由前端 dev server 提供，并在浏览器中直接调用后端接口，用于验证前后端联调。</p>
+      <dl>
+        <dt>服务名</dt>
+        <dd id="service">-</dd>
+        <dt>后端地址</dt>
+        <dd id="endpoint">-</dd>
+        <dt>结果</dt>
+        <dd><span id="status" class="status pending">检测中…</span></dd>
+      </dl>
+      <pre id="payload">等待响应…</pre>
+    </main>
+    <script type="module">
+      const statusEl = document.getElementById('status');
+      const payloadEl = document.getElementById('payload');
+      const serviceEl = document.getElementById('service');
+      const endpointEl = document.getElementById('endpoint');
+
+      function setStatus(text, kind) {
+        statusEl.textContent = text;
+        statusEl.className = `status ${kind}`;
+      }
+
+      try {
+        const config = await (await fetch('/tendata-smoke-config.json')).json();
+        const url = `${config.apiBaseUrl.replace(/\/+$/, '')}/${config.endpoint.replace(/^\/+/, '')}`;
+        serviceEl.textContent = config.serviceName;
+        endpointEl.textContent = url;
+
+        const response = await fetch(url);
+        const payload = await response.json();
+        payloadEl.textContent = JSON.stringify(payload, null, 2);
+
+        if (response.ok && payload.status === config.expectedStatus) {
+          setStatus('联调通过', 'ok');
+        } else {
+          setStatus(`联调失败（HTTP ${response.status}）`, 'fail');
+        }
+      } catch (error) {
+        setStatus('联调失败', 'fail');
+        payloadEl.textContent = String(error);
+      }
+    </script>
+  </body>
+</html>

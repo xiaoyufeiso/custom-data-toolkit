@@ -1,0 +1,9 @@
+{
+  "note": "模板 home/about 可在业务切片开始前删除",
+  "suggested": [
+    "src/pages/home",
+    "src/pages/about",
+    "src/views/home",
+    "src/views/about"
+  ]
+}

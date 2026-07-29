@@ -1,0 +1,26 @@
+{
+  "name": "custom-data-toolkit",
+  "packageManager": "pnpm",
+  "frontend": {
+    "dir": "web",
+    "port": 5173,
+    "smokePath": "/tendata-smoke.html",
+    "smokeConfigPath": "/tendata-smoke-config.json"
+  },
+  "backend": {
+    "dir": "backend",
+    "runtime": "python",
+    "port": 8000,
+    "apiBaseUrl": "http://127.0.0.1:8000",
+    "smokeEndpoint": "/api/v1/health",
+    "smokeUrl": "http://127.0.0.1:8000/api/v1/health",
+    "expectedStatus": "ok",
+    "javaTask": ":custom-data-toolkit-resource-server:bootRun",
+    "pythonPackage": "custom_data_toolkit"
+  },
+  "mirrors": {
+    "goproxy": "https://goproxy.cn,direct",
+    "gosumdb": "sum.golang.google.cn",
+    "uvIndex": "https://pypi.tuna.tsinghua.edu.cn/simple"
+  }
+}

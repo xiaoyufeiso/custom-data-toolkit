@@ -1,0 +1,91 @@
+{
+  "name": "web",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "engines": {
+    "node": ">=20.0.0 <21.0.0 || >=22.12.0"
+  },
+  "scripts": {
+    "start:uat": "vite --mode uat",
+    "start:pro": "vite --mode pro",
+    "start:mock": "vite --mode mock",
+    "build:uat": "tsc && vite build --mode uat",
+    "build:pro": "tsc && vite build --mode pro",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src --ext .ts,.tsx --fix",
+    "lint:style": "stylelint \"src/**/*.{less,css}\" --fix",
+    "analyze": "cross-env ANALYZE=true vite build",
+    "prepare": "husky"
+  },
+  "dependencies": {
+    "@tendata-biz-components/biz-table": "^1.0.22",
+    "@tendata-biz-components/text-tooltip": "5.0.2",
+    "@tendata-ui/icon": "1.0.90",
+    "@tendata-ui/theme": "0.0.5",
+    "@tendata-ui/utils": "0.0.7",
+    "axios": "^1.14.0",
+    "dayjs": "^1.11.20",
+    "react": "18",
+    "react-dom": "18",
+    "react-intl": "^10.1.1",
+    "react-router-dom": "6",
+    "tendata-ui": "3.0.7",
+    "zustand": "5",
+    "swr": "^2.3.0"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/node": "^25.6.0",
+    "@types/react": "^18.3.0",
+    "@types/react-dom": "^18.3.0",
+    "@typescript-eslint/eslint-plugin": "8.58.0",
+    "@typescript-eslint/parser": "8.58.0",
+    "@vitejs/plugin-react": "^4.3.0",
+    "@vitest/coverage-v8": "^4.1.4",
+    "cross-env": "^10.1.0",
+    "eslint": "8",
+    "eslint-config-airbnb": "^19.0.4",
+    "eslint-import-resolver-typescript": "^4.4.4",
+    "eslint-plugin-import": "^2.32.0",
+    "eslint-plugin-jsx-a11y": "^6.10.2",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "husky": "^9.1.7",
+    "jsdom": "^26.1.0",
+    "less": "^4.6.4",
+    "lint-staged": "15",
+    "msw": "^2.13.3",
+    "postcss-less": "^6.0.0",
+    "rollup-plugin-visualizer": "^7.0.1",
+    "sharp": "^0.34.5",
+    "stylelint": "16",
+    "stylelint-config-css-modules": "4.4",
+    "stylelint-config-standard": "36",
+    "svgo": "^4.0.1",
+    "typescript": "~5.5.0",
+    "vite": "^6.0.0",
+    "vite-plugin-image-optimizer": "^2.0.3",
+    "vitest": "^4.1.4"
+  },
+  "lint-staged": {
+    "src/**/*.{ts,tsx}": [
+      "eslint --fix --no-error-on-unmatched-pattern"
+    ],
+    "src/**/*.{less,css}": [
+      "stylelint --fix --allow-empty-input"
+    ]
+  },
+  "msw": {
+    "workerDirectory": [
+      "public"
+    ]
+  },
+  "packageManager": "pnpm@10.0.0"
+}

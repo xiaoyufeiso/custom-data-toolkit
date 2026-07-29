@@ -1,0 +1,1 @@
+Alembic migrations. Run: uv run alembic init 若需完整模板。

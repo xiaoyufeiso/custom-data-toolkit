@@ -1,0 +1,40 @@
+{
+  "name": "custom-data-toolkit",
+  "kind": "fullstack",
+  "outputDir": ".scaffold-out",
+  "tendataSkillDir": "/mnt/c/Users/86136/.codex/skills/tendata-fullstack-generator",
+  "docs": {
+    "project": [
+      "docs/requirements.md",
+      "docs/architecture.md",
+      "docs/ai-coding.md"
+    ],
+    "companyRoot": "../技术方案",
+    "company": []
+  },
+  "frontend": {
+    "pack": "react-vite",
+    "dir": "web",
+    "port": 5173,
+    "packageManager": "pnpm",
+    "serverState": "swr",
+    "removeSamples": true
+  },
+  "backend": {
+    "pack": "python-fastapi",
+    "runtime": "python",
+    "database": "sqlite",
+    "auth": "session-cookie",
+    "port": 8000,
+    "removeSamples": true,
+    "noDocker": true,
+    "timezone": "Asia/Shanghai",
+    "_comment": "scaffold-kit 仅支持 postgresql|sqlite；合并后已手工对齐 MySQL（见 backend/.env.example）"
+  },
+  "constraints": {
+    "region": "cn",
+    "trellis": "none",
+    "preserveDocs": true,
+    "preserveAgentsMd": true
+  }
+}
