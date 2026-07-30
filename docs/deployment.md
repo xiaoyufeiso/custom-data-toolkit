@@ -53,7 +53,7 @@ docker run -d --name cdt-mysql -e MYSQL_ROOT_PASSWORD=root -e MYSQL_DATABASE=cus
 WSL 示例（主机/库名须与 `backend/.env` 一致；数据库账号固定为 `customs_app`）：
 
 ```bash
-cd /mnt/d/实习/custom-data-toolkit
+cd ~/custom-data-toolkit
 
 # 若尚无账号，用具备权限的管理员先创建（一次性；密码自行替换）
 mysql -h 172.28.112.1 -P 3306 -u root -p -e "

@@ -28,17 +28,26 @@ custom-data-toolkit/
 
 见 `docs/` 与 `openspec/`；Agent 入口：`AGENTS.md`。
 
-## 本地启动（骨架就绪后）
+## 推荐工作区（WSL）
 
-1. 启动 MySQL 8，建库并执行 `docs/database.md` 中 `currency`/`rate` DDL  
-2. `cd backend && cp .env.example .env && uv sync --group dev --group test`  
+```text
+/home/fei/custom-data-toolkit
+```
+
+Agent / CLI 请在此目录打开；勿长期依赖 `/mnt/d/实习/...`（跨文件系统慢且易热更新异常）。
+
+## 本地启动
+
+1. MySQL 可达（见 `docs/deployment.md`）；业务表可用 `deploy/sql/schema.sql` + 种子数据  
+2. `cd backend && cp -n .env.example .env && uv sync --group dev --group test`  
 3. `cd web && pnpm install`  
-4. 联调：`node scripts/tendata-fullstack.mjs dev`（或分别启动前后端）
+4. 分别启动前后端，或 `node scripts/tendata-fullstack.mjs dev`（若脚本可用）
 
 ## 当前阶段
 
 ```text
-S0 文档 ✓ → S3 骨架 ✓ → S4 纵向切片（认证 → 货币 → 汇率 → API Key）
+文档/骨架 ✓ → 认证 ✓ → 货币 ✓ → 汇率 ✓ → API Key/公开查询 ✓
+→ 待办：按 fullstack-ai-development-workflow 收敛文档、裁剪骨架、归档 OpenSpec
 ```
 
-按 `openspec/changes/add-currency-rate-mgmt/tasks.md` 推进。
+进度见 `docs/progress.md`；Agent 约束见 `AGENTS.md`。
