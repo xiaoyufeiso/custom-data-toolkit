@@ -72,7 +72,7 @@
 - 日期：2026-07-29
 - 状态：Accepted
 - 背景：本机无公司库；需要空库自建表以开发联调。项目要求简单、效率优先，并与既有 DDL 对齐。
-- 决策：本地继续使用 **MySQL 8**（推荐 Docker 一键起）；空库先执行 `docs/database.md` 中的 `currency`/`rate` DDL，再跑 Alembic 创建管理表。不改用 PostgreSQL / SQLite。
+- 决策：本地继续使用 **MySQL 8**（推荐 Docker 一键起）；空库先执行 `deploy/sql/schema.sql` / `docs/data-contract.md` 中的 `currency`/`rate` DDL，再跑 Alembic 创建管理表。不改用 PostgreSQL / SQLite。
 - 原因：与公司存量表结构一致，避免方言差异；简单项目不值得双库适配。
 - 后果：开发者需本机或 Docker 提供 MySQL；无公司数据时用管理端或种子脚本录入少量样例即可。
 

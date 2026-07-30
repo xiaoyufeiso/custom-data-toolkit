@@ -2,7 +2,7 @@
 
 > 状态：Architecture Baseline（draft）  
 > 目标：本机/内网可运行的后台管理系统 MVP  
-> 上游文档：`requirements.md`、`spec.md`
+> 上游文档：`product.md`；行为细节见 OpenSpec；外部表见 `data-contract.md`
 
 ## 1. 技术栈
 

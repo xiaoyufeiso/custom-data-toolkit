@@ -1,6 +1,7 @@
 # Custom Data Toolkit API 规格
 
-> 状态：API Baseline（draft）  
+> 状态：API Baseline（draft，**过渡权威**）  
+> 目标：迁出为 OpenAPI（生成或手写 `openapi.yaml`）后，本文降级为索引。  
 > Base URL：`/api/v1`  
 > 管理端认证：HttpOnly Session Cookie + CSRF  
 > 对外认证：`X-API-Key`
