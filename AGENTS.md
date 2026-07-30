@@ -13,17 +13,18 @@
 
 1. `fullstack-ai-development-workflow` skill（流程与分层门禁）
 2. `README.md` — 仓库入口与启动
-3. `docs/architecture.md` — 技术结构
-4. `docs/requirements.md` — 产品范围（稳定真相收敛前暂用；目标为 `docs/product.md`）
-5. `docs/database.md` — 数据模型（外部表语义；目标补 `docs/data-contract.md`）
-6. `docs/api.md` — 契约摘要（目标迁 OpenAPI）
-7. `docs/spec.md` / 当前 OpenSpec change — 行为与变更 delta
-8. `docs/testing.md`、`docs/deployment.md` — 验收与本地运行
-9. `openspec/specs/customs-dict/spec.md` — 字典仅占位，**禁止实现**
-10. 当前变更：`openspec/changes/add-currency-rate-mgmt/`（未归档前）
+3. `docs/README.md` — 文档索引与更新矩阵
+4. `docs/product.md` — 稳定产品边界
+5. `docs/architecture.md` — 技术结构
+6. `docs/data-contract.md` — 外部表 `currency`/`rate` 语义
+7. `docs/api.md` — API 契约摘要（过渡；目标 OpenAPI）
+8. 当前 OpenSpec change 或归档后的 `openspec/specs/<domain>/`
+9. `docs/development.md`、`docs/operations.md` — 本地开发与运维
+10. `openspec/specs/customs-dict/spec.md` — 字典仅占位，**禁止实现**
+11. 未归档变更：`openspec/changes/add-currency-rate-mgmt/`
 
-冲突时：可执行代码与迁移优先于过时 Markdown；项目内文档优先于外部通用习惯。  
-同一事实只在一个权威层维护（skill：公司标准 / 稳定项目真相 / OpenSpec / 可执行产物）。
+冲突时：可执行代码与迁移优先于过时 Markdown；项目内权威文档优先于外部通用习惯。  
+同一事实只在一个权威层维护（公司标准 / 稳定项目真相 / OpenSpec / 可执行产物）。
 
 ## Mandatory Workflow
 
@@ -37,7 +38,7 @@ plan →（用户确认）→ implement → verify → test → review → docum
 
 ### Plan（必须先完成并等人确认）
 
-- 读相关 Requirement / Spec / API / Database / 当前 OpenSpec change。
+- 读相关 Product / Architecture / Data-contract / API / 当前 OpenSpec change。
 - 列出：影响的表、接口、页面、测试、正常/异常/边界场景。
 - 明确本切片 In/Out of Scope。
 - **输出简短 Plan；未获确认不得 Implement。**
@@ -50,9 +51,9 @@ plan →（用户确认）→ implement → verify → test → review → docum
 
 ### Verify / Test / Review / Document
 
-- 对照 Spec Scenario 逐条核对；实际跑相关测试。
+- 对照 OpenSpec Scenario 与 `development.md` 清单逐条核对；实际跑相关测试。
 - 标出 BLOCKER / MAJOR / MINOR；有 BLOCKER 不得宣称完成。
-- 行为变化写回权威文档层；更新 `docs/progress.md` 与 change `tasks.md`。
+- 行为变化写回权威层（见 `docs/README.md` 更新矩阵）；更新 change `tasks.md` 与可选 `docs/progress.md`。
 - 提交信息：`类型(范围): 中文简述`（如 `feat(rate): 实现汇率列表筛选`）。
 
 ## Stack
@@ -82,7 +83,7 @@ MVP MUST NOT：海关字典、Casdoor/Casbin、自助注册、爬虫逻辑、无
 
 ## Known follow-ups（交接）
 
-- 文档按 skill 收敛：`product.md` / `development.md` / `operations.md` / `data-contract.md`；削减与 OpenSpec 双写。
-- 删除前端未使用骨架（home/about/counter demo 等）。
-- 归档 `openspec/changes/add-currency-rate-mgmt`。
-- 当前功能基线提交：`chore(baseline): 保存货币汇率与 API Key 功能基线`。
+- 归档 `openspec/changes/add-currency-rate-mgmt`（合并 auth/currency/rate 领域 spec）
+- 删除前端未使用骨架（home/about/counter demo 等）
+- API 契约迁 OpenAPI 后降级 `docs/api.md`
+- 对照 `development.md` §5 完成 M6 验收勾选

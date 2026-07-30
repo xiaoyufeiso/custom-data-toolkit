@@ -44,6 +44,7 @@
 
 ## 6. 验证与文档
 
-- [ ] 6.1 对照 `docs/testing.md` 勾选核心项
-- [ ] 6.2 更新 `progress.md`
+- [ ] 6.1 对照 `docs/development.md` §5 勾选核心项
+- [x] 6.2 更新 `progress.md`（文档收敛 2026-07-30）
 - [ ] 6.3 变更归档：Delta 合并进 `openspec/specs/` 领域 spec
+- [x] 6.4 文档按 skill 收敛（product/development/operations/data-contract）

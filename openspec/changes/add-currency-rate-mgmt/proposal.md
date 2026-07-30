@@ -27,7 +27,7 @@ Out of Scope:
 - `openspec/specs/tech.md` — 技术基线
 - `openspec/specs/ui.md` — 管理端交互
 - `openspec/specs/customs-dict/spec.md` — 明确排除
-- 传统契约：`docs/spec.md`、`docs/api.md`、`docs/database.md`
+- 传统契约：`docs/api.md`、`docs/data-contract.md`；行为 Delta 在本 change `specs/`；产品边界 `docs/product.md`
 
 ## Approach
 

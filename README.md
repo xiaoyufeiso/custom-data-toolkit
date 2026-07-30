@@ -6,27 +6,34 @@
 
 - 前端：React + TypeScript + Vite（`web/`）
 - 后端：Python FastAPI（`backend/`）
-- 数据库：MySQL 8（本地自建；见 `docs/deployment.md`）
+- 数据库：MySQL 8（本地自建；见 `docs/development.md` / `docs/operations.md`）
 
 ## 工程结构
 
 ```text
 custom-data-toolkit/
-├─ web/                 # Tendata React 前端骨架
-├─ backend/             # Tendata Python FastAPI 骨架（已对齐 MySQL）
-├─ docs/                # 产品/工程文档
-├─ openspec/            # SDD / Spec
+├─ web/                 # Tendata React 前端
+├─ backend/             # Tendata Python FastAPI（已对齐 MySQL）
+├─ docs/                # 稳定项目真相（见 docs/README.md）
+├─ openspec/            # 行为变更与领域 Spec
 ├─ scripts/             # 全栈联调脚本
 ├─ profile.json         # scaffold-kit 生成配置
 ├─ AGENTS.md
 └─ README.md
 ```
 
-骨架由 `scaffold-kit` 生成并 merge；已去 Hero 示例与 Dockerfile，属轻量壳，不含业务功能。
+## 文档
 
-## 文档索引
+索引与**阶段更新矩阵**：[`docs/README.md`](docs/README.md)。
 
-见 `docs/` 与 `openspec/`；Agent 入口：`AGENTS.md`。
+| 权威文档 | 用途 |
+|---|---|
+| `docs/product.md` | 产品边界 |
+| `docs/architecture.md` | 架构 |
+| `docs/development.md` | 本地开发与测试 |
+| `docs/operations.md` | 运维交付 |
+| `docs/data-contract.md` | 外部表语义 |
+| `AGENTS.md` | AI 约束 |
 
 ## 推荐工作区（WSL）
 
@@ -34,20 +41,21 @@ custom-data-toolkit/
 /home/fei/custom-data-toolkit
 ```
 
-Agent / CLI 请在此目录打开；勿长期依赖 `/mnt/d/实习/...`（跨文件系统慢且易热更新异常）。
+Agent / CLI 请在此目录打开；勿长期依赖 `/mnt/d/实习/...`。
 
 ## 本地启动
 
-1. MySQL 可达（见 `docs/deployment.md`）；业务表可用 `deploy/sql/schema.sql` + 种子数据  
-2. `cd backend && cp -n .env.example .env && uv sync --group dev --group test`  
-3. `cd web && pnpm install`  
-4. 分别启动前后端，或 `node scripts/tendata-fullstack.mjs dev`（若脚本可用）
+1. MySQL 可达；导入 `deploy/sql/schema.sql`（见 `docs/development.md`）
+2. `cd backend && cp -n .env.example .env && uv sync --group dev --group test`
+3. `cd backend && uv run alembic upgrade head`
+4. `cd web && pnpm install`
+5. 分别启动前后端，或 `node scripts/tendata-fullstack.mjs dev`（若脚本可用）
 
 ## 当前阶段
 
 ```text
 文档/骨架 ✓ → 认证 ✓ → 货币 ✓ → 汇率 ✓ → API Key/公开查询 ✓
-→ 待办：按 fullstack-ai-development-workflow 收敛文档、裁剪骨架、归档 OpenSpec
+→ 进行中：M6 发布整理（验收、OpenSpec 归档、骨架裁剪）
 ```
 
-进度见 `docs/progress.md`；Agent 约束见 `AGENTS.md`。
+进度见 `docs/progress.md`。

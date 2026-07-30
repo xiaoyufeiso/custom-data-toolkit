@@ -8,8 +8,9 @@ alwaysApply: true
 
 ## 必读
 
-编码前阅读 `docs/spec.md`、`docs/api.md`、`docs/database.md` 与 `docs/ai-coding.md`。
+编码前阅读 `docs/product.md`、`docs/architecture.md`、`docs/data-contract.md`、`docs/api.md`、`docs/development.md` 与 `AGENTS.md`。
 实现首个 MVP 时同时遵循 `openspec/changes/add-currency-rate-mgmt/`。
+文档权威与更新矩阵见 `docs/README.md`。
 
 ## MUST
 
@@ -17,8 +18,8 @@ alwaysApply: true
 - 管理端鉴权：Session Cookie + CSRF；对外查询：`X-API-Key`
 - 复用 MySQL 表 `currency`、`rate`，不要擅自改列语义（`data` 为字符串汇率）
 - 后端分层：routers → services → repositories → models
-- 行为/API/表变更同步更新 `docs/`（必要时更新 openspec）
-- Verify 必须对照 Spec Scenario / Checklist 逐条；Test 必须实跑
+- 行为/API/外部表变更写回权威层（OpenSpec / `api.md` 或未来 OpenAPI / `data-contract.md`）
+- Verify 必须对照 OpenSpec Scenario / `development.md` Checklist 逐条；Test 必须实跑
 
 ## MUST NOT
 
@@ -29,7 +30,8 @@ alwaysApply: true
 - 在对外 `/public/*` 提供写接口
 - 用 PostgreSQL 替换已决定的 MySQL 复用方案（除非新增 ADR）
 - 以“代码看起来正确”代替 Verify/Test
+- 恢复或新建与权威文档双写的停用文件（见 `docs/archive/README.md`）
 
 ## 验证
 
-完成后对照 `docs/testing.md` 与相关 Verification Checklist；实际跑测试，不以“看起来对”代替。
+完成后对照 `docs/development.md` 验收清单与相关 OpenSpec Verification Checklist；实际跑测试，不以“看起来对”代替。

@@ -5,9 +5,9 @@
   "tendataSkillDir": "/mnt/c/Users/86136/.codex/skills/tendata-fullstack-generator",
   "docs": {
     "project": [
-      "docs/requirements.md",
+      "docs/product.md",
       "docs/architecture.md",
-      "docs/ai-coding.md"
+      "docs/development.md"
     ],
     "companyRoot": "../技术方案",
     "company": []
