@@ -15,6 +15,8 @@ import {
   type Rate,
 } from '@/services/rate';
 import { getApiErrorMessage } from '@/shared/utils/apiError';
+import CurrencyPicker from './CurrencyPicker';
+import { fetchAllCurrencies } from './currencyPickerUtils';
 import styles from './index.module.less';
 
 const DEFAULT_PAGE_SIZE = 20;
@@ -108,6 +110,7 @@ const RatesView = () => {
   const [filterDraft, setFilterDraft] = useState<FilterDraft>(emptyFilter);
   const [applied, setApplied] = useState<AppliedFilter>({});
   const [currencies, setCurrencies] = useState<Currency[]>([]);
+  const [currenciesLoading, setCurrenciesLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
@@ -116,11 +119,35 @@ const RatesView = () => {
   const [editForm, setEditForm] = useState<EditForm>({ data: '', checked: false });
 
   useEffect(() => {
-    void listCurrencies({ page: 1, pageSize: 100 })
-      .then((data) => setCurrencies(data.items ?? []))
-      .catch(() => {
-        message.error('加载货币选项失败');
-      });
+    let cancelled = false;
+    const loadCurrencies = async () => {
+      setCurrenciesLoading(true);
+      try {
+        const all = await fetchAllCurrencies(async (pageNum, size) => {
+          const data = await listCurrencies({ page: pageNum, pageSize: size });
+          return {
+            items: data.items ?? [],
+            total: data.total ?? 0,
+          };
+        });
+        if (!cancelled) {
+          setCurrencies(all as Currency[]);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setCurrencies([]);
+          message.error(getApiErrorMessage(error, '加载货币选项失败'));
+        }
+      } finally {
+        if (!cancelled) {
+          setCurrenciesLoading(false);
+        }
+      }
+    };
+    void loadCurrencies();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const load = useCallback(async () => {
@@ -390,25 +417,18 @@ const RatesView = () => {
             </div>
           ) : (
             <div className={styles.form}>
-              <label className={styles.label}>
+              <div className={styles.label}>
                 货币
-                <select
-                  className={styles.select}
+                <CurrencyPicker
+                  currencies={currencies}
                   value={createForm.currencyId}
-                  onChange={(e) => setCreateForm((prev) => ({
+                  loading={currenciesLoading}
+                  onChange={(currencyId) => setCreateForm((prev) => ({
                     ...prev,
-                    currencyId: e.target.value,
+                    currencyId,
                   }))}
-                >
-                  <option value="">请选择</option>
-                  {currencies.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                      {c.code ? `（${c.code}）` : ''}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                />
+              </div>
               <label className={styles.label}>
                 日期
                 <input

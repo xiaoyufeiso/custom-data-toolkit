@@ -30,6 +30,7 @@
 ### 汇率列表
 - 筛选：货币、日期或区间、可选 checked
 - 支持新建/编辑 `data` 与 `checked`
+- **新建汇率**货币选择：自定义下拉；选项文案 `code (name)`（无 code 仅名称）；按 `code` 首字母分组；无 code 归 `#`；右侧仅展示有数据的字母索引，点击滚动到对应段；列表可隐藏滚动条但仍支持滚轮；选项通过既有分页 API 串行拉全量（见 change `improve-rate-create-currency-picker`）
 
 ### API Key 列表
 - 展示 name、prefix、enabled、创建时间

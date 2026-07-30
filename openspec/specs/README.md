@@ -12,6 +12,7 @@
 | 变更 | 路径 | 状态 |
 |------|------|------|
 | 汇率与货币管理 MVP | `openspec/changes/add-currency-rate-mgmt/` | proposed（实现完成，待归档） |
+| 新建汇率货币选择器首字母索引 | `openspec/changes/improve-rate-create-currency-picker/` | proposed（仅文档，未实现） |
 
 ## 说明
 
