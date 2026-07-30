@@ -1,5 +1,10 @@
-import WorkspaceView from '@/views/workspace';
+import PageBoundary from '@/shared/components/pageBoundary';
+import CurrenciesView from '@/views/currencies';
 
-const CurrenciesPage = () => <WorkspaceView />;
+const CurrenciesPage = () => (
+  <PageBoundary>
+    <CurrenciesView />
+  </PageBoundary>
+);
 
 export default CurrenciesPage;

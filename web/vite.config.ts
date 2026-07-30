@@ -82,6 +82,11 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 5173,
       strictPort: true,
+      watch: {
+        // WSL 对 /mnt 下的 Windows 文件系统事件可能不可靠，使用轮询保证热更新。
+        usePolling: true,
+        interval: 300,
+      },
       proxy: {
         '/api': {
           target: 'http://127.0.0.1:8000',

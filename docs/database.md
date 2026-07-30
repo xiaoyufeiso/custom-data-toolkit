@@ -29,11 +29,11 @@ admin_user 可选关联创建 api_key（MVP 可不强绑，仅记录 created_by�
 |---|---|---|---|
 | id | bigint | PK, AI | 货币 ID |
 | name | varchar(100) | NOT NULL | 货币名称 |
-| code | varchar(10) | NULL | 货币三位码（对外查询键） |
+| code | varchar(10) | NULL | 货币字母码（1~10 位字母/下划线；对外查询键；语义见 ADR-010） |
 
 说明：
 
-- 无 DB 级 `code` 唯一索引时，应用层对非空 `code` SHOULD 做唯一校验。
+- 库列宽度保持 `varchar(10)`（复用既有 DDL）；**应用层**对非空 `code` MUST 校验为恰好 3 位数字，并做唯一校验。
 - 删除前 MUST 确认无关联 `rate`。
 
 ### 3.2 rate

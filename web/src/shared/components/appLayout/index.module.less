@@ -5,15 +5,48 @@
 .header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  background: #1890ff;
+  line-height: 64px;
+  height: 64px;
 }
 
 .brand {
   color: #fff;
   font-size: 18px;
   font-weight: bold;
-  margin-right: 40px;
+  white-space: nowrap;
 }
 
-.menu {
-  flex: 1;
+.headerRight {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.userSlot {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.body {
+  min-height: calc(100vh - 64px);
+}
+
+.sider {
+  background: #fff;
+  border-right: 1px solid #f0f0f0;
+}
+
+.sideMenu {
+  height: 100%;
+  border-inline-end: none !important;
+}
+
+.content {
+  background: #f5f5f5;
+  min-height: calc(100vh - 64px);
 }

@@ -8,8 +8,8 @@ Admins MUST be able to maintain `data` and `checked`.
 The pair `(currency_id, date)` MUST remain unique.
 
 #### Scenario: List by code and date range
-- GIVEN rates for USD across multiple dates
-- WHEN the admin lists rates with code `USD` and a date range
+- GIVEN rates for code `156` across multiple dates
+- WHEN the admin lists rates with code `156` and a date range
 - THEN only matching rows are returned in pages
 
 #### Scenario: Duplicate currency date rejected
@@ -30,8 +30,8 @@ If the currency exists but no rates match, the system MUST return 200 with an em
 Public endpoints MUST NOT allow writes.
 
 #### Scenario: Query with valid key
-- GIVEN an enabled API key and rates for `USD` on 2026-07-29
-- WHEN the client calls public rates with that key, code `USD`, and date `2026-07-29`
+- GIVEN an enabled API key and rates for `156` on 2026-07-29
+- WHEN the client calls public rates with that key, code `156`, and date `2026-07-29`
 - THEN the response is 200 and includes the rate data
 
 #### Scenario: Invalid key rejected

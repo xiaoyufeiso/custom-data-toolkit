@@ -93,7 +93,7 @@ class AuthService:
         new_password: str,
     ) -> None:
         if not verify_password(user.password_hash, current_password):
-            raise LoginFailedException("Current password is incorrect.")
+            raise LoginFailedException("当前密码不正确。")
         user.password_hash = hash_password(new_password)
         user.updated_at = datetime.now(UTC).replace(tzinfo=None)
         self.repository.delete_other_sessions(user.id, session_row.id)  # type: ignore[arg-type]

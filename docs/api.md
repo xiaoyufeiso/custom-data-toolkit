@@ -49,10 +49,15 @@
 ```json
 {
   "code": "Currency.HasRates",
-  "message": "Cannot delete currency while rates exist.",
+  "message": "该货币仍有关联汇率，无法删除。",
   "requestId": "..."
 }
 ```
+
+说明：
+
+- `code`：机器可读错误码，供联调/日志；**前端面向用户的提示 MUST 只展示 `message`，不得拼接 `code`**。
+- `message`：面向用户的中文说明。
 
 | 状态码 | 场景 |
 |---:|---|
@@ -106,14 +111,15 @@
 
 ```json
 {
-  "name": "US Dollar",
-  "code": "USD"
+  "name": "人民币",
+  "code": "CNY"
 }
 ```
 
-删除冲突（仍有汇率）：409，`Currency.HasRates`。
-
-`code` 冲突：409，`Currency.CodeConflict`。
+- `code`：可选；若提供 MUST 为 1~10 位字母或下划线（如 `CNY`、`MYR_IM`，忽略大小写）。非法格式：400，`Currency.InvalidCode`。
+- **更新时**：请求体若显式带 `"code": null`（或空串），表示清空 code；省略 `code` 字段则保持原值不变。
+- 删除冲突（仍有汇率）：409，`Currency.HasRates`。
+- `code` 冲突：409，`Currency.CodeConflict`。
 
 ## 5. 汇率（管理端）
 
@@ -194,7 +200,7 @@
 
 查询参数：
 
-- `code`：必填（货币三位码）。**不支持按货币名称查询**（名称映射留给后续海关字典；见 ADR-009）。
+- `code`：必填（货币字母码，如 `CNY`、`MYR_IM`）。**不支持按货币名称查询**（名称映射留给后续海关字典；见 ADR-009 / ADR-010）。
 - 时间：`date` **或** `dateFrom`+`dateTo`（必填其一；区间时两者都必填且 from≤to）
 
 鉴权：`X-API-Key`
@@ -205,7 +211,7 @@
 {
   "items": [
     {
-      "currencyCode": "USD",
+      "currencyCode": "CNY",
       "date": "2026-07-29",
       "data": "7.1200",
       "checked": true

@@ -23,3 +23,16 @@ class AdminSession(SQLModel, table=True):
     csrf_secret_hash: str = Field(max_length=255)
     expires_at: datetime
     created_at: datetime
+
+
+class ApiKey(SQLModel, table=True):
+    __tablename__ = "api_keys"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    name: str = Field(max_length=100)
+    key_prefix: str = Field(max_length=16)
+    key_hash: str = Field(max_length=255, unique=True, index=True)
+    enabled: bool = Field(default=True)
+    created_by: Optional[int] = Field(default=None, foreign_key="admin_users.id")
+    created_at: datetime
+    updated_at: datetime

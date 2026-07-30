@@ -7,6 +7,10 @@ import type { MessageId } from '@/shared/hooks';
 export interface RouteMeta {
   titleKey?: MessageId;
   menu?: boolean;
+  /** 分组 key，相同 group 的路由会合并为一个可折叠子菜单 */
+  group?: string;
+  /** 分组显示名称对应的 i18n key */
+  groupTitleKey?: MessageId;
   icon?: React.ReactNode;
   hidden?: boolean;
   public?: boolean;
@@ -21,6 +25,8 @@ export type AppRouteObject =
 
 const Login = lazy(() => import('@/pages/login'));
 const Currencies = lazy(() => import('@/pages/currencies'));
+const Rates = lazy(() => import('@/pages/rates'));
+const ApiKeys = lazy(() => import('@/pages/api-keys'));
 
 const lazyLoad = (Component: React.LazyExoticComponent<React.ComponentType>) => (
   <Suspense fallback={<Loading />}>
@@ -42,7 +48,17 @@ const routes: AppRouteObject[] = [
   {
     path: '/currencies',
     element: <RequireAuth>{lazyLoad(Currencies)}</RequireAuth>,
-    meta: { titleKey: 'common.currencies', menu: true },
+    meta: { titleKey: 'common.currencies', menu: true, group: 'rateData', groupTitleKey: 'common.rateData' },
+  },
+  {
+    path: '/rates',
+    element: <RequireAuth>{lazyLoad(Rates)}</RequireAuth>,
+    meta: { titleKey: 'common.rates', menu: true, group: 'rateData', groupTitleKey: 'common.rateData' },
+  },
+  {
+    path: '/api-keys',
+    element: <RequireAuth>{lazyLoad(ApiKeys)}</RequireAuth>,
+    meta: { titleKey: 'common.apiKeys', menu: true },
   },
   { path: '*', element: <Navigate to="/currencies" replace /> },
 ];

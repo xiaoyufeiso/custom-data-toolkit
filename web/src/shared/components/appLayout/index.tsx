@@ -4,16 +4,13 @@ import {
 } from 'react-router-dom';
 import { Layout, Menu } from 'tendata-ui';
 import routes, { AppRouteObject } from '@/router';
-import LanguageSwitcher from '@/shared/components/languageSwitcher';
 import { useTranslate } from '@/shared/hooks';
 import styles from './index.module.less';
 
-const { Header, Content } = Layout;
+const { Header, Sider, Content } = Layout;
 
 /**
- * 从自描述路由表中派生出菜单可见项：
- * - 仅保留 `meta.menu === true` 且未被 `hidden` 的路由；
- * - 暂不处理嵌套菜单，如后续需要再基于 `children` 扩展为 SubMenu。
+ * 从自描述路由表中派生出菜单可见项。
  */
 const getMenuRoutes = (items: AppRouteObject[]) => items.filter(
   (r) => r.meta?.menu && !r.meta?.hidden && typeof r.path === 'string',
@@ -24,19 +21,49 @@ const AppLayout = () => {
   const t = useTranslate();
   const { pathname } = useLocation();
 
+  const isPublicPage = useMemo(() => {
+    const hit = routes.find((r) => typeof r.path === 'string' && r.path === pathname);
+    return Boolean(hit?.meta?.public);
+  }, [pathname]);
+
   const menuRoutes = useMemo(() => getMenuRoutes(routes), []);
 
-  const menuItems = useMemo(
-    () => menuRoutes.map((r) => ({
-      key: r.path as string,
-      label: (
-        <Link to={r.path as string}>
-          {r.meta?.titleKey ? t(r.meta.titleKey) : r.path}
+  const menuItems = useMemo(() => {
+    const items: Array<{
+      key: string;
+      label: React.ReactNode;
+      children?: Array<{ key: string; label: React.ReactNode }>;
+    }> = [];
+    const groupMap = new Map<string, typeof items>();
+
+    for (const r of menuRoutes) {
+      const path = r.path as string;
+      const label = (
+        <Link to={path}>
+          {r.meta?.titleKey ? t(r.meta.titleKey) : path}
         </Link>
-      ),
-    })),
-    [menuRoutes, t],
-  );
+      );
+
+      if (r.meta?.group) {
+        const groupKey = r.meta.group;
+        if (!groupMap.has(groupKey)) {
+          const groupItem = {
+            key: groupKey,
+            label: r.meta.groupTitleKey ? t(r.meta.groupTitleKey) : groupKey,
+            children: [] as Array<{ key: string; label: React.ReactNode }>,
+          };
+          groupMap.set(groupKey, [groupItem] as any);
+          items.push(groupItem);
+        }
+        const group = items.find((item) => item.key === groupKey);
+        group?.children?.push({ key: path, label });
+      } else {
+        items.push({ key: path, label });
+      }
+    }
+
+    return items;
+  }, [menuRoutes, t]);
 
   /**
    * 受控的菜单选中项：
@@ -59,16 +86,34 @@ const AppLayout = () => {
         <div className={styles.brand}>
           {t('common.appName')}
         </div>
-        <Menu
-          theme="dark"
-          mode="horizontal"
-          selectedKeys={selectedKeys}
-          items={menuItems}
-          className={styles.menu}
-        />
-        <LanguageSwitcher />
+        <div className={styles.headerRight}>
+          {/* 预留：登录用户名 / 改密 / 退出等 */}
+          <div className={styles.userSlot} aria-hidden={isPublicPage} />
+        </div>
       </Header>
-      <Content>{element}</Content>
+      <Layout className={styles.body}>
+        {!isPublicPage ? (
+          <Sider
+            width={220}
+            theme="light"
+            className={styles.sider}
+            breakpoint="lg"
+            collapsedWidth={64}
+          >
+            <Menu
+              mode="inline"
+              selectedKeys={selectedKeys}
+              defaultOpenKeys={menuRoutes
+                .filter((r) => r.meta?.group)
+                .map((r) => r.meta!.group as string)
+                .filter((v, i, a) => a.indexOf(v) === i)}
+              items={menuItems}
+              className={styles.sideMenu}
+            />
+          </Sider>
+        ) : null}
+        <Content className={styles.content}>{element}</Content>
+      </Layout>
     </Layout>
   );
 };
