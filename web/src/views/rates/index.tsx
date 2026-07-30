@@ -63,12 +63,34 @@ const emptyFilter: FilterDraft = {
   sortOrder: 'desc',
 };
 
-const getPageNumbers = (current: number, totalPages: number) => {
-  const pages: number[] = [];
-  const start = Math.max(1, current - 2);
-  const end = Math.min(totalPages, current + 2);
-  for (let i = start; i <= end; i += 1) pages.push(i);
-  return pages;
+type PageItem = number | 'ellipsis';
+
+/** 经典 1..N 页码；页数较多时保留首尾并用省略号。 */
+const getPageItems = (current: number, totalPages: number): PageItem[] => {
+  if (totalPages <= 7) {
+    return Array.from({ length: totalPages }, (_, i) => i + 1);
+  }
+
+  const set = new Set<number>([1, totalPages]);
+  for (let i = current - 1; i <= current + 1; i += 1) {
+    if (i >= 1 && i <= totalPages) set.add(i);
+  }
+  if (current <= 3) {
+    for (let i = 1; i <= 5; i += 1) set.add(i);
+  }
+  if (current >= totalPages - 2) {
+    for (let i = totalPages - 4; i <= totalPages; i += 1) set.add(i);
+  }
+
+  const sorted = [...set].sort((a, b) => a - b);
+  const items: PageItem[] = [];
+  let prev = 0;
+  for (const p of sorted) {
+    if (prev > 0 && p - prev > 1) items.push('ellipsis');
+    items.push(p);
+    prev = p;
+  }
+  return items;
 };
 
 const emptyCreate: CreateForm = {
@@ -125,7 +147,7 @@ const RatesView = () => {
   const onSearch = () => {
     const code = filterDraft.code.trim();
     if (code && !/^[A-Za-z_]{1,10}$/.test(code)) {
-      message.warning('筛选货币代码须为 1~10 位字母或下划线，如 CNY');
+      message.warning('筛选字母代码须为 1~10 位字母或下划线，如 CNY');
       return;
     }
 
@@ -233,7 +255,7 @@ const RatesView = () => {
   };
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
-  const pageNumbers = getPageNumbers(page, totalPages);
+  const pageItems = getPageItems(page, totalPages);
   const dateSortOrder = applied.sortOrder ?? filterDraft.sortOrder;
 
   const toggleDateSort = () => {
@@ -249,7 +271,7 @@ const RatesView = () => {
         <Space wrap>
           <Input
             allowClear
-            placeholder="货币代码（如 CNY）"
+            placeholder="字母代码（如 CNY）"
             value={filterDraft.code}
             onChange={(e) => setFilterDraft((prev) => ({ ...prev, code: e.target.value }))}
             onPressEnter={onSearch}
@@ -447,7 +469,7 @@ const RatesView = () => {
             <tr>
               <th>ID</th>
               <th>货币</th>
-              <th>Code</th>
+              <th>字母代码</th>
               <th>
                 <button
                   type="button"
@@ -527,15 +549,22 @@ const RatesView = () => {
             <Button disabled={page <= 1 || loading} onClick={() => setPage((p) => p - 1)}>
               上一页
             </Button>
-            {pageNumbers.map((p) => (
-              <Button
-                key={p}
-                type={p === page ? 'primary' : 'default'}
-                disabled={loading}
-                onClick={() => setPage(p)}
-              >
-                {p}
-              </Button>
+            {pageItems.map((item, index) => (
+              item === 'ellipsis' ? (
+                <span key={`ellipsis-${index}`} className={styles.pageEllipsis} aria-hidden>
+                  …
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  key={item}
+                  className={`${styles.pageBtn}${item === page ? ` ${styles.pageBtnActive}` : ''}`}
+                  disabled={loading}
+                  onClick={() => setPage(item)}
+                >
+                  {item}
+                </button>
+              )
             ))}
             <Button
               disabled={page >= totalPages || loading}

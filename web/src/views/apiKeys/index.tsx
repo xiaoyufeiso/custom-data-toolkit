@@ -24,12 +24,34 @@ const formatTime = (value: string) => {
 const DEFAULT_PAGE_SIZE = 20;
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
 
-const getPageNumbers = (current: number, totalPages: number) => {
-  const pages: number[] = [];
-  const start = Math.max(1, current - 2);
-  const end = Math.min(totalPages, current + 2);
-  for (let i = start; i <= end; i += 1) pages.push(i);
-  return pages;
+type PageItem = number | 'ellipsis';
+
+/** 经典 1..N 页码；页数较多时保留首尾并用省略号。 */
+const getPageItems = (current: number, totalPages: number): PageItem[] => {
+  if (totalPages <= 7) {
+    return Array.from({ length: totalPages }, (_, i) => i + 1);
+  }
+
+  const set = new Set<number>([1, totalPages]);
+  for (let i = current - 1; i <= current + 1; i += 1) {
+    if (i >= 1 && i <= totalPages) set.add(i);
+  }
+  if (current <= 3) {
+    for (let i = 1; i <= 5; i += 1) set.add(i);
+  }
+  if (current >= totalPages - 2) {
+    for (let i = totalPages - 4; i <= totalPages; i += 1) set.add(i);
+  }
+
+  const sorted = [...set].sort((a, b) => a - b);
+  const items: PageItem[] = [];
+  let prev = 0;
+  for (const p of sorted) {
+    if (prev > 0 && p - prev > 1) items.push('ellipsis');
+    items.push(p);
+    prev = p;
+  }
+  return items;
 };
 
 const ApiKeysView = () => {
@@ -130,7 +152,7 @@ const ApiKeysView = () => {
   const total = items.length;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const currentPage = Math.min(page, totalPages);
-  const pageNumbers = getPageNumbers(currentPage, totalPages);
+  const pageItems = getPageItems(currentPage, totalPages);
   const pageStart = (currentPage - 1) * pageSize;
   const pagedItems = items.slice(pageStart, pageStart + pageSize);
 
@@ -267,15 +289,22 @@ const ApiKeysView = () => {
           <Button disabled={currentPage <= 1 || loading} onClick={() => setPage((p) => p - 1)}>
             上一页
           </Button>
-          {pageNumbers.map((p) => (
-            <Button
-              key={p}
-              type={p === currentPage ? 'primary' : 'default'}
-              disabled={loading}
-              onClick={() => setPage(p)}
-            >
-              {p}
-            </Button>
+          {pageItems.map((item, index) => (
+            item === 'ellipsis' ? (
+              <span key={`ellipsis-${index}`} className={styles.pageEllipsis} aria-hidden>
+                …
+              </span>
+            ) : (
+              <button
+                type="button"
+                key={item}
+                className={`${styles.pageBtn}${item === currentPage ? ` ${styles.pageBtnActive}` : ''}`}
+                disabled={loading}
+                onClick={() => setPage(item)}
+              >
+                {item}
+              </button>
+            )
           ))}
           <Button
             disabled={currentPage >= totalPages || loading}

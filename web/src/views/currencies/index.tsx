@@ -19,12 +19,34 @@ import styles from './index.module.less';
 const DEFAULT_PAGE_SIZE = 20;
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
 
-const getPageNumbers = (current: number, totalPages: number) => {
-  const pages: number[] = [];
-  const start = Math.max(1, current - 2);
-  const end = Math.min(totalPages, current + 2);
-  for (let i = start; i <= end; i += 1) pages.push(i);
-  return pages;
+type PageItem = number | 'ellipsis';
+
+/** 经典 1..N 页码；页数较多时保留首尾并用省略号。 */
+const getPageItems = (current: number, totalPages: number): PageItem[] => {
+  if (totalPages <= 7) {
+    return Array.from({ length: totalPages }, (_, i) => i + 1);
+  }
+
+  const set = new Set<number>([1, totalPages]);
+  for (let i = current - 1; i <= current + 1; i += 1) {
+    if (i >= 1 && i <= totalPages) set.add(i);
+  }
+  if (current <= 3) {
+    for (let i = 1; i <= 5; i += 1) set.add(i);
+  }
+  if (current >= totalPages - 2) {
+    for (let i = totalPages - 4; i <= totalPages; i += 1) set.add(i);
+  }
+
+  const sorted = [...set].sort((a, b) => a - b);
+  const items: PageItem[] = [];
+  let prev = 0;
+  for (const p of sorted) {
+    if (prev > 0 && p - prev > 1) items.push('ellipsis');
+    items.push(p);
+    prev = p;
+  }
+  return items;
 };
 
 type FormState = {
@@ -93,7 +115,7 @@ const CurrenciesView = () => {
     }
     const code = form.code.trim();
     if (code && !/^[A-Za-z_]{1,10}$/.test(code)) {
-      message.warning('货币 code 须为 1~10 位字母或下划线，如 CNY');
+      message.warning('货币字母代码须为 1~10 位字母或下划线，如 CNY');
       return;
     }
     setSubmitting(true);
@@ -129,7 +151,7 @@ const CurrenciesView = () => {
   };
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
-  const pageNumbers = getPageNumbers(page, totalPages);
+  const pageItems = getPageItems(page, totalPages);
 
   return (
     <div className={styles.page}>
@@ -137,7 +159,7 @@ const CurrenciesView = () => {
         <Space wrap>
           <Input
             allowClear
-            placeholder="搜索名称或 code"
+            placeholder="搜索名称或字母代码"
             value={q}
             onChange={(e) => setQ(e.target.value)}
             onPressEnter={onSearch}
@@ -167,7 +189,7 @@ const CurrenciesView = () => {
               />
             </label>
             <label className={styles.label}>
-              Code（可选）
+              字母代码（可选）
               <Input
                 value={form.code}
                 onChange={(e) => setForm((prev) => ({ ...prev, code: e.target.value }))}
@@ -202,7 +224,7 @@ const CurrenciesView = () => {
             <tr>
               <th>ID</th>
               <th>名称</th>
-              <th>Code</th>
+              <th>字母代码</th>
               <th>操作</th>
             </tr>
           </thead>
@@ -259,15 +281,22 @@ const CurrenciesView = () => {
             <Button disabled={page <= 1 || loading} onClick={() => setPage((p) => p - 1)}>
               上一页
             </Button>
-            {pageNumbers.map((p) => (
-              <Button
-                key={p}
-                type={p === page ? 'primary' : 'default'}
-                disabled={loading}
-                onClick={() => setPage(p)}
-              >
-                {p}
-              </Button>
+            {pageItems.map((item, index) => (
+              item === 'ellipsis' ? (
+                <span key={`ellipsis-${index}`} className={styles.pageEllipsis} aria-hidden>
+                  …
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  key={item}
+                  className={`${styles.pageBtn}${item === page ? ` ${styles.pageBtnActive}` : ''}`}
+                  disabled={loading}
+                  onClick={() => setPage(item)}
+                >
+                  {item}
+                </button>
+              )
             ))}
             <Button
               disabled={page >= totalPages || loading}
