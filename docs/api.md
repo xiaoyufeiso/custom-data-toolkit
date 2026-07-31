@@ -265,7 +265,35 @@
 - 无汇率记录：200，`items: []`
 - API Key 无效：401，`Auth.InvalidApiKey`
 
-## 8. 健康检查
+## 8. 海关数据字典（管理端）
+
+前缀：`/api/v1/customs-dict/mappings`。Session + CSRF（写操作）。第一版仅增量同步 Redis，不做整表覆盖。
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/customs-dict/mappings` | 列表；query：`dictType`、`rawValue`、`standardValue`、`enabled`、`page`、`pageSize` |
+| GET | `/customs-dict/mappings/{id}` | 详情 |
+| POST | `/customs-dict/mappings` | 新建（默认启用，source=`manual`） |
+| PATCH | `/customs-dict/mappings/{id}` | 仅更新 `standardValue`；若提交不同 `rawValue` → 400 `CustomsDict.RawValueImmutable` |
+| POST | `/customs-dict/mappings/{id}/enable` | 启用并 HSET |
+| POST | `/customs-dict/mappings/{id}/disable` | 停用并 HDEL（不删第三方其它 field） |
+| POST | `/customs-dict/mappings/{id}/resync` | 单条重试同步 |
+| POST | `/customs-dict/mappings/replay-sync?dictType=` | 按类型重放：启用 HSET、停用 HDEL；保留 Redis 中未知 field |
+
+创建/更新 body（camelCase）：
+
+```json
+{
+  "dictType": "country",
+  "rawValue": "中国大陆",
+  "standardValue": "CHN"
+}
+```
+
+常见错误码：`CustomsDict.NotFound`、`CustomsDict.DuplicateRawValue`、`CustomsDict.RawValueImmutable`、`CustomsDict.InvalidType`、`CustomsDict.EmptyValue`。  
+Redis 失败时 MySQL 仍保存，`syncStatus` 为 `failed`/`pending`，`syncError` 脱敏。
+
+## 9. 健康检查
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
