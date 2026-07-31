@@ -54,16 +54,24 @@ def _login(client: TestClient) -> dict[str, str]:
     return {"X-CSRF-Token": token}
 
 
-def _unused_digit_code(session: Session) -> str:
-    for n in range(1000):
-        candidate = f"{(int(datetime.now(UTC).timestamp() * 1000) + n) % 1000:03d}"
-        row = session.execute(
-            text("SELECT id FROM currency WHERE code = :code LIMIT 1"),
-            {"code": candidate},
-        ).first()
-        if row is None:
+def _unused_letter_code(session: Session) -> str:
+    taken = {
+        row[0]
+        for row in session.execute(text("SELECT code FROM currency")).all()
+        if row[0]
+    }
+    alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    start = int(datetime.now(UTC).timestamp() * 1000)
+    for offset in range(len(alphabet) ** 3):
+        value = (start + offset) % (len(alphabet) ** 3)
+        candidate = (
+            alphabet[value // (len(alphabet) ** 2)]
+            + alphabet[(value // len(alphabet)) % len(alphabet)]
+            + alphabet[value % len(alphabet)]
+        )
+        if candidate not in taken:
             return candidate
-    raise RuntimeError("no free 3-digit currency code available for test")
+    raise RuntimeError("no free 3-letter currency code available for test")
 
 
 def test_admin_api_key_and_public_rates_flow(client: TestClient) -> None:
@@ -74,7 +82,7 @@ def test_admin_api_key_and_public_rates_flow(client: TestClient) -> None:
     headers = _login(client)
     suffix = datetime.now(UTC).strftime("%H%M%S%f")
     with Session(engine) as session:
-        code = _unused_digit_code(session)
+        code = _unused_letter_code(session)
 
     created_currency = client.post(
         "/api/v1/currencies",
@@ -123,7 +131,7 @@ def test_admin_api_key_and_public_rates_flow(client: TestClient) -> None:
 
     code_not_found = client.get(
         "/api/v1/public/rates",
-        params={"code": "999", "date": date.today().isoformat()},
+        params={"code": "QQQ", "date": date.today().isoformat()},
         headers={"X-API-Key": plaintext_key},
     )
     assert code_not_found.status_code == 404
