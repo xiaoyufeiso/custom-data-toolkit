@@ -8,13 +8,13 @@
 - [x] 0.1 需求澄清（标准值自由填写、单表+类型筛选、停用代替删除、原始值不可改）
 - [x] 0.2 共用 Redis 默认假设：第三方写正式 Hash、按类型拆 key、仅增量同步、缺失成功后 ZREM、导入搁置
 - [x] 0.3 更新 product / architecture / ADR-011 / 本 change
-- [ ] 0.4 切片 1 Plan 获用户确认后开始编码
+- [x] 0.4 切片 1 Plan 获用户确认后开始编码
 
 ## 1. 后端 — 模型与迁移
 
-- [ ] 1.1 映射表模型 + Alembic 迁移
-- [ ] 1.2 预置类型常量（country/continent）
-- [ ] 1.3 单元：唯一约束、trim、原始值不可变、无内容码表校验
+- [x] 1.1 映射表模型 + Alembic 迁移
+- [x] 1.2 预置类型常量（country/continent）
+- [x] 1.3 单元：唯一约束元数据、trim、dict_type 枚举（原始值不可变校验留包 2 service）
 
 ## 2. 后端 — 标准字典 API + 增量 Redis
 
