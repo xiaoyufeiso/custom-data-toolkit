@@ -293,6 +293,28 @@
 常见错误码：`CustomsDict.NotFound`、`CustomsDict.DuplicateRawValue`、`CustomsDict.RawValueImmutable`、`CustomsDict.InvalidType`、`CustomsDict.EmptyValue`。  
 Redis 失败时 MySQL 仍保存，`syncStatus` 为 `failed`/`pending`，`syncError` 脱敏。
 
+### 8.1 缺失字典
+
+前缀：`/api/v1/customs-dict/missing`。缺失数据来自第三方 ZSET；本系统只读列表/处理/导出。
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/customs-dict/missing` | 列表；**`dictType` 必填**；可选 `rawValue`、`page`、`pageSize`；按出现次数降序 |
+| POST | `/customs-dict/missing/handle` | 处理：写 MySQL（source=`missing`）→ 正式 Hash 成功后 ZREM |
+| GET | `/customs-dict/missing/export` | 导出当前筛选全量 xlsx（不改 Redis） |
+
+处理 body：
+
+```json
+{
+  "dictType": "country",
+  "rawValue": "中国大陆",
+  "standardValue": "CHN"
+}
+```
+
+同类型原始值已存在 → 409 `CustomsDict.DuplicateRawValue`。正式同步失败则 missing **不删**；单条 `resync` 成功后会尝试 ZREM。
+
 ## 9. 健康检查
 
 | 方法 | 路径 | 说明 |

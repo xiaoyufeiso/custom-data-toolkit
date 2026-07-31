@@ -1,3 +1,4 @@
+from contextlib import suppress
 from datetime import UTC, datetime
 
 from custom_data_toolkit.middleware.error_handler import (
@@ -15,6 +16,7 @@ from custom_data_toolkit.models.customs_dict import (
 )
 from custom_data_toolkit.repositories.customs_dict_repository import CustomsDictRepository
 from custom_data_toolkit.services.customs_dict_redis import (
+    DICT_TYPE_LABELS,
     CustomsDictRedisStore,
     sanitize_redis_error,
 )
@@ -156,6 +158,115 @@ class CustomsDictService:
         self._sync_mapping(mapping)
         return mapping
 
+    def list_missing(
+        self,
+        *,
+        dict_type: str,
+        raw_value: str | None,
+        page: int,
+        page_size: int,
+    ) -> tuple[list[dict[str, object]], int]:
+        cleaned_type = _parse_dict_type(dict_type.strip())
+        cleaned_raw = normalize_dict_text(raw_value) if raw_value else None
+        if cleaned_raw == "":
+            cleaned_raw = None
+        try:
+            items, total = self.redis_store.list_missing_page(
+                dict_type=cleaned_type,
+                raw_value=cleaned_raw,
+                page=page,
+                page_size=page_size,
+            )
+        except Exception as exc:  # noqa: BLE001
+            raise AppException(
+                f"读取缺失字典失败：{sanitize_redis_error(exc)}",
+                error_code="CustomsDict.MissingReadFailed",
+            ) from exc
+        label = DICT_TYPE_LABELS[cleaned_type]
+        return [
+            {
+                "dict_type": cleaned_type,
+                "dict_type_label": label,
+                "raw_value": member,
+                "occurrence_count": int(score),
+            }
+            for member, score in items
+        ], total
+
+    def handle_missing(
+        self,
+        *,
+        dict_type: str,
+        raw_value: str,
+        standard_value: str,
+        actor_id: int | None,
+    ) -> CustomsDictMapping:
+        cleaned_type = _parse_dict_type(dict_type.strip())
+        cleaned_raw = self._require_text(raw_value, field="原始值")
+        cleaned_standard = self._require_text(standard_value, field="标准值")
+        existing = self.repository.get_by_type_raw(cleaned_type, cleaned_raw)
+        if existing is not None:
+            raise ConflictException(
+                "该字典类型下原始值已存在。",
+                error_code="CustomsDict.DuplicateRawValue",
+            )
+        now = datetime.now(UTC).replace(tzinfo=None)
+        mapping = CustomsDictMapping(
+            dict_type=cleaned_type,
+            raw_value=cleaned_raw,
+            standard_value=cleaned_standard,
+            enabled=True,
+            source=CustomsDictSource.MISSING.value,
+            sync_status=CustomsDictSyncStatus.PENDING.value,
+            created_by=actor_id,
+            updated_by=actor_id,
+            created_at=now,
+            updated_at=now,
+        )
+        self.repository.add(mapping)
+        self.repository.commit()
+        self.repository.refresh(mapping)
+        self._sync_mapping(mapping)
+        return mapping
+
+    def export_missing_xlsx(
+        self,
+        *,
+        dict_type: str,
+        raw_value: str | None,
+    ) -> bytes:
+        from io import BytesIO
+
+        from openpyxl import Workbook
+
+        cleaned_type = _parse_dict_type(dict_type.strip())
+        cleaned_raw = normalize_dict_text(raw_value) if raw_value else None
+        if cleaned_raw == "":
+            cleaned_raw = None
+        try:
+            items = self.redis_store.list_missing_all(
+                dict_type=cleaned_type,
+                raw_value=cleaned_raw,
+            )
+        except Exception as exc:  # noqa: BLE001
+            raise AppException(
+                f"导出缺失字典失败：{sanitize_redis_error(exc)}",
+                error_code="CustomsDict.MissingReadFailed",
+            ) from exc
+
+        workbook = Workbook()
+        sheet = workbook.active
+        sheet.title = "missing"
+        sheet.append(
+            ["字典类型编码", "字典类型名称", "原始值", "出现次数", "标准值", "备注"]
+        )
+        label = DICT_TYPE_LABELS[cleaned_type]
+        for member, score in items:
+            sheet.append([cleaned_type, label, member, int(score), "", ""])
+        buffer = BytesIO()
+        workbook.save(buffer)
+        return buffer.getvalue()
+
     def replay_sync(self, *, dict_type: str) -> dict[str, int]:
         cleaned_type = _parse_dict_type(dict_type.strip())
         mappings = self.repository.list_by_dict_type(cleaned_type)
@@ -194,6 +305,12 @@ class CustomsDictService:
         mapping.last_synced_at = datetime.now(UTC).replace(tzinfo=None)
         self.repository.commit()
         self.repository.refresh(mapping)
+        if mapping.enabled:
+            with suppress(Exception):
+                self.redis_store.remove_missing(
+                    dict_type=mapping.dict_type,
+                    raw_value=mapping.raw_value,
+                )
 
     @staticmethod
     def _require_text(value: str, *, field: str) -> str:

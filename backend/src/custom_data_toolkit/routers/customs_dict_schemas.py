@@ -45,3 +45,23 @@ class CustomsDictReplaySyncResponse(CamelModel):
     synced: int
     failed: int
     total: int
+
+
+class CustomsDictMissingPublic(CamelModel):
+    dict_type: str = Field(alias="dictType")
+    dict_type_label: str = Field(alias="dictTypeLabel")
+    raw_value: str = Field(alias="rawValue")
+    occurrence_count: int = Field(alias="occurrenceCount")
+
+
+class CustomsDictMissingListResponse(CamelModel):
+    items: list[CustomsDictMissingPublic]
+    page: int
+    page_size: int = Field(alias="pageSize")
+    total: int
+
+
+class CustomsDictMissingHandleRequest(CamelModel):
+    dict_type: str = Field(alias="dictType")
+    raw_value: str = Field(alias="rawValue")
+    standard_value: str = Field(alias="standardValue")
