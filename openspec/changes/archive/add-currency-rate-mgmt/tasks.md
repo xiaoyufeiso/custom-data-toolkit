@@ -40,11 +40,11 @@
 - [ ] 5.2 后台布局 + 侧栏（沿用模板布局，暂不重做）
 - [x] 5.3 货币管理页
 - [x] 5.4 汇率管理页
-- [x] 5.5 API Key 管理页（一次性明文展示）
+- [x] 5.5 API Key 管理页（一次性明文展示）— 已实现后于 2026-07-31 从前端搁置移除；后端 API 保留
 
 ## 6. 验证与文档
 
-- [ ] 6.1 对照 `docs/development.md` §5 勾选核心项
+- [x] 6.1 对照 `docs/development.md` §5 勾选核心项（2026-07-31；前端 API Key UI 豁免）
 - [x] 6.2 更新 `progress.md`（文档收敛 2026-07-30）
-- [ ] 6.3 变更归档：Delta 合并进 `openspec/specs/` 领域 spec
+- [x] 6.3 变更归档：Delta 合并进 `openspec/specs/{auth,currency,rate}/`（2026-07-31）
 - [x] 6.4 文档按 skill 收敛（product/development/operations/data-contract）

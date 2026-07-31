@@ -30,7 +30,7 @@ Out of Scope:
 - `docs/api.md` — 既有分页 `GET /currencies`（本变更不改契约）
 - `docs/data-contract.md` — `currency.code` 可空
 - `openspec/specs/ui.md` — 汇率列表交互摘要（归档前不改稳定正文；行为以本 change delta 为准）
-- 既有活跃 change：`openspec/changes/add-currency-rate-mgmt/`（MVP 基线，待归档）
+- MVP 基线（已归档）：`openspec/changes/archive/add-currency-rate-mgmt/`；领域 spec：`openspec/specs/rate/spec.md`
 
 ## Approach
 

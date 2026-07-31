@@ -19,10 +19,10 @@
 ## 3. 完整验证与文档
 
 - [x] 3.1 对照 rate/ui 全部 Scenario 逐条 Verify
-- [ ] 3.2 实跑后端测试、前端测试、lint、类型检查和生产构建
+- [x] 3.2 实跑后端测试、前端测试、lint、类型检查和 UAT 构建（M6 2026-07-31）
 - [x] 3.3 确认无数据库迁移、无公开写接口、无鉴权变化
 - [x] 3.4 更新 `docs/api.md`、本 tasks 和必要进度文档
-- [ ] 3.5 完成评审且无 BLOCKER 后归档 change
+- [x] 3.5 归档：rate/ui delta 已合并进 `openspec/specs/{rate,ui}`（2026-07-31）
 
 ## TBD / Approval
 

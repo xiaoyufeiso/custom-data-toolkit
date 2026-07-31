@@ -1,6 +1,11 @@
 import { FormEvent, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Button, Card, Input, message } from 'tendata-ui';
+import {
+  Button,
+  Card,
+  Input,
+  message,
+} from 'tendata-ui';
 import { login } from '@/services/auth';
 import styles from './index.module.less';
 
@@ -30,24 +35,31 @@ const LoginView = () => {
     <div className={styles.wrap}>
       <Card title="Custom Data Toolkit" className={styles.card}>
         <form onSubmit={onSubmit} className={styles.form}>
-          <label className={styles.label}>
-            用户名
+          <div className={styles.label}>
+            <span id="login-username-label">用户名</span>
             <Input
+              aria-labelledby="login-username-label"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               autoComplete="username"
             />
-          </label>
-          <label className={styles.label}>
-            密码
-                          <Input
-                            type="password"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            autoComplete="current-password"
-                          />
-          </label>
-          <Button type="primary" htmlType="submit" loading={loading} block>
+          </div>
+          <div className={styles.label}>
+            <span id="login-password-label">密码</span>
+            <Input
+              aria-labelledby="login-password-label"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoComplete="current-password"
+            />
+          </div>
+          <Button
+            type="primary"
+            htmlType="submit"
+            loading={loading}
+            classNames={styles.submitButton}
+          >
             登录
           </Button>
         </form>
