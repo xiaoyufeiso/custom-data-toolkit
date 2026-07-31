@@ -82,4 +82,4 @@ CREATE TABLE `rate` (
 
 - 外部表列语义变更：先与数据方确认 → 更新本文 → 再改 ORM/校验/调用方。
 - 本系统 MUST NOT 为方便实现而擅自缩短/改写 `data` 字符串语义或去掉唯一键。
-- 海关字典及相关映射表：本轮不创建（见 `openspec/specs/customs-dict/spec.md`）。
+- 海关字典映射表为本系统**自有表**（非本文外部表）：结构与语义以 Alembic 迁移 + `openspec/changes/add-customs-dict-mgmt/` 为准；勿与 `currency`/`rate` 混用。

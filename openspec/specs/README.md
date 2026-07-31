@@ -5,7 +5,7 @@
 | 认证 | auth/spec.md | 1.0 | active | TBD | 2026-07-31 |
 | 货币 | currency/spec.md | 1.1 | active | TBD | 2026-07-31 |
 | 汇率 / 对外查询 / API Key（后端） | rate/spec.md | 1.1 | active | TBD | 2026-07-31 |
-| 海关字典（占位） | customs-dict/spec.md | 0.1 | draft | TBD | 2026-07-29 |
+| 海关字典 | customs-dict/spec.md | 0.2 | draft（交付中） | TBD | 2026-07-31 |
 | UI 交互摘要 | ui.md | — | active | TBD | 2026-07-31 |
 
 稳定产品/架构正文已迁出 OpenSpec 全局文件，见 `docs/product.md`、`docs/architecture.md`。
@@ -14,10 +14,11 @@
 
 | 变更 | 路径 | 状态 |
 |------|------|------|
+| 海关数据字典管理（第一版） | `openspec/changes/add-customs-dict-mgmt/` | proposed（含缺失；增量 Redis；导入搁置；待切片开发） |
 | 新建汇率货币选择器首字母索引 | `openspec/changes/improve-rate-create-currency-picker/` | proposed（仅文档，未实现） |
-| 货币同名软提醒 | `openspec/changes/add-duplicate-currency-name-warnings/` | deferred（已澄清，暂不实现） |
-| 货币列表关联汇率数量 | `openspec/changes/add-currency-rate-counts/` | deferred（已澄清，暂不实现） |
-| 管理端 UI 组件库化与视觉统一 | `openspec/changes/standardize-admin-ui-components/` | proposed（货币/汇率完成；API Key 页搁置；登录页待实施） |
+| 货币同名软提醒 | `openspec/changes/add-duplicate-currency-name-warnings/` | deferred |
+| 货币列表关联汇率数量 | `openspec/changes/add-currency-rate-counts/` | deferred |
+| 管理端 UI 组件库化与视觉统一 | `openspec/changes/standardize-admin-ui-components/` | proposed（货币/汇率完成；登录页待实施） |
 
 ## 已归档变更
 
@@ -31,11 +32,12 @@
 ## Deferred（无活跃实现）
 
 - 前端 API Key 管理 UI（含筛选 / 批量删除 / BizTable 对齐）
+- 字典：导入 / 整表覆盖全量 / 操作日志 / 处理历史
 - `add-duplicate-currency-name-warnings`
 - `add-currency-rate-counts`
 
 ## 说明
 
-- 领域级 `auth` / `currency` / `rate` 正式 spec 在 `openspec/specs/<domain>/`。
+- 领域级正式 spec 在 `openspec/specs/<domain>/`；海关字典交付细节以活跃 change Delta 为准直至归档。
 - 行为冲突时：已归档领域 spec > 活跃 change delta > 其它草稿。
 - `prd.md` / `tech.md` 仅为重定向，勿再写入事实。
