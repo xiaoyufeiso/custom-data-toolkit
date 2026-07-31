@@ -1,7 +1,5 @@
 const common = {
   'common.appName': 'Customs Data Tool',
-  'common.home': 'Home',
-  'common.about': 'About',
   'common.rateData': 'Data Management',
   'common.currencies': 'Currencies',
   'common.rates': 'Rates',

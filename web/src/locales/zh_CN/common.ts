@@ -1,7 +1,5 @@
 const common = {
   'common.appName': '海关数据处理工具',
-  'common.home': '首页',
-  'common.about': '关于',
   'common.rateData': '数据管理',
   'common.currencies': '货币管理',
   'common.rates': '汇率管理',
