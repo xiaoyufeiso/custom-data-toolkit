@@ -2,7 +2,9 @@ import { useCallback } from 'react';
 import { useIntl, type PrimitiveType } from 'react-intl';
 import about from '@/locales/en/about';
 import common from '@/locales/en/common';
+import currencies from '@/locales/en/currencies';
 import home from '@/locales/en/home';
+import rates from '@/locales/en/rates';
 
 /**
  * 全量 message id 的字面量联合类型。
@@ -16,8 +18,10 @@ import home from '@/locales/en/home';
  */
 export type MessageId =
   | keyof typeof common
+  | keyof typeof currencies
   | keyof typeof home
-  | keyof typeof about;
+  | keyof typeof about
+  | keyof typeof rates;
 
 /**
  * 插值字典。当前业务仅使用 string/number/boolean/Date 这类原始值；

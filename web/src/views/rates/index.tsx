@@ -1,20 +1,48 @@
-import { useCallback, useEffect, useState } from 'react';
+import type {
+  ComponentProps,
+  Key,
+  ReactElement,
+  ReactNode,
+} from 'react';
 import {
+  Children,
+  useCallback,
+  useEffect,
+  useState,
+} from 'react';
+import BizTable from '@tendata-biz-components/biz-table';
+import { PlusOutlined, ReloadOutlined } from '@tendata-ui/icon';
+import dayjs, { type Dayjs } from 'dayjs';
+import {
+  AutoComplete,
   Button,
   Card,
+  Checkbox,
+  DatePicker,
+  Form,
   Input,
+  Modal,
+  Select,
   Space,
+  Tag,
   message,
 } from 'tendata-ui';
-import { listCurrencies, type Currency } from '@/services/currency';
 import {
+  listCurrencies,
+  listCurrencySuggestions,
+  type Currency,
+  type CurrencySuggestion,
+} from '@/services/currency';
+import {
+  batchCheckRates,
+  batchDeleteRates,
   createRate,
-  deleteRate,
   listRates,
   updateRate,
   type Rate,
 } from '@/services/rate';
-import { getApiErrorMessage } from '@/shared/utils/apiError';
+import { useTranslate } from '@/shared/hooks';
+import { getApiErrorCode, getApiErrorMessage } from '@/shared/utils/apiError';
 import CurrencyPicker from './CurrencyPicker';
 import { fetchAllCurrencies } from './currencyPickerUtils';
 import styles from './index.module.less';
@@ -22,15 +50,27 @@ import styles from './index.module.less';
 const DEFAULT_PAGE_SIZE = 20;
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
 
-type DateMode = 'none' | 'single' | 'range';
+type ColumnsType = NonNullable<ComponentProps<typeof BizTable>['columns']>;
+type CheckboxProps = {
+  children?: ReactNode;
+  checked?: boolean;
+  onChange?: (event: { target: { checked: boolean } }) => void;
+};
+
+// tendata-ui 3.0.0 的声明文件遗漏了 Checkbox 本身的函数签名。
+const TendataCheckbox = Checkbox as unknown as (
+  props: CheckboxProps,
+) => ReactElement;
+
+type DateMode = 'single' | 'range';
 
 type FilterDraft = {
   code: string;
-  dateMode: DateMode;
+  dateMode?: DateMode;
   date: string;
   dateFrom: string;
   dateTo: string;
-  checked: '' | 'true' | 'false';
+  checked?: 'true' | 'false';
   sortOrder: 'asc' | 'desc';
 };
 
@@ -43,66 +83,32 @@ type AppliedFilter = {
   sortOrder?: 'asc' | 'desc';
 };
 
-type CreateForm = {
+type RateForm = {
   currencyId: string;
-  date: string;
-  data: string;
-  checked: boolean;
-};
-
-type EditForm = {
+  date: Dayjs | null;
   data: string;
   checked: boolean;
 };
 
 const emptyFilter: FilterDraft = {
   code: '',
-  dateMode: 'none',
+  dateMode: undefined,
   date: '',
   dateFrom: '',
   dateTo: '',
-  checked: '',
+  checked: undefined,
   sortOrder: 'desc',
 };
 
-type PageItem = number | 'ellipsis';
-
-/** 经典 1..N 页码；页数较多时保留首尾并用省略号。 */
-const getPageItems = (current: number, totalPages: number): PageItem[] => {
-  if (totalPages <= 7) {
-    return Array.from({ length: totalPages }, (_, i) => i + 1);
-  }
-
-  const set = new Set<number>([1, totalPages]);
-  for (let i = current - 1; i <= current + 1; i += 1) {
-    if (i >= 1 && i <= totalPages) set.add(i);
-  }
-  if (current <= 3) {
-    for (let i = 1; i <= 5; i += 1) set.add(i);
-  }
-  if (current >= totalPages - 2) {
-    for (let i = totalPages - 4; i <= totalPages; i += 1) set.add(i);
-  }
-
-  const sorted = [...set].sort((a, b) => a - b);
-  const items: PageItem[] = [];
-  let prev = 0;
-  for (const p of sorted) {
-    if (prev > 0 && p - prev > 1) items.push('ellipsis');
-    items.push(p);
-    prev = p;
-  }
-  return items;
-};
-
-const emptyCreate: CreateForm = {
+const emptyForm: RateForm = {
   currencyId: '',
-  date: '',
+  date: null,
   data: '',
   checked: false,
 };
 
 const RatesView = () => {
+  const t = useTranslate();
   const [items, setItems] = useState<Rate[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -110,13 +116,16 @@ const RatesView = () => {
   const [filterDraft, setFilterDraft] = useState<FilterDraft>(emptyFilter);
   const [applied, setApplied] = useState<AppliedFilter>({});
   const [currencies, setCurrencies] = useState<Currency[]>([]);
+  const [codeSuggestions, setCodeSuggestions] = useState<CurrencySuggestion[]>([]);
   const [currenciesLoading, setCurrenciesLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [checking, setChecking] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Rate | null>(null);
-  const [createForm, setCreateForm] = useState<CreateForm>(emptyCreate);
-  const [editForm, setEditForm] = useState<EditForm>({ data: '', checked: false });
+  const [selectedRowKeys, setSelectedRowKeys] = useState<Key[]>([]);
+  const [form] = Form.useForm<RateForm>();
 
   useEffect(() => {
     let cancelled = false;
@@ -136,7 +145,7 @@ const RatesView = () => {
       } catch (error) {
         if (!cancelled) {
           setCurrencies([]);
-          message.error(getApiErrorMessage(error, '加载货币选项失败'));
+          message.error(getApiErrorMessage(error, t('rates.message.loadCurrenciesFailed')));
         }
       } finally {
         if (!cancelled) {
@@ -144,13 +153,35 @@ const RatesView = () => {
         }
       }
     };
-    void loadCurrencies();
+    loadCurrencies();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [t]);
+
+  useEffect(() => {
+    const prefix = filterDraft.code.trim();
+    if (!prefix) {
+      setCodeSuggestions([]);
+      return undefined;
+    }
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      try {
+        const data = await listCurrencySuggestions(prefix, 'code', controller.signal);
+        setCodeSuggestions(data);
+      } catch {
+        if (!controller.signal.aborted) setCodeSuggestions([]);
+      }
+    }, 300);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [filterDraft.code]);
 
   const load = useCallback(async () => {
+    setSelectedRowKeys([]);
     setLoading(true);
     try {
       const data = await listRates({
@@ -161,20 +192,20 @@ const RatesView = () => {
       setItems(data.items ?? []);
       setTotal(data.total ?? 0);
     } catch (error) {
-      message.error(getApiErrorMessage(error, '加载汇率列表失败'));
+      message.error(getApiErrorMessage(error, t('rates.message.loadFailed')));
     } finally {
       setLoading(false);
     }
-  }, [applied, page, pageSize]);
+  }, [applied, page, pageSize, t]);
 
   useEffect(() => {
-    void load();
+    load();
   }, [load]);
 
   const onSearch = () => {
     const code = filterDraft.code.trim();
     if (code && !/^[A-Za-z_]{1,10}$/.test(code)) {
-      message.warning('筛选字母代码须为 1~10 位字母或下划线，如 CNY');
+      message.warning(t('rates.message.codeInvalid'));
       return;
     }
 
@@ -183,18 +214,18 @@ const RatesView = () => {
 
     if (filterDraft.dateMode === 'single') {
       if (!filterDraft.date) {
-        message.warning('请选择日期');
+        message.warning(t('rates.message.dateRequired'));
         return;
       }
       next.date = filterDraft.date;
     } else if (filterDraft.dateMode === 'range') {
       const { dateFrom, dateTo } = filterDraft;
       if (!dateFrom || !dateTo) {
-        message.warning('请填写起始日期与结束日期');
+        message.warning(t('rates.message.rangeRequired'));
         return;
       }
       if (dateFrom > dateTo) {
-        message.warning('起始日期不能晚于结束日期');
+        message.warning(t('rates.message.rangeInvalid'));
         return;
       }
       next.dateFrom = dateFrom;
@@ -205,111 +236,251 @@ const RatesView = () => {
     if (filterDraft.checked === 'false') next.checked = false;
     next.sortOrder = filterDraft.sortOrder;
 
+    setSelectedRowKeys([]);
     setPage(1);
     setApplied(next);
   };
 
+  const onResetFilters = () => {
+    setFilterDraft({ ...emptyFilter });
+    setCodeSuggestions([]);
+    setSelectedRowKeys([]);
+    setPage(1);
+    setApplied({ sortOrder: 'desc' });
+  };
+
   const openCreate = () => {
     setEditing(null);
-    setCreateForm(emptyCreate);
+    form.setFieldsValue(emptyForm);
     setFormOpen(true);
   };
 
   const openEdit = (row: Rate) => {
     setEditing(row);
-    setEditForm({ data: row.data, checked: row.checked });
+    form.setFieldsValue({
+      currencyId: String(row.currencyId),
+      date: dayjs(row.date),
+      data: row.data,
+      checked: row.checked,
+    });
     setFormOpen(true);
   };
 
-  const onSubmit = async () => {
+  const closeForm = () => {
+    setFormOpen(false);
+    setEditing(null);
+    form.resetFields();
+  };
+
+  const onSubmit = async (values: RateForm) => {
     setSubmitting(true);
     try {
       if (editing) {
-        const data = editForm.data.trim();
-        if (!data) {
-          message.warning('请填写汇率值');
-          setSubmitting(false);
-          return;
-        }
-        await updateRate(editing.id, { data, checked: editForm.checked });
-        message.success('已更新');
-      } else {
-        const currencyId = Number(createForm.currencyId);
-        if (!currencyId) {
-          message.warning('请选择货币');
-          setSubmitting(false);
-          return;
-        }
-        if (!createForm.date) {
-          message.warning('请选择日期');
-          setSubmitting(false);
-          return;
-        }
-        const data = createForm.data.trim();
-        if (!data) {
-          message.warning('请填写汇率值');
-          setSubmitting(false);
-          return;
-        }
-        await createRate({
-          currencyId,
-          date: createForm.date,
-          data,
-          checked: createForm.checked,
+        await updateRate(editing.id, {
+          data: values.data.trim(),
+          checked: values.checked,
         });
-        message.success('已创建');
+        message.success(t('rates.message.updated'));
+      } else {
+        await createRate({
+          currencyId: Number(values.currencyId),
+          date: values.date!.format('YYYY-MM-DD'),
+          data: values.data.trim(),
+          checked: values.checked,
+        });
+        message.success(t('rates.message.created'));
       }
-      setFormOpen(false);
+      closeForm();
       await load();
     } catch (error) {
-      message.error(getApiErrorMessage(error, '保存失败'));
+      message.error(getApiErrorMessage(error, t('rates.message.savedFailed')));
     } finally {
       setSubmitting(false);
     }
   };
 
-  const onDelete = async (row: Rate) => {
-    const label = `${row.currencyCode || row.currencyName} / ${row.date}`;
-    const ok = window.confirm(`确认删除汇率「${label}」？`);
-    if (!ok) return;
+  const onBatchDelete = async () => {
+    const ids = selectedRowKeys.map(Number);
+    if (ids.length === 0) return;
+    setDeleting(true);
     try {
-      await deleteRate(row.id);
-      message.success('已删除');
-      await load();
+      await batchDeleteRates(ids);
+      message.success(t('rates.batchDelete.success', { count: ids.length }));
+      setSelectedRowKeys([]);
+      if (ids.length === items.length && page > 1) {
+        setPage((current) => current - 1);
+      } else {
+        await load();
+      }
     } catch (error) {
-      message.error(getApiErrorMessage(error, '删除失败'));
+      message.error(getApiErrorMessage(error, t('rates.batchDelete.failed')));
+      if (getApiErrorCode(error) === 'BatchDelete.StaleSelection') {
+        await load();
+      }
+    } finally {
+      setDeleting(false);
     }
   };
 
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
-  const pageItems = getPageItems(page, totalPages);
-  const dateSortOrder = applied.sortOrder ?? filterDraft.sortOrder;
+  const openBatchDeleteConfirm = () => {
+    Modal.confirm({
+      // tendata-ui 的静态 Modal 类型误将 children 声明为必填；实际内容由 content 提供。
+      children: Children,
+      centered: true,
+      title: t('rates.batchDelete.confirmTitle', {
+        count: selectedRowKeys.length,
+      }),
+      content: t('rates.batchDelete.confirmContent'),
+      onOk: onBatchDelete,
+    });
+  };
 
-  const toggleDateSort = () => {
-    const next = dateSortOrder === 'desc' ? 'asc' : 'desc';
+  const onBatchCheck = async () => {
+    const ids = selectedRowKeys.map(Number);
+    if (ids.length === 0) return;
+    setChecking(true);
+    try {
+      await batchCheckRates(ids);
+      message.success(t('rates.batchCheck.success', { count: ids.length }));
+      await load();
+    } catch (error) {
+      message.error(getApiErrorMessage(error, t('rates.batchCheck.failed')));
+      if (getApiErrorCode(error) === 'BatchCheck.StaleSelection') {
+        await load();
+      }
+    } finally {
+      setChecking(false);
+    }
+  };
+
+  const openBatchCheckConfirm = () => {
+    Modal.confirm({
+      // tendata-ui 的静态 Modal 类型误将 children 声明为必填；实际内容由 content 提供。
+      children: Children,
+      centered: true,
+      title: t('rates.batchCheck.confirmTitle', {
+        count: selectedRowKeys.length,
+      }),
+      content: t('rates.batchCheck.confirmContent'),
+      onOk: onBatchCheck,
+    });
+  };
+
+  const applyDateSort = (next: 'asc' | 'desc') => {
+    setSelectedRowKeys([]);
     setFilterDraft((prev) => ({ ...prev, sortOrder: next }));
     setPage(1);
     setApplied((prev) => ({ ...prev, sortOrder: next }));
   };
 
+  const columns: ColumnsType = [
+    {
+      title: t('rates.column.id'),
+      dataIndex: 'id',
+      key: 'id',
+      width: 60,
+    },
+    {
+      title: t('rates.column.currency'),
+      dataIndex: 'currencyName',
+      key: 'currencyName',
+      width: 120,
+    },
+    {
+      title: t('rates.column.code'),
+      dataIndex: 'currencyCode',
+      key: 'currencyCode',
+      width: 100,
+      render: (code: string | null) => code || '—',
+    },
+    {
+      title: t('rates.column.date'),
+      dataIndex: 'date',
+      key: 'date',
+      width: 110,
+      sorter: true,
+      sortOrder: (applied.sortOrder ?? 'desc') === 'asc' ? 'ascend' : 'descend',
+    },
+    {
+      title: t('rates.column.value'),
+      dataIndex: 'data',
+      key: 'data',
+      width: 120,
+    },
+    {
+      title: t('rates.column.checked'),
+      dataIndex: 'checked',
+      key: 'checked',
+      width: 80,
+      render: (checked: boolean) => (
+        <Tag color={checked ? 'success' : 'default'}>
+          {checked ? t('rates.value.yes') : t('rates.value.no')}
+        </Tag>
+      ),
+    },
+    {
+      title: t('rates.column.actions'),
+      key: 'actions',
+      width: 80,
+      render: (_value: unknown, row: Rate) => (
+        <Button type="link" onClick={() => openEdit(row)}>
+          {t('rates.action.edit')}
+        </Button>
+      ),
+    },
+  ];
+
   return (
     <div className={styles.page}>
+      <div className={styles.pageAction}>
+        <Button
+          type="primary"
+          icon={<PlusOutlined width={16} height={16} />}
+          iconPosition="start"
+          onClick={openCreate}
+        >
+          {t('rates.action.create')}
+        </Button>
+      </div>
       <div className={styles.toolbar}>
+        <strong className={styles.toolbarTitle}>{t('rates.filters.title')}</strong>
         <Space wrap>
-          <Input
+          <AutoComplete
             allowClear
-            placeholder="字母代码（如 CNY）"
+            placeholder={t('rates.search.codePlaceholder')}
             value={filterDraft.code}
-            onChange={(e) => setFilterDraft((prev) => ({ ...prev, code: e.target.value }))}
-            onPressEnter={onSearch}
+            options={codeSuggestions.map((suggestion) => ({
+              key: suggestion.id,
+              value: suggestion.code ?? '',
+              label: suggestion.code
+                ? `${suggestion.code} (${suggestion.name})`
+                : suggestion.name,
+            }))}
+            filterOption={false}
+            listHeight={240}
+            onChange={(value) => setFilterDraft((prev) => ({
+              ...prev,
+              code: String(value),
+            }))}
+            onSelect={(value) => {
+              setFilterDraft((prev) => ({ ...prev, code: String(value) }));
+              setCodeSuggestions([]);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') onSearch();
+            }}
             style={{ width: 160 }}
             maxLength={10}
           />
-          <select
-            className={styles.select}
+          <Select
+            allowClear
+            placeholder={t('rates.dateMode.all')}
             value={filterDraft.dateMode}
-            onChange={(e) => {
-              const dateMode = e.target.value as DateMode;
+            options={[
+              { value: 'single', label: t('rates.dateMode.single') },
+              { value: 'range', label: t('rates.dateMode.range') },
+            ]}
+            onChange={(dateMode?: DateMode) => {
               setFilterDraft((prev) => ({
                 ...prev,
                 dateMode,
@@ -318,282 +489,214 @@ const RatesView = () => {
                 dateTo: dateMode === 'range' ? prev.dateTo : '',
               }));
             }}
-            style={{ minWidth: 120 }}
-          >
-            <option value="none">不限日期</option>
-            <option value="single">指定日期</option>
-            <option value="range">日期范围</option>
-          </select>
+            style={{ width: 120 }}
+          />
           {filterDraft.dateMode === 'single' ? (
-            <input
-              className={styles.dateInput}
-              type="date"
-              value={filterDraft.date}
-              onChange={(e) => setFilterDraft((prev) => ({ ...prev, date: e.target.value }))}
-              title="指定日期"
+            <DatePicker
+              value={filterDraft.date ? dayjs(filterDraft.date) : null}
+              onChange={(_date, dateString) => setFilterDraft((prev) => ({
+                ...prev,
+                date: dateString as string,
+              }))}
             />
           ) : null}
           {filterDraft.dateMode === 'range' ? (
-            <>
-              <input
-                className={styles.dateInput}
-                type="date"
-                value={filterDraft.dateFrom}
-                onChange={(e) => setFilterDraft((prev) => ({ ...prev, dateFrom: e.target.value }))}
-                title="起始日期"
-              />
-              <span className={styles.dateSep}>至</span>
-              <input
-                className={styles.dateInput}
-                type="date"
-                value={filterDraft.dateTo}
-                onChange={(e) => setFilterDraft((prev) => ({ ...prev, dateTo: e.target.value }))}
-                title="结束日期"
-              />
-            </>
+            <DatePicker.RangePicker
+              value={[
+                filterDraft.dateFrom ? dayjs(filterDraft.dateFrom) : null,
+                filterDraft.dateTo ? dayjs(filterDraft.dateTo) : null,
+              ]}
+              onChange={(_dates, dateStrings) => setFilterDraft((prev) => ({
+                ...prev,
+                dateFrom: dateStrings[0],
+                dateTo: dateStrings[1],
+              }))}
+            />
           ) : null}
-          <select
-            className={styles.select}
+          <Select
+            allowClear
+            placeholder={t('rates.checked.all')}
             value={filterDraft.checked}
-            onChange={(e) => setFilterDraft((prev) => ({
+            options={[
+              { value: 'true', label: t('rates.checked.true') },
+              { value: 'false', label: t('rates.checked.false') },
+            ]}
+            onChange={(checked?: FilterDraft['checked']) => setFilterDraft((prev) => ({
               ...prev,
-              checked: e.target.value as FilterDraft['checked'],
+              checked,
             }))}
-            style={{ minWidth: 120 }}
+            style={{ width: 120 }}
+          />
+          <Button
+            type="link"
+            icon={<ReloadOutlined width={16} height={16} />}
+            iconPosition="start"
+            onClick={onResetFilters}
           >
-            <option value="">全部</option>
-            <option value="true">已核对</option>
-            <option value="false">未核对</option>
-          </select>
-          <Button onClick={onSearch}>筛选</Button>
+            {t('rates.action.reset')}
+          </Button>
+          <Button type="primary" onClick={onSearch}>
+            {t('rates.action.filter')}
+          </Button>
         </Space>
+        <div className={styles.batchToolbar}>
+          <strong>{t('rates.batchActions.title')}</strong>
+          <div className={styles.batchToolbarActions}>
+            <Space>
+              <TendataCheckbox
+                checked={
+                  items.length > 0
+                  && items.every((item) => selectedRowKeys.includes(item.id))
+                }
+                onChange={({ target }) => {
+                  setSelectedRowKeys(target.checked ? items.map((item) => item.id) : []);
+                }}
+              >
+                {t('rates.batchActions.selectPage')}
+              </TendataCheckbox>
+              <span>
+                {t('rates.batchActions.selected', { count: selectedRowKeys.length })}
+              </span>
+              <fieldset
+                disabled={selectedRowKeys.length === 0 || checking}
+                className={styles.batchDeleteFieldset}
+              >
+                <Button
+                  type="secondary"
+                  loading={checking}
+                  disabled={selectedRowKeys.length === 0}
+                  onClick={openBatchCheckConfirm}
+                >
+                  {t('rates.batchCheck.button')}
+                </Button>
+              </fieldset>
+              <fieldset
+                disabled={selectedRowKeys.length === 0 || deleting}
+                className={styles.batchDeleteFieldset}
+              >
+                <Button
+                  danger
+                  loading={deleting}
+                  disabled={selectedRowKeys.length === 0}
+                  onClick={openBatchDeleteConfirm}
+                >
+                  {t('rates.batchDelete.button')}
+                </Button>
+              </fieldset>
+            </Space>
+          </div>
+        </div>
       </div>
 
-      {formOpen ? (
-        <Card
-          title={editing ? '编辑汇率' : '新建汇率'}
-          className={styles.formCard}
-          extra={(
-            <Button type="link" onClick={() => setFormOpen(false)}>
-              关闭
-            </Button>
-          )}
+      <Modal
+        title={editing ? t('rates.modal.editTitle') : t('rates.modal.createTitle')}
+        open={formOpen}
+        okText={t('rates.action.save')}
+        cancelText={t('rates.action.cancel')}
+        confirmLoading={submitting}
+        destroyOnClose
+        maskClosable={false}
+        onOk={() => form.submit()}
+        onCancel={closeForm}
+      >
+        <Form<RateForm>
+          form={form}
+          layout="vertical"
+          initialValues={emptyForm}
+          onFinish={onSubmit}
         >
           {editing ? (
-            <div className={styles.form}>
-              <div className={styles.label}>
-                货币
+            <>
+              <Form.Item label={t('rates.form.currency')}>
                 <span>
                   {editing.currencyName}
-                  {editing.currencyCode ? `（${editing.currencyCode}）` : ''}
+                  {editing.currencyCode ? ` (${editing.currencyCode})` : ''}
                 </span>
-              </div>
-              <div className={styles.label}>
-                日期
+              </Form.Item>
+              <Form.Item label={t('rates.form.date')}>
                 <span>{editing.date}</span>
-              </div>
-              <label className={styles.label}>
-                汇率值
-                <Input
-                  value={editForm.data}
-                  onChange={(e) => setEditForm((prev) => ({ ...prev, data: e.target.value }))}
-                  maxLength={50}
-                />
-              </label>
-              <label className={styles.label}>
-                <span>
-                  <input
-                    type="checkbox"
-                    checked={editForm.checked}
-                    onChange={(e) => setEditForm((prev) => ({
-                      ...prev,
-                      checked: e.target.checked,
-                    }))}
-                  />
-                  {' '}
-                  已核对
-                </span>
-              </label>
-            </div>
+              </Form.Item>
+            </>
           ) : (
-            <div className={styles.form}>
-              <div className={styles.label}>
-                货币
+            <>
+              <Form.Item
+                label={t('rates.form.currency')}
+                name="currencyId"
+                rules={[{
+                  required: true,
+                  message: t('rates.message.currencyRequired'),
+                }]}
+              >
                 <CurrencyPicker
                   currencies={currencies}
-                  value={createForm.currencyId}
                   loading={currenciesLoading}
-                  onChange={(currencyId) => setCreateForm((prev) => ({
-                    ...prev,
-                    currencyId,
-                  }))}
                 />
-              </div>
-              <label className={styles.label}>
-                日期
-                <input
-                  className={styles.dateInput}
-                  type="date"
-                  value={createForm.date}
-                  onChange={(e) => setCreateForm((prev) => ({ ...prev, date: e.target.value }))}
-                />
-              </label>
-              <label className={styles.label}>
-                汇率值
-                <Input
-                  value={createForm.data}
-                  onChange={(e) => setCreateForm((prev) => ({ ...prev, data: e.target.value }))}
-                  maxLength={50}
-                  placeholder="如 7.1200"
-                />
-              </label>
-              <label className={styles.label}>
-                <span>
-                  <input
-                    type="checkbox"
-                    checked={createForm.checked}
-                    onChange={(e) => setCreateForm((prev) => ({
-                      ...prev,
-                      checked: e.target.checked,
-                    }))}
-                  />
-                  {' '}
-                  已核对
-                </span>
-              </label>
-            </div>
+              </Form.Item>
+              <Form.Item
+                label={t('rates.form.date')}
+                name="date"
+                rules={[{
+                  required: true,
+                  message: t('rates.message.dateRequired'),
+                }]}
+              >
+                <DatePicker />
+              </Form.Item>
+            </>
           )}
-          <Space style={{ marginTop: 16 }}>
-            <Button type="primary" loading={submitting} onClick={() => void onSubmit()}>
-              保存
-            </Button>
-            <Button onClick={() => setFormOpen(false)}>取消</Button>
-          </Space>
-        </Card>
-      ) : null}
+          <Form.Item
+            label={t('rates.form.value')}
+            name="data"
+            rules={[{
+              required: true,
+              whitespace: true,
+              message: t('rates.message.valueRequired'),
+            }]}
+          >
+            <Input
+              maxLength={50}
+              placeholder={editing ? undefined : t('rates.form.valuePlaceholder')}
+            />
+          </Form.Item>
+          <Form.Item name="checked" valuePropName="checked">
+            <TendataCheckbox>{t('rates.form.checked')}</TendataCheckbox>
+          </Form.Item>
+        </Form>
+      </Modal>
 
-      <Card
-        title={(
-          <div className={styles.cardTitleRow}>
-            <span>
-              汇率列表{loading ? '（加载中…）' : ''}
-            </span>
-            <Button type="primary" onClick={openCreate}>
-              新建汇率
-            </Button>
-          </div>
-        )}
-      >
-        <table className={styles.table}>
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>货币</th>
-              <th>字母代码</th>
-              <th>
-                <button
-                  type="button"
-                  className={styles.sortHeader}
-                  onClick={toggleDateSort}
-                  title={dateSortOrder === 'desc' ? '当前按日期降序，点击升序' : '当前按日期升序，点击降序'}
-                >
-                  <span>日期</span>
-                  <span className={styles.sortCarets} aria-hidden>
-                    <span
-                      className={`${styles.sortCaretUp} ${dateSortOrder === 'asc' ? styles.sortCaretActive : ''}`}
-                    />
-                    <span
-                      className={`${styles.sortCaretDown} ${dateSortOrder === 'desc' ? styles.sortCaretActive : ''}`}
-                    />
-                  </span>
-                </button>
-              </th>
-              <th>汇率值</th>
-              <th>已核对</th>
-              <th>操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.length === 0 ? (
-              <tr>
-                <td colSpan={7} className={styles.empty}>
-                  {loading ? '加载中…' : '暂无数据'}
-                </td>
-              </tr>
-            ) : (
-              items.map((row) => (
-                <tr key={row.id}>
-                  <td>{row.id}</td>
-                  <td>{row.currencyName}</td>
-                  <td>{row.currencyCode || '—'}</td>
-                  <td>{row.date}</td>
-                  <td>{row.data}</td>
-                  <td>{row.checked ? '是' : '否'}</td>
-                  <td>
-                    <Space>
-                      <Button type="link" onClick={() => openEdit(row)}>
-                        编辑
-                      </Button>
-                      <Button type="link" danger onClick={() => void onDelete(row)}>
-                        删除
-                      </Button>
-                    </Space>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-
-        <div className={styles.pager}>
-          <span>
-            共 {total} 条 · 第 {page}/{totalPages} 页
-          </span>
-          <Space>
-            <select
-              className={styles.select}
-              value={String(pageSize)}
-              onChange={(e) => {
-                const next = Number(e.target.value);
-                setPageSize(next);
-                setPage(1);
-              }}
-              style={{ minWidth: 100 }}
-            >
-              {PAGE_SIZE_OPTIONS.map((size) => (
-                <option key={size} value={size}>
-                  {size}/页
-                </option>
-              ))}
-            </select>
-            <Button disabled={page <= 1 || loading} onClick={() => setPage((p) => p - 1)}>
-              上一页
-            </Button>
-            {pageItems.map((item, index) => (
-              item === 'ellipsis' ? (
-                <span key={`ellipsis-${index}`} className={styles.pageEllipsis} aria-hidden>
-                  …
-                </span>
-              ) : (
-                <button
-                  type="button"
-                  key={item}
-                  className={`${styles.pageBtn}${item === page ? ` ${styles.pageBtnActive}` : ''}`}
-                  disabled={loading}
-                  onClick={() => setPage(item)}
-                >
-                  {item}
-                </button>
-              )
-            ))}
-            <Button
-              disabled={page >= totalPages || loading}
-              onClick={() => setPage((p) => p + 1)}
-            >
-              下一页
-            </Button>
-          </Space>
-        </div>
+      <Card>
+        <BizTable
+          rowKey="id"
+          size="small"
+          columns={columns}
+          dataSource={items}
+          rowSelection={{
+            columnWidth: 32,
+            selectedRowKeys,
+            onChange: setSelectedRowKeys,
+          }}
+          tdLoading={loading}
+          noData={{ text: t('rates.empty') }}
+          page={{
+            current: page,
+            pageSize,
+            total,
+            showSizeChanger: true,
+            pageSizeOptions: PAGE_SIZE_OPTIONS,
+            showTotal: (count) => t('rates.total', { total: count }),
+          }}
+          onSortChange={(orderKey, orderType) => {
+            if (orderKey === 'date') {
+              applyDateSort(orderType === 'ascend' ? 'asc' : 'desc');
+            }
+          }}
+          onChange={(pagination) => {
+            setSelectedRowKeys([]);
+            const nextPageSize = pagination.pageSize ?? pageSize;
+            setPageSize(nextPageSize);
+            setPage(nextPageSize === pageSize ? pagination.current ?? 1 : 1);
+          }}
+        />
       </Card>
     </div>
   );

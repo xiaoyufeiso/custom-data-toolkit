@@ -61,3 +61,11 @@ export async function updateRate(id: number, payload: RateUpdatePayload): Promis
 export async function deleteRate(id: number): Promise<void> {
   await http.delete(`/rates/${id}`);
 }
+
+export async function batchDeleteRates(ids: number[]): Promise<void> {
+  await http.post('/rates/batch-delete', { ids });
+}
+
+export async function batchCheckRates(ids: number[]): Promise<void> {
+  await http.post('/rates/batch-check', { ids });
+}

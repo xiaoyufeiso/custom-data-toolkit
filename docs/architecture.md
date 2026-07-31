@@ -46,7 +46,7 @@ custom-data-toolkit/
 前端负责：
 
 - 登录页与后台布局（侧栏 + 内容区）。
-- 货币、汇率、API Key 页面的列表/表单/确认框。
+- 货币、汇率页面的列表/表单/确认框。
 - 请求加载、空态、错误与重试。
 - 管理端 Session Cookie 请求（credentials）与 CSRF 头。
 
@@ -54,7 +54,8 @@ custom-data-toolkit/
 
 - 最终鉴权判定。
 - 汇率唯一性与外键约束的最终保证。
-- 存储 API Key 明文（创建响应展示后不落盘到前端持久存储）。
+- API Key 管理 UI（2026-07-31 起搁置；后端 `/api-keys` 与对外 `X-API-Key` 鉴权仍保留）。
+- 存储 API Key 明文。
 
 建议域划分：
 
@@ -64,8 +65,7 @@ web/src/
 ├─ views/
 │  ├─ auth/
 │  ├─ currencies/
-│  ├─ rates/
-│  └─ api-keys/
+│  └─ rates/
 ├─ shared/
 ├─ store/
 └─ router/

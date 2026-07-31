@@ -1,0 +1,31 @@
+---
+description: Web 页面整体布局与非组件主题 Token
+globs: "web/src/**/*.{ts,tsx,less,css}"
+alwaysApply: false
+---
+
+# Web 布局与页面色彩
+
+页面整体布局参考后台工作台风格：浅色页面背景、白色内容面板、紧凑筛选区和表格区。
+
+## 页面级 Token
+
+- `--color-page-bg: #f4f7fb`
+- `--color-surface: #fff`
+- `--color-surface-soft: #f7f9fc`
+- `--color-surface-blue: #eef6ff`
+- `--color-border: #d9e2ef`
+- `--color-border-soft: #e6edf6`
+- `--color-text: #172033`
+- `--color-text-muted: #617089`
+- `--color-text-subtle: #8794a8`
+- `--shadow-panel: 0 8px 22px rgba(112, 122, 143, 0.5)`
+- `--padding-page: 12px 24px 24px`
+
+## 使用边界
+
+- 上述 Token 仅用于页面壳、布局容器、业务专属区域和非组件说明文字。
+- 按钮、输入框、选择器、表格、分页、弹窗及其 hover/active/disabled 状态必须使用 tendata-ui 默认主题。
+- 不得用页面 CSS 覆盖 tendata-ui 的主色、成功色、警告色、危险色、边框或交互状态。
+- 不定义项目级 `primary/success/warning/danger` Token；对应颜色由 tendata-ui 管理。
+- 自定义样式优先处理尺寸、间距、排布和领域交互，不复刻通用组件视觉。

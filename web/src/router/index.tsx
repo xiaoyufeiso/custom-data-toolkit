@@ -26,7 +26,6 @@ export type AppRouteObject =
 const Login = lazy(() => import('@/pages/login'));
 const Currencies = lazy(() => import('@/pages/currencies'));
 const Rates = lazy(() => import('@/pages/rates'));
-const ApiKeys = lazy(() => import('@/pages/api-keys'));
 
 const lazyLoad = (Component: React.LazyExoticComponent<React.ComponentType>) => (
   <Suspense fallback={<Loading />}>
@@ -48,17 +47,16 @@ const routes: AppRouteObject[] = [
   {
     path: '/currencies',
     element: <RequireAuth>{lazyLoad(Currencies)}</RequireAuth>,
-    meta: { titleKey: 'common.currencies', menu: true, group: 'rateData', groupTitleKey: 'common.rateData' },
+    meta: {
+      titleKey: 'common.currencies', menu: true, group: 'rateData', groupTitleKey: 'common.rateData',
+    },
   },
   {
     path: '/rates',
     element: <RequireAuth>{lazyLoad(Rates)}</RequireAuth>,
-    meta: { titleKey: 'common.rates', menu: true, group: 'rateData', groupTitleKey: 'common.rateData' },
-  },
-  {
-    path: '/api-keys',
-    element: <RequireAuth>{lazyLoad(ApiKeys)}</RequireAuth>,
-    meta: { titleKey: 'common.apiKeys', menu: true },
+    meta: {
+      titleKey: 'common.rates', menu: true, group: 'rateData', groupTitleKey: 'common.rateData',
+    },
   },
   { path: '*', element: <Navigate to="/currencies" replace /> },
 ];

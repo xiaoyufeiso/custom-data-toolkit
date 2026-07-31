@@ -1,4 +1,4 @@
-# Custom Data Toolkit — 开发手册
+﻿# Custom Data Toolkit — 开发手册
 
 > 权威层：贡献者如何在本地搭建、开发、测试与提交流程。  
 > 不是架构说明（见 `architecture.md`），也不是部署运维（见 `operations.md`）。
@@ -57,12 +57,26 @@ docker run -d --name cdt-mysql \
 | 场景 | 命令 |
 |---|---|
 | 后端依赖 | `cd backend && uv sync --group dev --group test` |
+| 后端开发 | `cd backend && ~/.local/bin/uv run uvicorn custom_data_toolkit.main:app --reload --host 127.0.0.1 --port 8000` |
 | 后端测试 | `cd backend && uv run pytest` |
 | 后端 lint | `cd backend && uv run ruff check .` |
 | 迁移 | `cd backend && uv run alembic upgrade head` |
 | 前端依赖 | `cd web && pnpm install` |
-| 前端开发 | `cd web && pnpm dev` |
+| 前端开发（UAT） | `cd web && pnpm start:uat` |
 | 前端测试 | `cd web && pnpm test`（以 package.json scripts 为准） |
+
+本地联调时分别打开两个终端，从项目根目录启动前后端：
+
+```bash
+# 前端
+cd web
+pnpm start:uat
+
+# 后端
+cd backend
+~/.local/bin/uv run uvicorn custom_data_toolkit.main:app \
+  --reload --host 127.0.0.1 --port 8000
+```
 
 国内网络下后端首次拉包可配置 uv 镜像，例如：
 
@@ -102,11 +116,12 @@ plan →（用户确认）→ implement → verify → test → review → docum
 ### 前端
 
 - 登录校验与错误提示；货币/汇率列表与确认框。
-- API Key 明文仅创建时可见；加载/错误/重试。
+- 前端 API Key 管理 UI 已搁置（见 `docs/progress.md` 2026-07-31）；管理端不再验收密钥页面。
 
 ### Smoke
 
-- 健康检查 → 登录 → 货币/汇率可见 → 创建 Key → 公开查询成功 → 停用 Key 后失败。
+- 健康检查 → 登录 → 货币/汇率可见。
+- 对外查询仍可用后端已有 API Key（可通过接口或运维脚本创建）；管理端 UI 创建 Key 路径暂不验收。
 
 ### MVP 验收清单（发布前勾选）
 
@@ -122,7 +137,7 @@ plan →（用户确认）→ implement → verify → test → review → docum
 
 **API Key 与对外**
 
-- [ ] 明文只出现一次；有效 Key 可查；无效/停用 401
+- [ ] （前端 UI 搁置）有效 Key 可查公开汇率；无效/停用 401
 - [ ] 未知 code 404；无数据空列表
 
 **范围**
@@ -156,3 +171,4 @@ plan →（用户确认）→ implement → verify → test → review → docum
 | DB 连不上 | `.env` 主机/库名/账号是否与 MySQL 一致；是否用 `customs_app` |
 | 管理端写 403 | 是否带 `X-CSRF-Token`；是否先 `GET /auth/csrf` |
 | 公开查询 401 | Key 是否明文正确、是否已停用 |
+

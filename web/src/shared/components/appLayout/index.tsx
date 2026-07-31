@@ -7,7 +7,7 @@ import routes, { AppRouteObject } from '@/router';
 import { useTranslate } from '@/shared/hooks';
 import styles from './index.module.less';
 
-const { Header, Sider, Content } = Layout;
+const { Sider, Content } = Layout;
 
 /**
  * 从自描述路由表中派生出菜单可见项。
@@ -15,6 +15,12 @@ const { Header, Sider, Content } = Layout;
 const getMenuRoutes = (items: AppRouteObject[]) => items.filter(
   (r) => r.meta?.menu && !r.meta?.hidden && typeof r.path === 'string',
 );
+
+type MenuItem = {
+  key: string;
+  label: React.ReactNode;
+  children?: MenuItem[];
+};
 
 const AppLayout = () => {
   const element = useRoutes(routes);
@@ -29,14 +35,8 @@ const AppLayout = () => {
   const menuRoutes = useMemo(() => getMenuRoutes(routes), []);
 
   const menuItems = useMemo(() => {
-    const items: Array<{
-      key: string;
-      label: React.ReactNode;
-      children?: Array<{ key: string; label: React.ReactNode }>;
-    }> = [];
-    const groupMap = new Map<string, typeof items>();
-
-    for (const r of menuRoutes) {
+    const groupMap = new Map<string, MenuItem>();
+    return menuRoutes.reduce<MenuItem[]>((items, r) => {
       const path = r.path as string;
       const label = (
         <Link to={path}>
@@ -46,23 +46,22 @@ const AppLayout = () => {
 
       if (r.meta?.group) {
         const groupKey = r.meta.group;
-        if (!groupMap.has(groupKey)) {
-          const groupItem = {
+        let groupItem = groupMap.get(groupKey);
+        if (!groupItem) {
+          groupItem = {
             key: groupKey,
             label: r.meta.groupTitleKey ? t(r.meta.groupTitleKey) : groupKey,
-            children: [] as Array<{ key: string; label: React.ReactNode }>,
+            children: [],
           };
-          groupMap.set(groupKey, [groupItem] as any);
+          groupMap.set(groupKey, groupItem);
           items.push(groupItem);
         }
-        const group = items.find((item) => item.key === groupKey);
-        group?.children?.push({ key: path, label });
+        groupItem.children?.push({ key: path, label });
       } else {
         items.push({ key: path, label });
       }
-    }
-
-    return items;
+      return items;
+    }, []);
   }, [menuRoutes, t]);
 
   /**
@@ -80,39 +79,52 @@ const AppLayout = () => {
     return [matched[0] ?? keys[0]];
   }, [pathname, menuRoutes]);
 
+  const activeRoute = useMemo(
+    () => menuRoutes
+      .filter((route) => {
+        const path = route.path as string;
+        return pathname === path || pathname.startsWith(`${path}/`);
+      })
+      .sort((a, b) => String(b.path).length - String(a.path).length)[0],
+    [pathname, menuRoutes],
+  );
+
+  if (isPublicPage) {
+    return element;
+  }
+
   return (
     <Layout className={styles.appLayout}>
-      <Header className={styles.header}>
+      <Sider
+        width={240}
+        theme="light"
+        className={styles.sider}
+        breakpoint="lg"
+        collapsedWidth={64}
+      >
         <div className={styles.brand}>
-          {t('common.appName')}
+          <span className={styles.brandText}>{t('common.appName')}</span>
         </div>
-        <div className={styles.headerRight}>
-          {/* 预留：登录用户名 / 改密 / 退出等 */}
-          <div className={styles.userSlot} aria-hidden={isPublicPage} />
-        </div>
-      </Header>
+        <Menu
+          mode="inline"
+          selectedKeys={selectedKeys}
+          defaultOpenKeys={menuRoutes
+            .filter((r) => r.meta?.group)
+            .map((r) => r.meta!.group as string)
+            .filter((v, i, a) => a.indexOf(v) === i)}
+          items={menuItems}
+          className={styles.sideMenu}
+        />
+      </Sider>
       <Layout className={styles.body}>
-        {!isPublicPage ? (
-          <Sider
-            width={220}
-            theme="light"
-            className={styles.sider}
-            breakpoint="lg"
-            collapsedWidth={64}
-          >
-            <Menu
-              mode="inline"
-              selectedKeys={selectedKeys}
-              defaultOpenKeys={menuRoutes
-                .filter((r) => r.meta?.group)
-                .map((r) => r.meta!.group as string)
-                .filter((v, i, a) => a.indexOf(v) === i)}
-              items={menuItems}
-              className={styles.sideMenu}
-            />
-          </Sider>
-        ) : null}
-        <Content className={styles.content}>{element}</Content>
+        <Content className={styles.content}>
+          {activeRoute?.meta?.titleKey ? (
+            <h1 className={styles.pageTitle}>
+              {t(activeRoute.meta.titleKey)}
+            </h1>
+          ) : null}
+          {element}
+        </Content>
       </Layout>
     </Layout>
   );

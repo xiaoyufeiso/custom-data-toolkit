@@ -1,11 +1,15 @@
+from typing import Literal
+
 from fastapi import APIRouter, Depends, Query, status
 
 from custom_data_toolkit.deps import CurrentAuthDep, SessionDep, require_session_csrf
 from custom_data_toolkit.repositories.currency_repository import CurrencyRepository
+from custom_data_toolkit.routers.common_schemas import BatchIdsRequest
 from custom_data_toolkit.routers.currency_schemas import (
     CurrencyCreateRequest,
     CurrencyListResponse,
     CurrencyPublic,
+    CurrencySuggestionPublic,
     CurrencyUpdateRequest,
 )
 from custom_data_toolkit.services.currency_service import CurrencyService
@@ -50,6 +54,36 @@ def create_currency(
 ) -> CurrencyPublic:
     currency = service.create(name=body.name, code=body.code)
     return _to_public(currency)
+
+
+@router.get("/suggestions", response_model=list[CurrencySuggestionPublic])
+def list_currency_suggestions(
+    _auth: CurrentAuthDep,
+    service: CurrencyService = CurrencyServiceDep,
+    prefix: str = Query(..., min_length=1, max_length=100),
+    field: Literal["nameOrCode", "code"] = "nameOrCode",
+    limit: int = Query(10, ge=1, le=10),
+) -> list[CurrencySuggestionPublic]:
+    suggestions = service.list_suggestions(prefix=prefix, field=field, limit=limit)
+    return [
+        CurrencySuggestionPublic(
+            id=currency.id,
+            name=currency.name,
+            code=currency.code,
+            match_field=match_field,
+        )
+        for currency, match_field in suggestions
+    ]
+
+
+@router.post("/batch-delete", status_code=status.HTTP_204_NO_CONTENT)
+def batch_delete_currencies(
+    body: BatchIdsRequest,
+    _auth: CurrentAuthDep,
+    _csrf: None = Depends(require_session_csrf),
+    service: CurrencyService = CurrencyServiceDep,
+) -> None:
+    service.delete_batch(body.ids)
 
 
 @router.get("/{currency_id}", response_model=CurrencyPublic)

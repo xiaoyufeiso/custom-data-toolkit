@@ -53,16 +53,24 @@ def _login(client: TestClient) -> dict[str, str]:
     return {"X-CSRF-Token": token}
 
 
-def _unused_digit_code(session: Session) -> str:
-    for n in range(1000):
-        candidate = f"{(int(datetime.now(UTC).timestamp() * 1000) + n) % 1000:03d}"
-        row = session.execute(
-            text("SELECT id FROM currency WHERE code = :code LIMIT 1"),
-            {"code": candidate},
-        ).first()
-        if row is None:
+def _unused_letter_code(session: Session) -> str:
+    taken = {
+        row[0]
+        for row in session.execute(text("SELECT code FROM currency")).all()
+        if row[0]
+    }
+    alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    start = int(datetime.now(UTC).timestamp() * 1000)
+    for offset in range(len(alphabet) ** 3):
+        value = (start + offset) % (len(alphabet) ** 3)
+        candidate = (
+            alphabet[value // (len(alphabet) ** 2)]
+            + alphabet[(value // len(alphabet)) % len(alphabet)]
+            + alphabet[value % len(alphabet)]
+        )
+        if candidate not in taken:
             return candidate
-    raise RuntimeError("no free 3-digit currency code available for test")
+    raise RuntimeError("no free 3-letter currency code available for test")
 
 
 def test_unauthorized_list_rates(client: TestClient) -> None:
@@ -70,11 +78,17 @@ def test_unauthorized_list_rates(client: TestClient) -> None:
     assert res.status_code == 401
 
 
+def test_unauthorized_batch_rate_operations(client: TestClient) -> None:
+    for path in ("batch-delete", "batch-check"):
+        res = client.post(f"/api/v1/rates/{path}", json={"ids": [1]})
+        assert res.status_code == 401
+
+
 def test_rate_crud_filter_and_duplicate(client: TestClient) -> None:
     headers = _login(client)
     suffix = datetime.now(UTC).strftime("%H%M%S%f")
     with Session(engine) as session:
-        code = _unused_digit_code(session)
+        code = _unused_letter_code(session)
 
     currency = client.post(
         "/api/v1/currencies",
@@ -139,6 +153,120 @@ def test_rate_crud_filter_and_duplicate(client: TestClient) -> None:
 
     deleted = client.delete(f"/api/v1/rates/{rate_id}", headers=headers)
     assert deleted.status_code == 204
+
+    currency_deleted = client.delete(f"/api/v1/currencies/{currency_id}", headers=headers)
+    assert currency_deleted.status_code == 204
+
+
+def test_rate_batch_operations_contract_and_atomicity(client: TestClient) -> None:
+    headers = _login(client)
+    suffix = datetime.now(UTC).strftime("%H%M%S%f")
+    with Session(engine) as session:
+        code = _unused_letter_code(session)
+
+    currency = client.post(
+        "/api/v1/currencies",
+        json={"name": f"Batch Rate Currency {suffix}", "code": code},
+        headers=headers,
+    )
+    assert currency.status_code == 201
+    currency_id = currency.json()["id"]
+
+    rate_ids: list[int] = []
+    for day_offset in range(2):
+        created = client.post(
+            "/api/v1/rates",
+            json={
+                "currencyId": currency_id,
+                "date": (date.today() + timedelta(days=day_offset)).isoformat(),
+                "data": "1.0",
+                "checked": False,
+            },
+            headers=headers,
+        )
+        assert created.status_code == 201
+        rate_ids.append(created.json()["id"])
+
+    invalid_batches = (
+        [],
+        [rate_ids[0], rate_ids[0]],
+        [0],
+        [-1],
+        ["1"],
+        [1.5],
+        [True],
+        list(range(1, 102)),
+    )
+    for path in ("batch-delete", "batch-check"):
+        for invalid_ids in invalid_batches:
+            invalid = client.post(
+                f"/api/v1/rates/{path}",
+                json={"ids": invalid_ids},
+                headers=headers,
+            )
+            assert invalid.status_code == 422
+
+    without_csrf = client.post(
+        "/api/v1/rates/batch-delete",
+        json={"ids": rate_ids},
+    )
+    assert without_csrf.status_code == 403
+
+    missing_id = 9_223_372_036_854_775_000
+    stale = client.post(
+        "/api/v1/rates/batch-delete",
+        json={"ids": [rate_ids[0], missing_id]},
+        headers=headers,
+    )
+    assert stale.status_code == 409
+    assert stale.json()["code"] == "BatchDelete.StaleSelection"
+    assert stale.json()["details"]["missingIds"] == [missing_id]
+    assert client.get(f"/api/v1/rates/{rate_ids[0]}").status_code == 200
+
+    check_without_csrf = client.post(
+        "/api/v1/rates/batch-check",
+        json={"ids": rate_ids},
+    )
+    assert check_without_csrf.status_code == 403
+
+    stale_check = client.post(
+        "/api/v1/rates/batch-check",
+        json={"ids": [rate_ids[0], missing_id]},
+        headers=headers,
+    )
+    assert stale_check.status_code == 409
+    assert stale_check.json()["code"] == "BatchCheck.StaleSelection"
+    assert stale_check.json()["details"]["missingIds"] == [missing_id]
+    assert client.get(f"/api/v1/rates/{rate_ids[0]}").json()["checked"] is False
+
+    already_checked = client.put(
+        f"/api/v1/rates/{rate_ids[1]}",
+        json={"checked": True},
+        headers=headers,
+    )
+    assert already_checked.status_code == 200
+    checked_update_time = already_checked.json()["updateTime"]
+
+    checked = client.post(
+        "/api/v1/rates/batch-check",
+        json={"ids": rate_ids},
+        headers=headers,
+    )
+    assert checked.status_code == 204
+    assert client.get(f"/api/v1/rates/{rate_ids[0]}").json()["checked"] is True
+    assert (
+        client.get(f"/api/v1/rates/{rate_ids[1]}").json()["updateTime"]
+        == checked_update_time
+    )
+
+    deleted = client.post(
+        "/api/v1/rates/batch-delete",
+        json={"ids": rate_ids},
+        headers=headers,
+    )
+    assert deleted.status_code == 204
+    for rate_id in rate_ids:
+        assert client.get(f"/api/v1/rates/{rate_id}").status_code == 404
 
     currency_deleted = client.delete(f"/api/v1/currencies/{currency_id}", headers=headers)
     assert currency_deleted.status_code == 204

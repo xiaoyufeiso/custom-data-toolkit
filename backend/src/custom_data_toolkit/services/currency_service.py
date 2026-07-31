@@ -31,6 +31,37 @@ class CurrencyService:
             raise NotFoundException("未找到该货币。")
         return currency
 
+    def list_suggestions(
+        self,
+        *,
+        prefix: str,
+        field: str,
+        limit: int,
+    ) -> list[tuple[Currency, str]]:
+        cleaned_prefix = prefix.strip()
+        if not cleaned_prefix:
+            raise AppException("推荐前缀不能为空。")
+        currencies = self.repository.list_suggestions(
+            prefix=cleaned_prefix,
+            field=field,
+            limit=limit,
+        )
+        normalized_prefix = cleaned_prefix.casefold()
+        suggestions: list[tuple[Currency, str]] = []
+        for currency in currencies:
+            normalized_code = (currency.code or "").strip().casefold()
+            normalized_name = currency.name.strip().casefold()
+            if field == "code" or normalized_code == normalized_prefix:
+                match_field = "code"
+            elif normalized_name == normalized_prefix:
+                match_field = "name"
+            elif normalized_code.startswith(normalized_prefix):
+                match_field = "code"
+            else:
+                match_field = "name"
+            suggestions.append((currency, match_field))
+        return suggestions
+
     def create(self, *, name: str, code: str | None) -> Currency:
         cleaned_name = name.strip()
         if not cleaned_name:
@@ -81,6 +112,29 @@ class CurrencyService:
                 error_code="Currency.HasRates",
             )
         self.repository.delete(currency)
+        self.repository.commit()
+
+    def delete_batch(self, currency_ids: list[int]) -> None:
+        currencies = self.repository.get_by_ids_for_update(currency_ids)
+        found_ids = {currency.id for currency in currencies}
+        missing_ids = sorted(set(currency_ids) - found_ids)
+        if missing_ids:
+            raise ConflictException(
+                "部分货币已不存在，本次未删除任何货币，请刷新列表后重试。",
+                error_code="BatchDelete.StaleSelection",
+                details={"missingIds": missing_ids},
+            )
+
+        blocked_ids = sorted(self.repository.list_ids_with_rates(currency_ids))
+        if blocked_ids:
+            raise ConflictException(
+                "部分货币仍有关联汇率，本次未删除任何货币。",
+                error_code="Currency.HasRates",
+                details={"blockedIds": blocked_ids},
+            )
+
+        for currency in currencies:
+            self.repository.delete(currency)
         self.repository.commit()
 
     def _ensure_code_unique(self, code: str | None, exclude_id: int | None = None) -> None:

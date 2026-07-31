@@ -81,6 +81,140 @@ def _unused_letter_code(session: Session) -> str:
 def test_unauthorized_list(client: TestClient) -> None:
     res = client.get("/api/v1/currencies")
     assert res.status_code == 401
+    suggestions = client.get(
+        "/api/v1/currencies/suggestions",
+        params={"prefix": "CN", "field": "nameOrCode"},
+    )
+    assert suggestions.status_code == 401
+
+
+def test_unauthorized_batch_delete(client: TestClient) -> None:
+    res = client.post("/api/v1/currencies/batch-delete", json={"ids": [1]})
+    assert res.status_code == 401
+
+
+def test_currency_batch_delete_contract(client: TestClient) -> None:
+    headers = _login(client)
+    suffix = datetime.now(UTC).strftime("%H%M%S%f")
+    created_ids: list[int] = []
+    for index in range(2):
+        created = client.post(
+            "/api/v1/currencies",
+            json={"name": f"Batch Delete {suffix}-{index}", "code": None},
+            headers=headers,
+        )
+        assert created.status_code == 201
+        created_ids.append(created.json()["id"])
+
+    invalid_batches = (
+        [],
+        [created_ids[0], created_ids[0]],
+        [0],
+        [-1],
+        ["1"],
+        [1.5],
+        [True],
+        list(range(1, 102)),
+    )
+    for invalid_ids in invalid_batches:
+        invalid = client.post(
+            "/api/v1/currencies/batch-delete",
+            json={"ids": invalid_ids},
+            headers=headers,
+        )
+        assert invalid.status_code == 422
+
+    without_csrf = client.post(
+        "/api/v1/currencies/batch-delete",
+        json={"ids": created_ids},
+    )
+    assert without_csrf.status_code == 403
+
+    stale = client.post(
+        "/api/v1/currencies/batch-delete",
+        json={"ids": [created_ids[0], 9_223_372_036_854_775_000]},
+        headers=headers,
+    )
+    assert stale.status_code == 409
+    assert stale.json()["code"] == "BatchDelete.StaleSelection"
+    assert stale.json()["details"]["missingIds"] == [9_223_372_036_854_775_000]
+    assert client.get(f"/api/v1/currencies/{created_ids[0]}").status_code == 200
+
+    deleted = client.post(
+        "/api/v1/currencies/batch-delete",
+        json={"ids": created_ids},
+        headers=headers,
+    )
+    assert deleted.status_code == 204
+    for currency_id in created_ids:
+        assert client.get(f"/api/v1/currencies/{currency_id}").status_code == 404
+
+
+def test_currency_prefix_suggestions_are_ordered_and_bounded(client: TestClient) -> None:
+    headers = _login(client)
+    suffix = datetime.now(UTC).strftime("%H%M%S%f")
+    base_name = f"Suggestion {suffix}"
+    with Session(engine) as session:
+        code = _unused_letter_code(session)
+
+    created_ids: list[int] = []
+    for index in range(12):
+        created = client.post(
+            "/api/v1/currencies",
+            json={
+                "name": base_name if index == 0 else f"{base_name} {index:02d}",
+                "code": code if index == 0 else None,
+            },
+            headers=headers,
+        )
+        assert created.status_code == 201
+        created_ids.append(created.json()["id"])
+
+    wildcard_name = f"Wild%{suffix}"
+    wildcard = client.post(
+        "/api/v1/currencies",
+        json={"name": wildcard_name, "code": None},
+        headers=headers,
+    )
+    assert wildcard.status_code == 201
+    created_ids.append(wildcard.json()["id"])
+
+    by_name = client.get(
+        "/api/v1/currencies/suggestions",
+        params={"prefix": base_name.lower(), "field": "nameOrCode"},
+    )
+    assert by_name.status_code == 200
+    assert len(by_name.json()) == 10
+    assert by_name.json()[0]["name"] == base_name
+    assert by_name.json()[0]["matchField"] == "name"
+
+    by_code = client.get(
+        "/api/v1/currencies/suggestions",
+        params={"prefix": code.lower(), "field": "code"},
+    )
+    assert by_code.status_code == 200
+    assert by_code.json()[0]["code"] == code
+    assert by_code.json()[0]["matchField"] == "code"
+
+    literal_wildcard = client.get(
+        "/api/v1/currencies/suggestions",
+        params={"prefix": f"Wild%{suffix}", "field": "nameOrCode"},
+    )
+    assert literal_wildcard.status_code == 200
+    assert [item["name"] for item in literal_wildcard.json()] == [wildcard_name]
+
+    empty = client.get(
+        "/api/v1/currencies/suggestions",
+        params={"prefix": "   ", "field": "nameOrCode"},
+    )
+    assert empty.status_code == 400
+
+    deleted = client.post(
+        "/api/v1/currencies/batch-delete",
+        json={"ids": created_ids},
+        headers=headers,
+    )
+    assert deleted.status_code == 204
 
 
 def test_currency_crud_and_code_conflict(client: TestClient) -> None:
@@ -187,13 +321,31 @@ def test_delete_blocked_when_rates_exist(client: TestClient) -> None:
         )
         session.commit()
 
-    blocked = client.delete(f"/api/v1/currencies/{currency_id}", headers=headers)
+    other = client.post(
+        "/api/v1/currencies",
+        json={"name": f"Batch Peer {suffix}", "code": None},
+        headers=headers,
+    )
+    assert other.status_code == 201
+    other_id = other.json()["id"]
+
+    blocked = client.post(
+        "/api/v1/currencies/batch-delete",
+        json={"ids": [currency_id, other_id]},
+        headers=headers,
+    )
     assert blocked.status_code == 409
     assert blocked.json()["code"] == "Currency.HasRates"
+    assert blocked.json()["details"]["blockedIds"] == [currency_id]
+    assert client.get(f"/api/v1/currencies/{other_id}").status_code == 200
 
     with Session(engine) as session:
         session.execute(text("DELETE FROM rate WHERE currency_id = :id"), {"id": currency_id})
         session.commit()
 
-    deleted = client.delete(f"/api/v1/currencies/{currency_id}", headers=headers)
+    deleted = client.post(
+        "/api/v1/currencies/batch-delete",
+        json={"ids": [currency_id, other_id]},
+        headers=headers,
+    )
     assert deleted.status_code == 204

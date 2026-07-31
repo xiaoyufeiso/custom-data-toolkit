@@ -7,8 +7,14 @@ class AppException(Exception):
     status_code = 400
     error_code = "App.BadRequest"
 
-    def __init__(self, message: str, error_code: str | None = None) -> None:
+    def __init__(
+        self,
+        message: str,
+        error_code: str | None = None,
+        details: dict[str, object] | None = None,
+    ) -> None:
         self.message = message
+        self.details = details
         if error_code is not None:
             self.error_code = error_code
 
@@ -40,9 +46,14 @@ class ConflictException(AppException):
     status_code = 409
     error_code = "App.Conflict"
 
-    def __init__(self, message: str, error_code: str = "App.Conflict") -> None:
+    def __init__(
+        self,
+        message: str,
+        error_code: str = "App.Conflict",
+        details: dict[str, object] | None = None,
+    ) -> None:
         self.error_code = error_code
-        super().__init__(message)
+        super().__init__(message, details=details)
 
 
 class LoginFailedException(AppException):
@@ -65,9 +76,16 @@ def register_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(AppException)
     async def handle_app_exception(request: Request, exc: AppException) -> JSONResponse:
         request_id = request.headers.get("X-Request-ID")
+        content: dict[str, object] = {
+            "code": exc.error_code,
+            "message": exc.message,
+            "requestId": request_id,
+        }
+        if exc.details is not None:
+            content["details"] = exc.details
         return JSONResponse(
             status_code=exc.status_code,
-            content={"code": exc.error_code, "message": exc.message, "requestId": request_id},
+            content=content,
         )
 
     @app.exception_handler(RequestValidationError)

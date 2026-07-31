@@ -21,6 +21,10 @@ class CurrencyUpdateRequest(CamelModel):
     code: str | None = None
 
 
+class CurrencySuggestionPublic(CurrencyPublic):
+    match_field: str = Field(alias="matchField")
+
+
 class CurrencyListResponse(CamelModel):
     items: list[CurrencyPublic]
     page: int

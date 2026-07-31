@@ -87,3 +87,4 @@ MVP MUST NOT：海关字典、Casdoor/Casbin、自助注册、爬虫逻辑、无
 - 删除前端未使用骨架（home/about/counter demo 等）
 - API 契约迁 OpenAPI 后降级 `docs/api.md`
 - 对照 `development.md` §5 完成 M6 验收勾选
+- **前端 API Key 管理 UI 已搁置并移除**（2026-07-31）；恢复时需重建路由/页面/服务，并继续 `add-page-bulk-delete` §4 与 `standardize-admin-ui-components` §4

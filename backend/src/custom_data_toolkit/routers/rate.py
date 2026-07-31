@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, Query, status
 from custom_data_toolkit.deps import CurrentAuthDep, SessionDep, require_session_csrf
 from custom_data_toolkit.models import Currency, Rate
 from custom_data_toolkit.repositories.rate_repository import RateRepository
+from custom_data_toolkit.routers.common_schemas import BatchIdsRequest
 from custom_data_toolkit.routers.rate_schemas import (
     RateCreateRequest,
     RateListResponse,
@@ -84,6 +85,26 @@ def create_rate(
         checked=body.checked,
     )
     return _to_public(rate, currency)
+
+
+@router.post("/batch-delete", status_code=status.HTTP_204_NO_CONTENT)
+def batch_delete_rates(
+    body: BatchIdsRequest,
+    _auth: CurrentAuthDep,
+    _csrf: None = Depends(require_session_csrf),
+    service: RateService = RateServiceDep,
+) -> None:
+    service.delete_batch(body.ids)
+
+
+@router.post("/batch-check", status_code=status.HTTP_204_NO_CONTENT)
+def batch_check_rates(
+    body: BatchIdsRequest,
+    _auth: CurrentAuthDep,
+    _csrf: None = Depends(require_session_csrf),
+    service: RateService = RateServiceDep,
+) -> None:
+    service.check_batch(body.ids)
 
 
 @router.get("/{rate_id}", response_model=RatePublic)

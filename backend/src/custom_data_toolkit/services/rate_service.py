@@ -120,6 +120,39 @@ class RateService:
         self.repository.delete(rate)
         self.repository.commit()
 
+    def delete_batch(self, rate_ids: list[int]) -> None:
+        rates = self.repository.get_by_ids_for_update(rate_ids)
+        found_ids = {rate.id for rate in rates}
+        missing_ids = sorted(set(rate_ids) - found_ids)
+        if missing_ids:
+            raise ConflictException(
+                "部分汇率已不存在，本次未删除任何汇率，请刷新列表后重试。",
+                error_code="BatchDelete.StaleSelection",
+                details={"missingIds": missing_ids},
+            )
+
+        for rate in rates:
+            self.repository.delete(rate)
+        self.repository.commit()
+
+    def check_batch(self, rate_ids: list[int]) -> None:
+        rates = self.repository.get_by_ids_for_update(rate_ids)
+        found_ids = {rate.id for rate in rates}
+        missing_ids = sorted(set(rate_ids) - found_ids)
+        if missing_ids:
+            raise ConflictException(
+                "部分汇率已不存在，本次未核对任何汇率，请刷新列表后重试。",
+                error_code="BatchCheck.StaleSelection",
+                details={"missingIds": missing_ids},
+            )
+
+        now = datetime.now(UTC).replace(tzinfo=None)
+        for rate in rates:
+            if not rate.checked:
+                rate.checked = True
+                rate.update_time = now
+        self.repository.commit()
+
     @staticmethod
     def _normalize_data(data: str) -> str:
         cleaned = data.strip()

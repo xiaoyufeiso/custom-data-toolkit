@@ -65,6 +65,14 @@ class RateRepository:
         )
         return self.session.exec(statement).first()
 
+    def get_by_ids_for_update(self, rate_ids: list[int]) -> list[Rate]:
+        statement = (
+            select(Rate)
+            .where(col(Rate.id).in_(rate_ids))
+            .with_for_update()
+        )
+        return list(self.session.exec(statement).all())
+
     def get_currency(self, currency_id: int) -> Currency | None:
         return self.session.get(Currency, currency_id)
 

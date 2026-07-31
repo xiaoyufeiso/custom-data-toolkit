@@ -1,138 +1,47 @@
 .page {
-  padding: 24px;
+  padding: var(--padding-page);
 }
 
 .toolbar {
-  margin-bottom: 16px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  border: 1px solid var(--color-border-soft);
+  border-radius: 6px;
+  background: var(--color-surface);
 }
 
-.cardTitleRow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+.toolbarTitle {
+  display: block;
+  margin-bottom: 10px;
 }
 
-.formCard {
-  margin-bottom: 16px;
+.pageAction {
+  position: absolute;
+  z-index: 1;
+  top: 14px;
+  right: 24px;
 }
 
-.form {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  max-width: 420px;
-}
-
-.label {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  font-size: 14px;
-  color: #333;
-}
-
-.table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 14px;
-
-  th,
-  td {
-    padding: 10px 12px;
-    border-bottom: 1px solid #f0f0f0;
-    border-right: 1px solid #f0f0f0;
-    text-align: left;
-  }
-
-  th:last-child,
-  td:last-child {
-    border-right: none;
-  }
-
-  th {
-    color: #666;
-    font-weight: 700;
-    background: #fafafa;
-  }
-
-  tbody tr:nth-child(odd) td {
-    background: #fff;
-  }
-
-  tbody tr:nth-child(even) td {
-    background: #fafafa;
-  }
-}
-
-.empty {
-  text-align: center;
-  color: #999;
-  padding: 24px 12px !important;
-}
-
-.pager {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-top: 16px;
-  color: #666;
-}
-
-.pageEllipsis {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  color: #999;
-  user-select: none;
-}
-
-.pageBtn {
-  box-sizing: border-box;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  min-width: 32px;
+.batchDeleteFieldset {
+  min-width: 0;
+  margin: 0;
   padding: 0;
-  border: 1px solid #d7d9e0;
-  border-radius: 6px;
-  background: #fff;
-  color: #444558;
-  font-size: 14px;
-  line-height: 1;
-  cursor: pointer;
-
-  &:hover:not(:disabled) {
-    border-color: #2574f5;
-    color: #2574f5;
-  }
-
-  &:disabled {
-    cursor: not-allowed;
-    opacity: 0.6;
-  }
+  border: 0;
 }
 
-.pageBtnActive {
-  background: #2574f5;
-  border-color: #2574f5;
-  color: #fff;
-
-  &:hover:not(:disabled) {
-    background: #0056d1;
-    border-color: #0056d1;
-    color: #fff;
-  }
+.batchToolbar {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding-top: 12px;
+  margin-top: 12px;
+  border-top: 1px solid var(--color-border-soft);
 }
 
-.select {
-  height: 32px;
-  padding: 4px 8px;
-  border: 1px solid #d9d9d9;
-  border-radius: 6px;
-  background: #fff;
+.batchToolbarActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  width: 100%;
 }

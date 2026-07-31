@@ -103,10 +103,12 @@
 | 方法 | 路径 | 说明 |
 |---|---|---|
 | GET | `/currencies` | 分页列表；可选 `q` 按 name/code 模糊 |
+| GET | `/currencies/suggestions` | 名称/code 前缀推荐 |
 | POST | `/currencies` | 创建 |
 | GET | `/currencies/{id}` | 详情 |
 | PUT | `/currencies/{id}` | 更新 |
 | DELETE | `/currencies/{id}` | 删除 |
+| POST | `/currencies/batch-delete` | 原子批量删除 1～100 条 |
 
 创建/更新 body：
 
@@ -122,6 +124,26 @@
 - 删除冲突（仍有汇率）：409，`Currency.HasRates`。
 - `code` 冲突：409，`Currency.CodeConflict`。
 
+推荐查询参数：
+
+- `prefix`：必填，trim 后非空，最长 100 字符。
+- `field`：`nameOrCode` 或 `code`，默认 `nameOrCode`。
+- `limit`：1～10，默认 10。
+- 返回 `id`、`name`、`code`、`matchField`；匹配忽略大小写。
+- 排序为完全匹配、code 前缀、名称前缀，同组稳定排序。
+
+批量删除请求：
+
+```json
+{ "ids": [1, 2, 3] }
+```
+
+- `ids` MUST 包含 1～100 个唯一正整数；非法请求返回 422。
+- 任一 ID 不存在：409，`BatchDelete.StaleSelection`，且不删除任何记录。
+- 任一货币仍有关联汇率：409，`Currency.HasRates`，且不删除任何记录。
+- 批量冲突响应可在通用错误结构上增加 `details.missingIds` 或 `details.blockedIds`。
+- 成功：204。现有单条删除接口保持兼容。
+
 ## 5. 汇率（管理端）
 
 | 方法 | 路径 | 说明 |
@@ -131,6 +153,8 @@
 | GET | `/rates/{id}` | 详情 |
 | PUT | `/rates/{id}` | 更新 |
 | DELETE | `/rates/{id}` | 删除 |
+| POST | `/rates/batch-delete` | 原子批量删除 1～100 条 |
+| POST | `/rates/batch-check` | 原子批量核对 1～100 条 |
 
 列表查询参数：
 
@@ -160,6 +184,22 @@
 ```
 
 唯一冲突：409，`Rate.DuplicateCurrencyDate`。
+
+批量删除请求：
+
+```json
+{ "ids": [1, 2, 3] }
+```
+
+- `ids` MUST 包含 1～100 个唯一正整数；非法请求返回 422。
+- 任一 ID 不存在：409，`BatchDelete.StaleSelection`，`details.missingIds` 返回缺失 ID，且不删除任何记录。
+- 成功：204。现有单条删除接口保持兼容。
+
+批量核对复用相同的 `ids` 请求结构：
+
+- 任一 ID 不存在：409，`BatchCheck.StaleSelection`，`details.missingIds` 返回缺失 ID，且不核对任何记录。
+- 已核对记录保持不变且不刷新 `updateTime`；未核对记录更新为已核对。
+- 成功：204。
 
 列表项建议字段：`id`、`currencyId`、`currencyCode`、`currencyName`、`date`、`data`、`checked`、`createTime`、`updateTime`。
 
