@@ -9,7 +9,7 @@ alwaysApply: true
 ## 必读
 
 编码前阅读 `docs/product.md`、`docs/architecture.md`、`docs/data-contract.md`、`docs/api.md`、`docs/development.md` 与 `AGENTS.md`。
-行为权威优先：`openspec/specs/{auth,currency,rate}/`；活跃 change 见 `openspec/specs/README.md`；MVP 历史见 `openspec/changes/archive/add-currency-rate-mgmt/`。
+行为权威优先：`openspec/specs/{auth,currency,rate,customs-dict}/`；活跃 change 见 `openspec/specs/README.md`（含 `add-customs-dict-mgmt`）；MVP 历史见 `openspec/changes/archive/`。
 文档权威与更新矩阵见 `docs/README.md`。
 
 ## MUST
@@ -24,7 +24,7 @@ alwaysApply: true
 ## MUST NOT
 
 - 跳过 Plan 门禁或自说自话扩大范围
-- 实现海关字典业务（见 `openspec/specs/customs-dict/spec.md`）
+- 在未获切片 Plan 确认时实现海关字典；或实现已搁置的导入/整表覆盖全量/操作日志/处理历史；字典 Redis 禁止擅自整表覆盖
 - 添加自助注册或 Casdoor/Casbin（MVP）
 - 提交 `.env`、密码或 API Key 明文
 - 在对外 `/public/*` 提供写接口

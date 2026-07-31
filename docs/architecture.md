@@ -17,10 +17,11 @@
 | Python 环境 | uv |
 | ORM | SQLModel |
 | 数据库迁移 | Alembic |
-| 数据库 | **MySQL**（复用现有 `currency` / `rate`） |
+| 数据库 | **MySQL**（复用现有 `currency` / `rate`；字典映射为应用自有表） |
+| 缓存 / 字典投影 | **Redis**（与第三方共用：正式 Hash + 缺失 ZSET；本系统 MySQL 权威 + 增量同步） |
 | API | REST + OpenAPI |
 | 管理端认证 | Session + HttpOnly Cookie + CSRF |
-| 对外认证 | API Key（`X-API-Key`） |
+| 对外认证 | API Key（`X-API-Key`）；字典下游主要读 Redis |
 | 后端测试 | Pytest |
 | 前端测试 | Vitest + React Testing Library + MSW |
 
@@ -46,7 +47,7 @@ custom-data-toolkit/
 前端负责：
 
 - 登录页与后台布局（侧栏 + 内容区）。
-- 货币、汇率页面的列表/表单/确认框。
+- 货币、汇率、海关字典（国家/洲）页面的列表/表单/确认框。
 - 请求加载、空态、错误与重试。
 - 管理端 Session Cookie 请求（credentials）与 CSRF 头。
 
@@ -56,6 +57,7 @@ custom-data-toolkit/
 - 汇率唯一性与外键约束的最终保证。
 - API Key 管理 UI（2026-07-31 起搁置；后端 `/api-keys` 与对外 `X-API-Key` 鉴权仍保留）。
 - 存储 API Key 明文。
+- 字典导入 / 处理历史 / 操作日志 UI（第一版搁置）；不做整表覆盖全量同步。
 
 建议域划分：
 
@@ -65,7 +67,8 @@ web/src/
 ├─ views/
 │  ├─ auth/
 │  ├─ currencies/
-│  └─ rates/
+│  ├─ rates/
+│  └─ customsDict/    # 标准字典（国家/洲）
 ├─ shared/
 ├─ store/
 └─ router/
@@ -90,21 +93,25 @@ routers → services → repositories → models
 - `currency`：货币
 - `rate`：汇率
 - `api_key`：API Key 管理与对外鉴权依赖
+- `customs_dict`：海关字典映射与 Redis 同步（见 `add-customs-dict-mgmt`）
 
 ## 5. 鉴权架构
 
 ```text
-浏览器 ──Session+CSRF──► /api/v1/auth|currencies|rates|api-keys
+浏览器 ──Session+CSRF──► /api/v1/auth|currencies|rates|api-keys|customs-dict...
 外部系统 ──X-API-Key──► /api/v1/public/rates
+下游 / 第三方 ──共用 Redis──► customs:{type}:dict（Hash）与 :missing（ZSET）
 ```
 
 - 管理端与对外 API 鉴权链路 MUST 隔离。
 - API Key 仅存哈希；校验时对提交明文做同样哈希比对。
+- 字典：本系统经管理端流程对约定 key 做增量写/删 missing；第三方也可写正式 Hash；不得在对外 `/public/*` 提供字典写接口。
 
 ## 6. 数据与外部系统
 
 - MySQL 中已有爬虫写入的 `currency` / `rate` 数据，系统 MUST 兼容读写。
 - 本系统不运行爬虫；不假设写入频率，列表查询 MUST 支持分页。
+- 海关字典映射表为本系统自有表（Alembic）。Redis 同步默认仅 `HSET`/`HDEL`，禁止第一版整表覆盖（ADR-011）。
 
 ## 7. 非功能
 

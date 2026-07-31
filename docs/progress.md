@@ -4,48 +4,36 @@
 
 ## 当前状态
 
-- 阶段：M6 发布整理完成
-- 整体状态：MVP + 已验收增量已归档；等待字典需求澄清
+- 阶段：海关字典第一版 — 需求与默认假设已写入文档，可开切片 1 Plan
+- 整体状态：等待用户确认切片 Plan 后编码
 - 最后更新：2026-07-31
 
 ## 里程碑
 
 | 里程碑 | 状态 |
 |---|---|
-| M0–M5 文档/骨架/认证/货币/汇率/API Key（后端） | 完成 |
-| 前端 API Key 管理模块 | 搁置（2026-07-31 从前端移除路由/页面/服务） |
-| M6 发布整理（验收勾选、OpenSpec 归档、骨架裁剪） | 完成 |
+| M0–M6 汇率 MVP 及发布整理 | 完成 |
+| 海关字典第一版文档 / Redis 默认假设 | 完成 |
+| 海关字典第一版开发 | 待开始 |
 
 ## 阻塞
 
-无。
+无（导入搁置；整表覆盖全量不做；与第三方书面约定非阻塞，联调微调）。
 
 ## 下一步
 
-1. 澄清海关字典需求后，新建 OpenSpec change（建议 `add-customs-dict-mgmt`）；**未批准前禁止实现**
-2. （可选）完成 `standardize-admin-ui-components` 登录页切片
-3. （可选）API 契约迁 OpenAPI 后降级 `docs/api.md`
-4. （可选）恢复前端 API Key UI（需重建模块，并继续 deferred 筛选/批量删除）
+1. 对 `add-customs-dict-mgmt` **切片 1（模型+迁移）** 提交 Plan → 用户确认 → 实现
+2. 标准字典 API + 增量 Redis → 缺失读/处理/导出 → 前端
 
-活跃 change 见：`openspec/specs/README.md`  
-领域权威：`openspec/specs/{auth,currency,rate}/spec.md`
+切片：`openspec/changes/add-customs-dict-mgmt/tasks.md`
 
 ## 日志（摘录）
 
-### 2026-07-31（M6）
+### 2026-07-31（字典默认假设）
 
-- 质量收口：登录页 Button 宽度修复；删除未用 home/about/workspace 骨架；`tsc` / 前端 51 测 / UAT build 通过
-- 验收：`docs/development.md` §5 核心项已勾选；公开汇率测试改为合法字母 code；前端 API Key UI 豁免
-- 归档 MVP：`add-currency-rate-mgmt` → `openspec/changes/archive/`，合并 `auth`/`currency`/`rate` 领域 spec
-- 归档增量：`add-page-bulk-delete`（currency/rate）、`add-rate-batch-check`、`add-currency-prefix-suggestions`
-- 保留 proposed：`standardize-admin-ui-components`（登录页未完成）、`improve-rate-create-currency-picker`
-- Deferred 不变：同名软提醒、汇率数量、前端 API Key UI
+- 采纳：第三方写正式 Hash；按类型拆 key；仅增量同步；缺失正式同步成功后 ZREM；导入搁置；内容不审核；单表+类型筛选
+- 明确不做：整表覆盖全量、导入、处理历史、操作日志
 
-### 2026-07-31
+### 2026-07-31（M6 / 初版字典文档）
 
-- 搁置全部前端 API Key 相关内容：删除 `web` 路由 `/api-keys`、`pages/api-keys`、`views/apiKeys`、`services/apiKey` 与菜单文案。
-- 后端 API Key 管理接口与对外 `X-API-Key` 公开查询仍保留。
-
-### 2026-07-30
-
-- 文档按 skill 收敛；删除 `docs/` 停用重定向文件（对照见 `docs/archive/README.md`）
+- M6 收尾完成；废止货币名称字典占位；ADR-011；新建 `add-customs-dict-mgmt`

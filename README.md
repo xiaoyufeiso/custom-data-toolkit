@@ -1,6 +1,6 @@
 # Custom Data Toolkit
 
-海关数据处理辅助工具后台管理系统。MVP：货币/汇率管理 + 对外汇率查询 API。海关字典本轮仅文档占位。
+海关数据处理辅助工具后台管理系统。MVP：货币/汇率管理 + 对外汇率查询 API。海关字典第一版（国家/洲 + Redis）见 `openspec/changes/add-customs-dict-mgmt/`。
 
 ## 技术栈
 
