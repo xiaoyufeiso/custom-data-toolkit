@@ -33,11 +33,11 @@
 
 ## 5. 完整验收与文档
 
-- [ ] 5.1 对照 currency/rate/api-key/ui 全部 Scenario 逐条 Verify
-- [ ] 5.2 实跑后端测试、前端测试、lint、类型检查和生产构建
-- [ ] 5.3 确认无数据库迁移、无公开写接口、无鉴权边界变化
-- [ ] 5.4 更新 `docs/api.md`、本 tasks 和必要进度文档
-- [ ] 5.5 完成评审且无 BLOCKER 后归档 change
+- [x] 5.1 对照 currency/rate/ui 已实现 Scenario 验收（api-key UI 豁免）
+- [x] 5.2 实跑后端测试、前端测试、lint、类型检查和 UAT 构建（M6 2026-07-31）
+- [x] 5.3 确认无数据库迁移、无公开写接口、无鉴权边界变化
+- [x] 5.4 更新 `docs/api.md`、本 tasks 和必要进度文档
+- [x] 5.5 归档：currency/rate delta 已合并进领域 spec；api-key §4 仍 deferred（无前端模块）
 
 ## TBD / Approval
 

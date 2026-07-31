@@ -21,7 +21,7 @@
 8. 当前 OpenSpec change 或归档后的 `openspec/specs/<domain>/`
 9. `docs/development.md`、`docs/operations.md` — 本地开发与运维
 10. `openspec/specs/customs-dict/spec.md` — 字典仅占位，**禁止实现**
-11. 未归档变更：`openspec/changes/add-currency-rate-mgmt/`
+11. 领域权威：`openspec/specs/{auth,currency,rate}/`；活跃 change 见 `openspec/specs/README.md`
 
 冲突时：可执行代码与迁移优先于过时 Markdown；项目内权威文档优先于外部通用习惯。  
 同一事实只在一个权威层维护（公司标准 / 稳定项目真相 / OpenSpec / 可执行产物）。
@@ -83,8 +83,7 @@ MVP MUST NOT：海关字典、Casdoor/Casbin、自助注册、爬虫逻辑、无
 
 ## Known follow-ups（交接）
 
-- 归档 `openspec/changes/add-currency-rate-mgmt`（合并 auth/currency/rate 领域 spec）
-- 删除前端未使用骨架（home/about/counter demo 等）
-- API 契约迁 OpenAPI 后降级 `docs/api.md`
-- 对照 `development.md` §5 完成 M6 验收勾选
-- **前端 API Key 管理 UI 已搁置并移除**（2026-07-31）；恢复时需重建路由/页面/服务，并继续 `add-page-bulk-delete` §4 与 `standardize-admin-ui-components` §4
+- 海关字典：需求澄清后新建 `add-customs-dict-mgmt`（未批准前禁止实现）
+- （可选）`standardize-admin-ui-components` 登录页切片；`improve-rate-create-currency-picker`
+- （可选）API 契约迁 OpenAPI 后降级 `docs/api.md`
+- **前端 API Key 管理 UI 已搁置并移除**（2026-07-31）；恢复时需重建路由/页面/服务，并继续筛选/批量删除与 BizTable 对齐（见 archive `add-page-bulk-delete` §4）

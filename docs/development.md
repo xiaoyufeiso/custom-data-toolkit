@@ -125,24 +125,26 @@ plan →（用户确认）→ implement → verify → test → review → docum
 
 ### MVP 验收清单（发布前勾选）
 
+> 勾选日期：2026-07-31（`chore/m6-release-wrapup`）。实跑：`backend` pytest（auth/currency/rate/public）、`web` vitest 51、`tsc --noEmit`、`vite build --mode uat`。
+
 **认证**
 
-- [ ] 无自助注册；预置管理员可登录；错误不泄露用户是否存在
-- [ ] Session Cookie HttpOnly；CSRF 失败不能写；退出后管理接口 401
+- [x] 无自助注册；预置管理员可登录；错误不泄露用户是否存在
+- [x] Session Cookie HttpOnly；CSRF 失败不能写；退出后管理接口 401
 
 **货币与汇率**
 
-- [ ] CRUD 符合 OpenSpec / 产品不变量；有关联汇率不能删货币
-- [ ] 同货币同日 409；可维护 `data`/`checked`；筛选分页正确
+- [x] CRUD 符合 OpenSpec / 产品不变量；有关联汇率不能删货币
+- [x] 同货币同日 409；可维护 `data`/`checked`；筛选分页正确
 
 **API Key 与对外**
 
-- [ ] （前端 UI 搁置）有效 Key 可查公开汇率；无效/停用 401
-- [ ] 未知 code 404；无数据空列表
+- [x] （前端 UI 搁置，仅后端验收）有效 Key 可查公开汇率；无效/停用 401
+- [x] 未知 code 404；无数据空列表
 
 **范围**
 
-- [ ] 无海关字典页面、路由、表、API
+- [x] 无海关字典页面、路由、表、API
 
 ### 切片完成定义
 

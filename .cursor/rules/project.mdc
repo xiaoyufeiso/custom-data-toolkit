@@ -9,7 +9,7 @@ alwaysApply: true
 ## 必读
 
 编码前阅读 `docs/product.md`、`docs/architecture.md`、`docs/data-contract.md`、`docs/api.md`、`docs/development.md` 与 `AGENTS.md`。
-实现首个 MVP 时同时遵循 `openspec/changes/add-currency-rate-mgmt/`。
+行为权威优先：`openspec/specs/{auth,currency,rate}/`；活跃 change 见 `openspec/specs/README.md`；MVP 历史见 `openspec/changes/archive/add-currency-rate-mgmt/`。
 文档权威与更新矩阵见 `docs/README.md`。
 
 ## MUST
