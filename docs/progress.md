@@ -4,8 +4,8 @@
 
 ## 当前状态
 
-- 阶段：标准字典导入/导出 — change `add-customs-dict-import`
-- 整体状态：实现完成，待合并 `feat/customs-dict-import`（基于 `feat/customs-dict-mapping-model`）
+- 阶段：字典类型管理 — change `add-customs-dict-types`
+- 整体状态：实现完成，待合并 `feat/customs-dict-types`（基于 `feat/customs-dict-import`）
 - 最后更新：2026-08-03
 
 ## 里程碑
@@ -16,19 +16,24 @@
 | 海关字典第一版文档 / Redis 默认假设 | 完成 |
 | 海关字典第一版开发（包 1–5） | 完成 |
 | 标准字典导入/导出 | 完成 |
+| 字典类型管理 | 完成 |
 
 ## 阻塞
 
-无。类型管理 / 整表覆盖 / 处理历史等仍为 Deferred。
+无。整表覆盖 / 处理历史 / 操作日志等仍为 Deferred。
 
 ## 下一步
 
-1. 合并 `feat/customs-dict-import`（或先合并 mapping-model）至 main（按需）
-2. 可选：E5 Redis 友好错误文案；归档 `add-customs-dict-import`
+1. 合并 `feat/customs-dict-types`（及上游 import/mapping 分支）至 main（按需）
+2. 可选：归档 `add-customs-dict-import` / `add-customs-dict-types`；E5 Redis 友好错误文案
 
-切片：`openspec/changes/add-customs-dict-import/tasks.md`
+切片：`openspec/changes/add-customs-dict-types/tasks.md`
 
 ## 日志（摘录）
+
+### 2026-08-03（字典类型）
+
+- 表 `customs_dict_type` + 种子；types API；映射校验改读 DB；类型管理页；标准/缺失下拉 `/options`
 
 ### 2026-08-03（导入/导出）
 

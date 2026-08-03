@@ -4,6 +4,7 @@ const common = {
   'common.currencies': 'Currencies',
   'common.rates': 'Rates',
   'common.customsDict': 'Dictionary',
+  'common.customsDictTypes': 'Dictionary Types',
   'common.customsDictMappings': 'Standard Dictionary',
   'common.customsDictMissing': 'Missing Dictionary',
   'common.switchLang': 'Switch Language',

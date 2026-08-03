@@ -1,10 +1,32 @@
 import { http } from '@/shared/api/http';
 
-export type CustomsDictType = 'country' | 'continent';
+export type CustomsDictTypeOption = {
+  code: string;
+  name: string;
+};
+
+export type CustomsDictTypeItem = {
+  id: number;
+  code: string;
+  name: string;
+  enabled: boolean;
+  mappingCount: number;
+  createdBy: number | null;
+  updatedBy: number | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CustomsDictTypeListResponse = {
+  items: CustomsDictTypeItem[];
+  page: number;
+  pageSize: number;
+  total: number;
+};
 
 export type CustomsDictMapping = {
   id: number;
-  dictType: CustomsDictType | string;
+  dictType: string;
   rawValue: string;
   standardValue: string;
   enabled: boolean;
@@ -202,6 +224,56 @@ export async function importCustomsDictMappings(file: File): Promise<CustomsDict
       // 去掉实例默认 application/json，让浏览器为 FormData 带上 boundary
       headers: { 'Content-Type': undefined },
     },
+  );
+  return data;
+}
+
+export async function listCustomsDictTypeOptions(): Promise<CustomsDictTypeOption[]> {
+  const { data } = await http.get<CustomsDictTypeOption[]>('/customs-dict/types/options');
+  return data;
+}
+
+export async function listCustomsDictTypes(params: {
+  enabled?: boolean;
+  q?: string;
+  page?: number;
+  pageSize?: number;
+}): Promise<CustomsDictTypeListResponse> {
+  const { data } = await http.get<CustomsDictTypeListResponse>('/customs-dict/types', {
+    params,
+  });
+  return data;
+}
+
+export async function createCustomsDictType(payload: {
+  code: string;
+  name: string;
+}): Promise<CustomsDictTypeItem> {
+  const { data } = await http.post<CustomsDictTypeItem>('/customs-dict/types', payload);
+  return data;
+}
+
+export async function updateCustomsDictType(
+  id: number,
+  payload: { name: string; code?: string },
+): Promise<CustomsDictTypeItem> {
+  const { data } = await http.patch<CustomsDictTypeItem>(
+    `/customs-dict/types/${id}`,
+    payload,
+  );
+  return data;
+}
+
+export async function enableCustomsDictType(id: number): Promise<CustomsDictTypeItem> {
+  const { data } = await http.post<CustomsDictTypeItem>(
+    `/customs-dict/types/${id}/enable`,
+  );
+  return data;
+}
+
+export async function disableCustomsDictType(id: number): Promise<CustomsDictTypeItem> {
+  const { data } = await http.post<CustomsDictTypeItem>(
+    `/customs-dict/types/${id}/disable`,
   );
   return data;
 }

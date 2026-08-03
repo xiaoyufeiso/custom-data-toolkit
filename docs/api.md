@@ -267,7 +267,26 @@
 
 ## 8. 海关数据字典（管理端）
 
-前缀：`/api/v1/customs-dict/mappings`。Session + CSRF（写操作）。第一版仅增量同步 Redis，不做整表覆盖。
+Session + CSRF（写操作）。仅增量同步 Redis，不做整表覆盖。字典类型以表 `customs_dict_type` 为准（种子 `country`/`continent`）；写映射/导入要求类型存在且启用。
+
+### 8.0 字典类型
+
+前缀：`/api/v1/customs-dict/types`。
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/customs-dict/types` | 列表；query：`enabled`、`q`、`page`、`pageSize`；项含 `mappingCount` |
+| GET | `/customs-dict/types/options` | 仅启用项：`[{ code, name }]`，供下拉 |
+| POST | `/customs-dict/types` | 新建（`code`+`name`；code 规范化为小写） |
+| PATCH | `/customs-dict/types/{id}` | 仅改 `name`；提交不同 `code` → 400 `CustomsDictType.CodeImmutable` |
+| POST | `/customs-dict/types/{id}/enable` | 启用 |
+| POST | `/customs-dict/types/{id}/disable` | 停用；有任意映射行 → 409 `CustomsDictType.HasMappings` |
+
+常见错误码：`CustomsDictType.NotFound`、`CustomsDictType.DuplicateCode`、`CustomsDictType.InvalidCode`、`CustomsDictType.HasMappings`、`CustomsDictType.CodeImmutable`。
+
+### 8.1 标准字典映射
+
+前缀：`/api/v1/customs-dict/mappings`。
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
@@ -305,10 +324,10 @@
 Redis 失败时 MySQL 仍保存，`syncStatus` 为 `failed`/`pending`，`syncError` 脱敏。
 
 导入/导出 xlsx 表头（与缺失导出一致）：`字典类型编码 | 字典类型名称 | 原始值 | 出现次数 | 标准值 | 备注`。  
-导入必填：`字典类型编码`、`原始值`、`标准值`（类型仅 `country`/`continent`）；忽略名称/次数/备注。同类型原始值已存在则更新标准值并增量同步 Redis；不存在则新建（`source=import`，默认启用）。导入**不**自动 ZREM missing。建议单文件 ≤1000 行数据。  
+导入必填：`字典类型编码`、`原始值`、`标准值`（类型须为**启用**类型）；忽略名称/次数/备注。同类型原始值已存在则更新标准值并增量同步 Redis；不存在则新建（`source=import`，默认启用）。导入**不**自动 ZREM missing。建议单文件 ≤1000 行数据。  
 导入成功 body：`{ "created": 1, "updated": 2, "failed": 1, "errors": [{ "row": 3, "message": "..." }] }`。整文件表头非法等 → 4xx；单行失败计入 `failed`，其它行继续。
 
-### 8.1 缺失字典
+### 8.2 缺失字典
 
 前缀：`/api/v1/customs-dict/missing`。缺失数据来自第三方 ZSET；本系统只读列表/处理/导出。
 

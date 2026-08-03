@@ -10,8 +10,8 @@ from custom_data_toolkit.models.customs_dict import (
     CustomsDictSource,
     CustomsDictSyncStatus,
     CustomsDictType,
-    assert_dict_type,
     normalize_dict_text,
+    validate_dict_type_code_format,
 )
 
 
@@ -21,14 +21,22 @@ def test_normalize_dict_text_trims_edges_only() -> None:
     assert normalize_dict_text("cNy") == "cNy"
 
 
-def test_assert_dict_type_accepts_preset_values() -> None:
-    assert assert_dict_type("country") is CustomsDictType.COUNTRY
-    assert assert_dict_type("continent") is CustomsDictType.CONTINENT
+def test_validate_dict_type_code_format_accepts_valid() -> None:
+    assert validate_dict_type_code_format("country") == "country"
+    assert validate_dict_type_code_format("Port_1") == "port_1"
 
 
-def test_assert_dict_type_rejects_unknown() -> None:
-    with pytest.raises(ValueError, match="unsupported dict_type"):
-        assert_dict_type("currency")
+def test_validate_dict_type_code_format_rejects_invalid() -> None:
+    with pytest.raises(ValueError):
+        validate_dict_type_code_format("1abc")
+    with pytest.raises(ValueError):
+        validate_dict_type_code_format("Bad-Code")
+
+
+def test_customs_dict_type_table_metadata() -> None:
+    table = SQLModel.metadata.tables["customs_dict_type"]
+    assert table.c.code.type.length == 32
+    assert table.c.name.type.length == DICT_TEXT_MAX_LENGTH
 
 
 def test_customs_dict_mapping_table_metadata() -> None:
@@ -42,7 +50,7 @@ def test_customs_dict_mapping_table_metadata() -> None:
 
     now = datetime(2026, 7, 31, 12, 0, 0)
     row = CustomsDictMapping(
-        dict_type=CustomsDictType.COUNTRY.value,
+        dict_type="country",
         raw_value="中国大陆",
         standard_value="CHN",
         enabled=True,
@@ -54,3 +62,12 @@ def test_customs_dict_mapping_table_metadata() -> None:
     assert row.enabled is True
     assert row.source == "manual"
     assert row.sync_status == "pending"
+
+    type_row = CustomsDictType(
+        code="port",
+        name="口岸",
+        enabled=True,
+        created_at=now,
+        updated_at=now,
+    )
+    assert type_row.enabled is True

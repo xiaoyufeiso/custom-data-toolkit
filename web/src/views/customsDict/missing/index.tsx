@@ -21,7 +21,9 @@ import {
   exportCustomsDictMissing,
   handleCustomsDictMissing,
   listCustomsDictMissing,
+  listCustomsDictTypeOptions,
   type CustomsDictMissingItem,
+  type CustomsDictTypeOption,
 } from '@/services/customsDict';
 import { useTranslate } from '@/shared/hooks';
 import { getApiErrorMessage } from '@/shared/utils/apiError';
@@ -52,11 +54,11 @@ const CustomsDictMissingView = () => {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [draft, setDraft] = useState<FilterDraft>({
-    dictType: 'country',
+    dictType: '',
     rawValue: '',
   });
   const [applied, setApplied] = useState<FilterDraft>({
-    dictType: 'country',
+    dictType: '',
     rawValue: '',
   });
   const [loading, setLoading] = useState(false);
@@ -65,16 +67,30 @@ const CustomsDictMissingView = () => {
   const [detailHandling, setDetailHandling] = useState(false);
   const [detail, setDetail] = useState<CustomsDictMissingItem | null>(null);
   const [standardValue, setStandardValue] = useState('');
+  const [typeOptionsRaw, setTypeOptionsRaw] = useState<CustomsDictTypeOption[]>([]);
+  const [typesReady, setTypesReady] = useState(false);
 
   const typeOptions = useMemo(
-    () => [
-      { label: t('customsDict.type.country'), value: 'country' },
-      { label: t('customsDict.type.continent'), value: 'continent' },
-    ],
-    [t],
+    () => typeOptionsRaw.map((item) => ({ label: item.name, value: item.code })),
+    [typeOptionsRaw],
   );
 
+  useEffect(() => {
+    void listCustomsDictTypeOptions()
+      .then((options) => {
+        setTypeOptionsRaw(options);
+        const first = options[0]?.code ?? '';
+        setDraft((prev) => (prev.dictType ? prev : { ...prev, dictType: first }));
+        setApplied((prev) => (prev.dictType ? prev : { ...prev, dictType: first }));
+      })
+      .catch(() => {
+        message.error(t('customsDict.message.loadFailed'));
+      })
+      .finally(() => setTypesReady(true));
+  }, [t]);
+
   const load = useCallback(async () => {
+    if (!typesReady) return;
     if (!applied.dictType) {
       message.warning(t('customsDict.message.dictTypeRequired'));
       return;
@@ -94,10 +110,10 @@ const CustomsDictMissingView = () => {
     } finally {
       setLoading(false);
     }
-  }, [applied, page, pageSize, t]);
+  }, [applied, page, pageSize, t, typesReady]);
 
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
 
   const closeDetail = () => {

@@ -35,8 +35,10 @@ import {
   exportCustomsDictMappings,
   importCustomsDictMappings,
   listCustomsDictMappings,
+  listCustomsDictTypeOptions,
   updateCustomsDictMapping,
   type CustomsDictMapping,
+  type CustomsDictTypeOption,
 } from '@/services/customsDict';
 import { useTranslate } from '@/shared/hooks';
 import { getApiErrorCode, getApiErrorMessage } from '@/shared/utils/apiError';
@@ -107,16 +109,27 @@ const CustomsDictMappingsView = () => {
   const [detail, setDetail] = useState<CustomsDictMapping | null>(null);
   const [editStandardValue, setEditStandardValue] = useState('');
   const [importing, setImporting] = useState(false);
+  const [typeOptionsRaw, setTypeOptionsRaw] = useState<CustomsDictTypeOption[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [form] = Form.useForm<FormState>();
 
   const typeOptions = useMemo(
-    () => [
-      { label: t('customsDict.type.country'), value: 'country' },
-      { label: t('customsDict.type.continent'), value: 'continent' },
-    ],
-    [t],
+    () => typeOptionsRaw.map((item) => ({ label: item.name, value: item.code })),
+    [typeOptionsRaw],
   );
+
+  const typeLabelMap = useMemo(
+    () => Object.fromEntries(typeOptionsRaw.map((item) => [item.code, item.name])),
+    [typeOptionsRaw],
+  );
+
+  useEffect(() => {
+    void listCustomsDictTypeOptions()
+      .then(setTypeOptionsRaw)
+      .catch(() => {
+        message.error(t('customsDict.message.loadFailed'));
+      });
+  }, [t]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -150,11 +163,7 @@ const CustomsDictMappingsView = () => {
     return status;
   };
 
-  const typeLabel = (dictType: string) => {
-    if (dictType === 'country') return t('customsDict.type.country');
-    if (dictType === 'continent') return t('customsDict.type.continent');
-    return dictType;
-  };
+  const typeLabel = (dictType: string) => typeLabelMap[dictType] ?? dictType;
 
   const closeDetail = () => {
     setDetailOpen(false);

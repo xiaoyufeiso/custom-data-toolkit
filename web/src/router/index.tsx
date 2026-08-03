@@ -28,6 +28,7 @@ const Currencies = lazy(() => import('@/pages/currencies'));
 const Rates = lazy(() => import('@/pages/rates'));
 const CustomsDictMappings = lazy(() => import('@/pages/customsDict/mappings'));
 const CustomsDictMissing = lazy(() => import('@/pages/customsDict/missing'));
+const CustomsDictTypes = lazy(() => import('@/pages/customsDict/types'));
 
 const lazyLoad = (Component: React.LazyExoticComponent<React.ComponentType>) => (
   <Suspense fallback={<Loading />}>
@@ -58,6 +59,16 @@ const routes: AppRouteObject[] = [
     element: <RequireAuth>{lazyLoad(Rates)}</RequireAuth>,
     meta: {
       titleKey: 'common.rates', menu: true, group: 'rateData', groupTitleKey: 'common.rateData',
+    },
+  },
+  {
+    path: '/customs-dict/types',
+    element: <RequireAuth>{lazyLoad(CustomsDictTypes)}</RequireAuth>,
+    meta: {
+      titleKey: 'common.customsDictTypes',
+      menu: true,
+      group: 'customsDict',
+      groupTitleKey: 'common.customsDict',
     },
   },
   {

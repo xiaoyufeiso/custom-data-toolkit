@@ -14,8 +14,9 @@
 
 | 变更 | 路径 | 状态 |
 |------|------|------|
-| 海关数据字典管理（第一版） | `openspec/changes/add-customs-dict-mgmt/` | proposed（含缺失；增量 Redis；导入搁置；待切片开发） |
-| 新建汇率货币选择器首字母索引 | `openspec/changes/improve-rate-create-currency-picker/` | proposed（仅文档，未实现） |
+| 标准字典导入/导出 | `openspec/changes/add-customs-dict-import/` | implemented（待归档） |
+| 字典类型管理 | `openspec/changes/add-customs-dict-types/` | implemented（待归档） |
+| 新建汇率货币选择器首字母索引 | `openspec/changes/improve-rate-create-currency-picker/` | implemented（待归档） |
 | 货币同名软提醒 | `openspec/changes/add-duplicate-currency-name-warnings/` | deferred |
 | 货币列表关联汇率数量 | `openspec/changes/add-currency-rate-counts/` | deferred |
 | 管理端 UI 组件库化与视觉统一 | `openspec/changes/standardize-admin-ui-components/` | proposed（货币/汇率完成；登录页待实施） |
@@ -24,6 +25,7 @@
 
 | 变更 | 路径 | 归档日期 |
 |------|------|----------|
+| 海关数据字典管理（第一版） | `openspec/changes/archive/add-customs-dict-mgmt/` | 2026-08-03 |
 | 汇率与货币管理 MVP | `openspec/changes/archive/add-currency-rate-mgmt/` | 2026-07-31 |
 | 管理页面内批量删除（currency/rate） | `openspec/changes/archive/add-page-bulk-delete/` | 2026-07-31（api-key §4 仍 deferred） |
 | 汇率批量核对与列表操作分区 | `openspec/changes/archive/add-rate-batch-check/` | 2026-07-31 |
@@ -32,7 +34,7 @@
 ## Deferred（无活跃实现）
 
 - 前端 API Key 管理 UI（含筛选 / 批量删除 / BizTable 对齐）
-- 字典：导入 / 整表覆盖全量 / 操作日志 / 处理历史
+- 字典：整表覆盖全量 / 操作日志 / 处理历史
 - `add-duplicate-currency-name-warnings`
 - `add-currency-rate-counts`
 

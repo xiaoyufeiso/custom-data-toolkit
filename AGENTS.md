@@ -80,12 +80,12 @@ plan →（用户确认）→ implement → verify → test → review → docum
 ## Scope Guard
 
 MUST NOT：Casdoor/Casbin、自助注册、爬虫逻辑、无鉴权对外写接口。  
-海关字典：仅允许在已确认 Plan 的 `add-customs-dict-mgmt` 切片内实现；Redis **仅增量同步**，禁止擅自做整表覆盖；禁止实现已搁置的导入/处理历史/操作日志。
+海关字典：仅允许在已确认 Plan 的相关 change 切片内实现；Redis **仅增量同步**，禁止擅自做整表覆盖；禁止实现已搁置的处理历史/操作日志。
 
 ## Known follow-ups（交接）
 
-- 海关字典第一版：`add-customs-dict-mgmt`（默认假设已写入；切片 Plan 确认后开发）
-- 字典搁置：导入、整表覆盖全量、操作日志、处理历史
-- （可选）`standardize-admin-ui-components` 登录页切片；`improve-rate-create-currency-picker`
+- 合并/归档：`add-customs-dict-import`、`add-customs-dict-types`（分支 `feat/customs-dict-types`）
+- 字典搁置：整表覆盖全量、操作日志、处理历史
+- （可选）`standardize-admin-ui-components` 登录页切片
 - （可选）API 契约迁 OpenAPI 后降级 `docs/api.md`
 - **前端 API Key 管理 UI 已搁置并移除**（2026-07-31）；恢复时需重建路由/页面/服务，并继续筛选/批量删除与 BizTable 对齐（见 archive `add-page-bulk-delete` §4）

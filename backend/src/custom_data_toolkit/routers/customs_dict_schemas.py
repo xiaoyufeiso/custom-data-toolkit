@@ -90,3 +90,37 @@ class CustomsDictMissingHandleRequest(CamelModel):
     dict_type: str = Field(alias="dictType")
     raw_value: str = Field(alias="rawValue")
     standard_value: str = Field(alias="standardValue")
+
+
+class CustomsDictTypePublic(CamelModel):
+    id: int
+    code: str
+    name: str
+    enabled: bool
+    mapping_count: int = Field(alias="mappingCount")
+    created_by: int | None = Field(default=None, alias="createdBy")
+    updated_by: int | None = Field(default=None, alias="updatedBy")
+    created_at: datetime = Field(alias="createdAt")
+    updated_at: datetime = Field(alias="updatedAt")
+
+
+class CustomsDictTypeOption(CamelModel):
+    code: str
+    name: str
+
+
+class CustomsDictTypeListResponse(CamelModel):
+    items: list[CustomsDictTypePublic]
+    page: int
+    page_size: int = Field(alias="pageSize")
+    total: int
+
+
+class CustomsDictTypeCreateRequest(CamelModel):
+    code: str
+    name: str
+
+
+class CustomsDictTypeUpdateRequest(CamelModel):
+    name: str
+    code: str | None = None

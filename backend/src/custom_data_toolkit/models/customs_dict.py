@@ -1,15 +1,19 @@
 from datetime import datetime
 from enum import StrEnum
+import re
 
 from sqlmodel import Field, SQLModel, UniqueConstraint
 
 DICT_TEXT_MAX_LENGTH = 255
 SYNC_ERROR_MAX_LENGTH = 512
+DICT_TYPE_CODE_MAX_LENGTH = 32
+DICT_TYPE_CODE_PATTERN = re.compile(r"^[a-z][a-z0-9_]{0,31}$")
 
-
-class CustomsDictType(StrEnum):
-    COUNTRY = "country"
-    CONTINENT = "continent"
+# 迁移种子与兼容常量（校验以 DB 为准）
+SEED_DICT_TYPES = (
+    ("country", "国家"),
+    ("continent", "洲"),
+)
 
 
 class CustomsDictSource(StrEnum):
@@ -29,11 +33,30 @@ def normalize_dict_text(value: str) -> str:
     return value.strip()
 
 
-def assert_dict_type(dict_type: str) -> CustomsDictType:
-    try:
-        return CustomsDictType(dict_type)
-    except ValueError as exc:
-        raise ValueError(f"unsupported dict_type: {dict_type}") from exc
+def normalize_dict_type_code(value: str) -> str:
+    return value.strip().lower()
+
+
+def validate_dict_type_code_format(code: str) -> str:
+    cleaned = normalize_dict_type_code(code)
+    if not cleaned or not DICT_TYPE_CODE_PATTERN.fullmatch(cleaned):
+        raise ValueError(
+            "dict type code must be 1-32 chars: start with a-z, then a-z0-9_"
+        )
+    return cleaned
+
+
+class CustomsDictType(SQLModel, table=True):
+    __tablename__ = "customs_dict_type"
+
+    id: int | None = Field(default=None, primary_key=True)
+    code: str = Field(max_length=DICT_TYPE_CODE_MAX_LENGTH, unique=True, index=True)
+    name: str = Field(max_length=DICT_TEXT_MAX_LENGTH)
+    enabled: bool = Field(default=True)
+    created_by: int | None = Field(default=None, foreign_key="admin_users.id")
+    updated_by: int | None = Field(default=None, foreign_key="admin_users.id")
+    created_at: datetime
+    updated_at: datetime
 
 
 class CustomsDictMapping(SQLModel, table=True):

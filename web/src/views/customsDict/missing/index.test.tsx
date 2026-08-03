@@ -8,6 +8,7 @@ import {
   HttpResponse,
 } from 'msw';
 import {
+  beforeEach,
   describe,
   expect,
   it,
@@ -118,6 +119,12 @@ vi.mock('@tendata-biz-components/biz-table', () => ({
 
 const MISSING_URL = 'http://localhost/api/v1/customs-dict/missing';
 const HANDLE_URL = `${MISSING_URL}/handle`;
+const TYPES_OPTIONS_URL = 'http://localhost/api/v1/customs-dict/types/options';
+
+const typeOptions = [
+  { code: 'country', name: '国家' },
+  { code: 'continent', name: '洲' },
+];
 
 const listResponse = {
   items: [
@@ -134,6 +141,12 @@ const listResponse = {
 };
 
 describe('CustomsDictMissingView', () => {
+  beforeEach(() => {
+    server.use(
+      http.get(TYPES_OPTIONS_URL, () => HttpResponse.json(typeOptions)),
+    );
+  });
+
   it('renders missing list without actions column', async () => {
     let requestedType = '';
     server.use(

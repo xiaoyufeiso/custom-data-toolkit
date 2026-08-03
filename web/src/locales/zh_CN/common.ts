@@ -4,6 +4,7 @@ const common = {
   'common.currencies': '货币管理',
   'common.rates': '汇率管理',
   'common.customsDict': '字典管理',
+  'common.customsDictTypes': '字典类型管理',
   'common.customsDictMappings': '标准字典管理',
   'common.customsDictMissing': '缺失字典管理',
   'common.switchLang': '切换语言',

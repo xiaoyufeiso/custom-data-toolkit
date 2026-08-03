@@ -11,27 +11,19 @@ from custom_data_toolkit.models.customs_dict import (
     CustomsDictMapping,
     CustomsDictSource,
     CustomsDictSyncStatus,
-    CustomsDictType,
     normalize_dict_text,
+    normalize_dict_type_code,
 )
 from custom_data_toolkit.repositories.customs_dict_repository import CustomsDictRepository
+from custom_data_toolkit.repositories.customs_dict_type_repository import (
+    CustomsDictTypeRepository,
+)
 from custom_data_toolkit.services.customs_dict_redis import (
     CUSTOMS_DICT_XLSX_HEADERS,
-    DICT_TYPE_LABELS,
     IMPORT_MAX_ROWS,
     CustomsDictRedisStore,
     sanitize_redis_error,
 )
-
-
-def _parse_dict_type(dict_type: str) -> str:
-    try:
-        return CustomsDictType(dict_type).value
-    except ValueError as exc:
-        raise AppException(
-            "字典类型仅支持 country 或 continent。",
-            error_code="CustomsDict.InvalidType",
-        ) from exc
 
 
 class CustomsDictService:
@@ -39,9 +31,41 @@ class CustomsDictService:
         self,
         repository: CustomsDictRepository,
         redis_store: CustomsDictRedisStore,
+        type_repository: CustomsDictTypeRepository | None = None,
     ) -> None:
         self.repository = repository
         self.redis_store = redis_store
+        self.type_repository = type_repository or CustomsDictTypeRepository(repository.session)
+
+    def _require_enabled_type(self, dict_type: str) -> str:
+        cleaned = normalize_dict_type_code(dict_type)
+        if not cleaned:
+            raise AppException("请选择字典类型。", error_code="CustomsDict.InvalidType")
+        row = self.type_repository.get_by_code(cleaned)
+        if row is None or not row.enabled:
+            raise AppException(
+                "字典类型不存在或已停用。",
+                error_code="CustomsDict.InvalidType",
+            )
+        return row.code
+
+    def _require_existing_type(self, dict_type: str) -> str:
+        cleaned = normalize_dict_type_code(dict_type)
+        if not cleaned:
+            raise AppException("请选择字典类型。", error_code="CustomsDict.InvalidType")
+        row = self.type_repository.get_by_code(cleaned)
+        if row is None:
+            raise AppException(
+                "字典类型不存在。",
+                error_code="CustomsDict.InvalidType",
+            )
+        return row.code
+
+    def _type_label(self, code: str) -> str:
+        row = self.type_repository.get_by_code(code)
+        if row is not None:
+            return row.name
+        return code
 
     def list_page(
         self,
@@ -55,7 +79,8 @@ class CustomsDictService:
     ) -> tuple[list[CustomsDictMapping], int]:
         cleaned_type = None
         if dict_type is not None and dict_type.strip():
-            cleaned_type = _parse_dict_type(dict_type.strip())
+            # 列表筛选允许历史/停用类型 code
+            cleaned_type = normalize_dict_type_code(dict_type)
         cleaned_raw = normalize_dict_text(raw_value) if raw_value else None
         cleaned_standard = normalize_dict_text(standard_value) if standard_value else None
         if cleaned_raw == "":
@@ -86,7 +111,7 @@ class CustomsDictService:
         actor_id: int | None,
         source: str = CustomsDictSource.MANUAL.value,
     ) -> CustomsDictMapping:
-        cleaned_type = _parse_dict_type(dict_type.strip())
+        cleaned_type = self._require_enabled_type(dict_type)
         cleaned_raw = self._require_text(raw_value, field="原始值")
         cleaned_standard = self._require_text(standard_value, field="标准值")
         existing = self.repository.get_by_type_raw(cleaned_type, cleaned_raw)
@@ -239,7 +264,7 @@ class CustomsDictService:
         page: int,
         page_size: int,
     ) -> tuple[list[dict[str, object]], int]:
-        cleaned_type = _parse_dict_type(dict_type.strip())
+        cleaned_type = self._require_existing_type(dict_type)
         cleaned_raw = normalize_dict_text(raw_value) if raw_value else None
         if cleaned_raw == "":
             cleaned_raw = None
@@ -255,7 +280,7 @@ class CustomsDictService:
                 f"读取缺失字典失败：{sanitize_redis_error(exc)}",
                 error_code="CustomsDict.MissingReadFailed",
             ) from exc
-        label = DICT_TYPE_LABELS[cleaned_type]
+        label = self._type_label(cleaned_type)
         return [
             {
                 "dict_type": cleaned_type,
@@ -274,7 +299,7 @@ class CustomsDictService:
         standard_value: str,
         actor_id: int | None,
     ) -> CustomsDictMapping:
-        cleaned_type = _parse_dict_type(dict_type.strip())
+        cleaned_type = self._require_enabled_type(dict_type)
         cleaned_raw = self._require_text(raw_value, field="原始值")
         cleaned_standard = self._require_text(standard_value, field="标准值")
         existing = self.repository.get_by_type_raw(cleaned_type, cleaned_raw)
@@ -312,7 +337,7 @@ class CustomsDictService:
 
         from openpyxl import Workbook
 
-        cleaned_type = _parse_dict_type(dict_type.strip())
+        cleaned_type = self._require_existing_type(dict_type)
         cleaned_raw = normalize_dict_text(raw_value) if raw_value else None
         if cleaned_raw == "":
             cleaned_raw = None
@@ -331,7 +356,7 @@ class CustomsDictService:
         sheet = workbook.active
         sheet.title = "missing"
         sheet.append(list(CUSTOMS_DICT_XLSX_HEADERS))
-        label = DICT_TYPE_LABELS[cleaned_type]
+        label = self._type_label(cleaned_type)
         for member, score in items:
             sheet.append([cleaned_type, label, member, int(score), "", ""])
         buffer = BytesIO()
@@ -352,7 +377,7 @@ class CustomsDictService:
 
         cleaned_type = None
         if dict_type is not None and dict_type.strip():
-            cleaned_type = _parse_dict_type(dict_type.strip())
+            cleaned_type = normalize_dict_type_code(dict_type)
         cleaned_raw = normalize_dict_text(raw_value) if raw_value else None
         cleaned_standard = normalize_dict_text(standard_value) if standard_value else None
         if cleaned_raw == "":
@@ -374,7 +399,7 @@ class CustomsDictService:
             sheet.append(
                 [
                     mapping.dict_type,
-                    DICT_TYPE_LABELS.get(mapping.dict_type, mapping.dict_type),
+                    self._type_label(mapping.dict_type),
                     mapping.raw_value,
                     "",
                     mapping.standard_value,
@@ -450,7 +475,7 @@ class CustomsDictService:
                 dict_type = self._xlsx_cell(row, header_map["字典类型编码"])
                 raw_value = self._xlsx_cell(row, header_map["原始值"])
                 standard_value = self._xlsx_cell(row, header_map["标准值"])
-                cleaned_type = _parse_dict_type(dict_type)
+                cleaned_type = self._require_enabled_type(dict_type)
                 cleaned_raw = self._require_text(raw_value, field="原始值")
                 cleaned_standard = self._require_text(standard_value, field="标准值")
                 existing = self.repository.get_by_type_raw(cleaned_type, cleaned_raw)
@@ -517,7 +542,7 @@ class CustomsDictService:
         return all(cell is None or str(cell).strip() == "" for cell in row)
 
     def replay_sync(self, *, dict_type: str) -> dict[str, int]:
-        cleaned_type = _parse_dict_type(dict_type.strip())
+        cleaned_type = self._require_existing_type(dict_type)
         mappings = self.repository.list_by_dict_type(cleaned_type)
         synced = 0
         failed = 0

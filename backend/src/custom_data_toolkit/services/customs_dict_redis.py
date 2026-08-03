@@ -9,11 +9,6 @@ from custom_data_toolkit.config.settings import settings
 
 _PASSWORD_IN_URL = re.compile(r"(://[^:/@]+:)([^@/]+)(@)")
 
-DICT_TYPE_LABELS = {
-    "country": "国家",
-    "continent": "洲",
-}
-
 # 标准字典导出/导入与缺失导出共用表头（按列名匹配）
 CUSTOMS_DICT_XLSX_HEADERS = (
     "字典类型编码",

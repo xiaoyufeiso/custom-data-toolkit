@@ -14,6 +14,7 @@ from custom_data_toolkit.routers import (
     currency,
     customs_dict,
     customs_dict_missing,
+    customs_dict_types,
     health,
     public_rates,
     rate,
@@ -47,4 +48,5 @@ app.include_router(rate.router, prefix="/api/v1")
 app.include_router(api_keys.router, prefix="/api/v1")
 app.include_router(customs_dict.router, prefix="/api/v1")
 app.include_router(customs_dict_missing.missing_router, prefix="/api/v1")
+app.include_router(customs_dict_types.router, prefix="/api/v1")
 app.include_router(public_rates.router, prefix="/api/v1")
