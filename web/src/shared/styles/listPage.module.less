@@ -1,3 +1,5 @@
+/* 列表页共用：筛选区、可点行、详情字段 */
+
 .page {
   padding: var(--padding-page);
 }
@@ -13,41 +15,6 @@
 .toolbarTitle {
   display: block;
   margin-bottom: 10px;
-}
-
-.pageAction {
-  position: absolute;
-  z-index: 1;
-  top: 14px;
-  right: 24px;
-}
-
-.batchDeleteFieldset {
-  min-width: 0;
-  margin: 0;
-  padding: 0;
-  border: 0;
-}
-
-.batchToolbar {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 10px;
-  padding-top: 12px;
-  margin-top: 12px;
-  border-top: 1px solid var(--color-border-soft);
-}
-
-.batchToolbarActions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  width: 100%;
-}
-
-.syncFailed {
-  color: var(--color-error, #cf1322);
 }
 
 .clickableRow {
@@ -92,7 +59,13 @@
   word-break: break-word;
 }
 
-.detailFooter {
+.detailActions {
   display: flex;
-  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.syncFailed {
+  color: var(--color-error, #cf1322);
 }

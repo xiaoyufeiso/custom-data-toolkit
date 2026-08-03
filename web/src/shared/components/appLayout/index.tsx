@@ -117,13 +117,15 @@ const AppLayout = () => {
         />
       </Sider>
       <Layout className={styles.body}>
-        <Content className={styles.content}>
-          {activeRoute?.meta?.titleKey ? (
-            <h1 className={styles.pageTitle}>
-              {t(activeRoute.meta.titleKey)}
-            </h1>
-          ) : null}
-          {element}
+        <Content className={styles.content} data-admin-content>
+          <div className={styles.contentBody}>
+            {activeRoute?.meta?.titleKey ? (
+              <h1 className={styles.pageTitle}>
+                {t(activeRoute.meta.titleKey)}
+              </h1>
+            ) : null}
+            {element}
+          </div>
         </Content>
       </Layout>
     </Layout>

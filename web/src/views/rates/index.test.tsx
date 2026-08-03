@@ -113,6 +113,28 @@ vi.mock('tendata-ui', async (importOriginal) => {
         ) : null}
       </div>
     ),
+    Drawer: ({
+      open,
+      title,
+      onClose,
+      children,
+      maskClosable = true,
+    }: {
+      open?: boolean;
+      title?: React.ReactNode;
+      onClose?: () => void;
+      children?: React.ReactNode;
+      maskClosable?: boolean;
+    }) => (open ? (
+      <div data-testid="detail-drawer">
+        <div>{title}</div>
+        <button type="button" onClick={onClose}>关闭</button>
+        {maskClosable ? (
+          <button type="button" onClick={onClose}>遮罩</button>
+        ) : null}
+        {children}
+      </div>
+    ) : null),
   };
 });
 
@@ -121,6 +143,7 @@ vi.mock('@tendata-biz-components/biz-table', () => ({
     columns = [],
     dataSource = [],
     onChange,
+    onRow,
     onSortChange,
     page,
     rowSelection,
@@ -133,6 +156,7 @@ vi.mock('@tendata-biz-components/biz-table', () => ({
     }>;
     dataSource?: Array<Record<string, unknown>>;
     onChange?: (pagination: { current?: number; pageSize?: number }) => void;
+    onRow?: (row: Record<string, unknown>) => { onClick?: () => void };
     onSortChange?: (key: string, order: 'ascend' | 'descend') => void;
     page?: {
       current?: number;
@@ -146,7 +170,7 @@ vi.mock('@tendata-biz-components/biz-table', () => ({
       onChange?: (keys: React.Key[]) => void;
     };
   }) => {
-    const actionColumn = columns.find((column) => column.key === 'actions');
+    const currencyColumn = columns.find((column) => column.key === 'currencyName');
     const checkedColumn = columns.find((column) => column.key === 'checked');
     const dateColumn = columns.find((column) => column.key === 'date');
     const selectedKeys = rowSelection?.selectedRowKeys ?? [];
@@ -163,26 +187,30 @@ vi.mock('@tendata-biz-components/biz-table', () => ({
             event.target.checked ? dataSource.map((row) => row.id as React.Key) : [],
           )}
         />
-        {dataSource.map((row) => (
-          <div key={String(row.id)}>
-            <input
-              type="checkbox"
-              aria-label={`选择${String(row.currencyName)} ${String(row.date)}`}
-              checked={selectedKeys.includes(row.id as React.Key)}
-              onChange={(event) => rowSelection?.onChange?.(
-                event.target.checked
-                  ? [...selectedKeys, row.id as React.Key]
-                  : selectedKeys.filter((key) => key !== row.id),
-              )}
-            />
-            <span>{String(row.currencyName)}</span>
-            <span>{String(row.currencyCode ?? '—')}</span>
-            <span>{String(row.date)}</span>
-            <span>{String(row.data)}</span>
-            {checkedColumn?.render?.(row.checked, row)}
-            {actionColumn?.render?.(undefined, row)}
-          </div>
-        ))}
+        {dataSource.map((row) => {
+          const rowProps = onRow?.(row);
+          return (
+            <div key={String(row.id)} onClick={rowProps?.onClick}>
+              <input
+                type="checkbox"
+                aria-label={`选择${String(row.currencyName)} ${String(row.date)}`}
+                checked={selectedKeys.includes(row.id as React.Key)}
+                onChange={(event) => rowSelection?.onChange?.(
+                  event.target.checked
+                    ? [...selectedKeys, row.id as React.Key]
+                    : selectedKeys.filter((key) => key !== row.id),
+                )}
+                onClick={(event) => event.stopPropagation()}
+              />
+              {currencyColumn?.render?.(row.currencyName, row)
+                ?? <span>{String(row.currencyName)}</span>}
+              <span>{String(row.currencyCode ?? '—')}</span>
+              <span>{String(row.date)}</span>
+              <span>{String(row.data)}</span>
+              {checkedColumn?.render?.(row.checked, row)}
+            </div>
+          );
+        })}
         {page?.showTotal?.(page.total ?? 0)}
         <button
           type="button"
@@ -265,17 +293,19 @@ describe('RatesView', () => {
     expect(await screen.findByText('人民币')).toBeInTheDocument();
     expect(screen.getByText('CNY')).toBeInTheDocument();
     expect(screen.getByText('7.1200')).toBeInTheDocument();
-    expect(screen.getAllByText('已核对').length).toBeGreaterThan(1);
+    expect(screen.getAllByText('已核对').length).toBeGreaterThan(0);
     expect(screen.getByText('共 1 条')).toBeInTheDocument();
+    expect(screen.getByText('查询列表')).toBeInTheDocument();
     expect(screen.getByRole('combobox', { name: '全部日期' })).toHaveValue('');
     expect(screen.getByRole('combobox', { name: '全部状态' })).toHaveValue('');
     expect(screen.getByTestId('biz-table')).toHaveAttribute(
       'data-selection-column-width',
       '32',
     );
-    expect(
-      screen.getByRole('button', { name: '批量删除' }).closest('fieldset'),
-    ).toBeDisabled();
+    expect(screen.queryByText('已选择 0 项')).not.toBeInTheDocument();
+    expect(screen.queryByText('批量操作')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '批量删除' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '批量核对' })).not.toBeInTheDocument();
   });
 
   it('clears selected date mode and status through library clear controls', async () => {
@@ -305,6 +335,7 @@ describe('RatesView', () => {
     expect(await screen.findByRole('button', { name: 'Create rate' })).toBeInTheDocument();
     expect(screen.getByPlaceholderText('Currency code (e.g. CNY)')).toBeInTheDocument();
     expect(screen.getByText('1 items')).toBeInTheDocument();
+    expect(screen.getByText('Query List')).toBeInTheDocument();
   });
 
   it('keeps server-side pagination and date sorting behavior', async () => {
@@ -341,9 +372,11 @@ describe('RatesView', () => {
 
     await user.click(screen.getByRole('checkbox', { name: '选择人民币 2026-07-30' }));
     expect(screen.getByRole('button', { name: '批量删除' })).toBeInTheDocument();
+    expect(screen.getByText('已选择 1 项')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: '下一页' }));
     expect(await screen.findByText('美元')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '批量删除' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '批量删除' })).not.toBeInTheDocument();
+    expect(screen.queryByText('已选择 1 项')).not.toBeInTheDocument();
 
     const sortButton = screen.getByRole('button', { name: '日期切换排序' });
     await user.click(sortButton);
@@ -377,7 +410,7 @@ describe('RatesView', () => {
     await screen.findByText('人民币');
 
     await user.type(screen.getByPlaceholderText('字母代码（如 CNY）'), 'cny');
-    await user.click(screen.getByRole('button', { name: '筛选' }));
+    await user.click(screen.getByRole('button', { name: '查询' }));
 
     await waitFor(() => {
       expect(requestedCodes).toContain('CNY');
@@ -408,8 +441,9 @@ describe('RatesView', () => {
     await user.type(codeInput, 'cny');
     await user.selectOptions(screen.getByRole('combobox', { name: '全部日期' }), 'single');
     await user.selectOptions(screen.getByRole('combobox', { name: '全部状态' }), 'false');
-    await user.click(screen.getByRole('button', { name: '筛选' }));
+    await user.click(screen.getByRole('button', { name: '查询' }));
     await user.click(screen.getByRole('checkbox', { name: '选择人民币 2026-07-30' }));
+    expect(screen.getByText('已选择 1 项')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: '重置' }));
 
@@ -424,7 +458,8 @@ describe('RatesView', () => {
     expect(codeInput).toHaveValue('');
     expect(screen.getByRole('combobox', { name: '全部日期' })).toHaveValue('');
     expect(screen.getByRole('combobox', { name: '全部状态' })).toHaveValue('');
-    expect(screen.getByText('已选择 0 项')).toBeInTheDocument();
+    expect(screen.queryByText('已选择 0 项')).not.toBeInTheDocument();
+    expect(screen.queryByText('已选择 1 项')).not.toBeInTheDocument();
   });
 
   it('suggests code prefixes without filtering until explicitly requested', async () => {
@@ -483,7 +518,7 @@ describe('RatesView', () => {
     });
   });
 
-  it('updates a rate through the modal form', async () => {
+  it('updates a rate through edit modal from detail', async () => {
     const user = userEvent.setup();
     const updatePayload = vi.fn();
     useListHandlers();
@@ -497,9 +532,13 @@ describe('RatesView', () => {
     renderWithProviders(<RatesView />);
     await screen.findByText('人民币');
 
+    await user.click(screen.getByRole('button', { name: '人民币' }));
+    expect(screen.getByTestId('detail-drawer')).toBeInTheDocument();
+    expect(screen.getByText('汇率详情')).toBeInTheDocument();
+
     await user.click(screen.getByRole('button', { name: '编辑' }));
     expect(screen.getByRole('dialog')).toBeInTheDocument();
-
+    expect(screen.getByText('编辑汇率')).toBeInTheDocument();
     const valueInput = screen.getByLabelText('汇率值');
     await user.clear(valueInput);
     await user.type(valueInput, '7.1300');
@@ -529,6 +568,7 @@ describe('RatesView', () => {
     await screen.findByText('人民币');
 
     await user.click(screen.getByRole('button', { name: '新建汇率' }));
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: '请选择' }));
     await user.click(screen.getByRole('button', { name: 'CNY (人民币)' }));
     await user.type(screen.getByLabelText('日期'), '2026-07-30');
@@ -560,6 +600,7 @@ describe('RatesView', () => {
     await screen.findByText('人民币');
 
     expect(screen.queryByRole('button', { name: '删除' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '批量删除' })).not.toBeInTheDocument();
     await user.click(screen.getByRole('checkbox', { name: '选择人民币 2026-07-30' }));
     await user.click(screen.getByRole('button', { name: '批量删除' }));
     expect(await screen.findByText('确认删除选中的 1 条汇率？')).toBeInTheDocument();
@@ -589,14 +630,13 @@ describe('RatesView', () => {
     renderWithProviders(<RatesView />);
     await screen.findByText('人民币');
 
-    expect(screen.getByText('批量操作')).toBeInTheDocument();
-    expect(screen.getByText('已选择 0 项')).toBeInTheDocument();
-    const batchCheckButton = screen.getByRole('button', { name: '批量核对' });
-    expect(batchCheckButton).toBeDisabled();
-    expect(screen.queryByRole('checkbox', { name: '清空选择' })).not.toBeInTheDocument();
+    expect(screen.queryByText('批量操作')).not.toBeInTheDocument();
+    expect(screen.queryByText('已选择 0 项')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '批量核对' })).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole('checkbox', { name: '全选本页' }));
+    await user.click(screen.getByRole('checkbox', { name: '全选当前页' }));
     expect(screen.getByText('已选择 1 项')).toBeInTheDocument();
+    const batchCheckButton = screen.getByRole('button', { name: '批量核对' });
     expect(batchCheckButton).toBeEnabled();
     await user.click(batchCheckButton);
     expect(await screen.findByText('确认核对选中的 1 条汇率？')).toBeInTheDocument();
@@ -639,9 +679,11 @@ describe('RatesView', () => {
 
     renderWithProviders(<RatesView />);
     await screen.findByText('人民币');
+    expect(screen.queryByRole('button', { name: '批量删除' })).not.toBeInTheDocument();
     await user.click(screen.getByRole('checkbox', { name: '全选当前页' }));
 
     expect(screen.getByRole('button', { name: '批量删除' })).toBeInTheDocument();
+    expect(screen.getByText('已选择 2 项')).toBeInTheDocument();
   });
 
   it('returns to the previous page after deleting the last current-page rate', async () => {
@@ -723,7 +765,7 @@ describe('RatesView', () => {
     await waitFor(() => {
       expect(listRequests).toBeGreaterThan(1);
     });
-    expect(screen.getByRole('button', { name: '批量删除' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '批量删除' })).not.toBeInTheDocument();
   });
 
   it('clears stale batch-check selection and refreshes the list', async () => {
@@ -759,6 +801,7 @@ describe('RatesView', () => {
     await waitFor(() => {
       expect(listRequests).toBeGreaterThan(1);
     });
-    expect(screen.getByText('已选择 0 项')).toBeInTheDocument();
+    expect(screen.queryByText('已选择 0 项')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '批量核对' })).not.toBeInTheDocument();
   });
 });

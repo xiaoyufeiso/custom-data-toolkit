@@ -1,5 +1,6 @@
 .appLayout {
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
   background: var(--color-page-bg);
 }
 
@@ -24,12 +25,14 @@
 
 .body {
   min-width: 0;
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
   background: var(--color-page-bg);
 }
 
 .sider {
-  min-height: 100vh;
+  height: 100vh;
+  overflow: auto;
   background: var(--color-surface);
   border-right: 1px solid var(--color-border-soft);
 }
@@ -44,10 +47,19 @@
 }
 
 .content {
+  display: flex;
+  flex-direction: column;
   position: relative;
   min-width: 0;
-  min-height: 100vh;
+  height: 100%;
+  overflow: hidden;
   background: var(--color-page-bg);
+}
+
+.contentBody {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
 }
 
 .pageTitle {

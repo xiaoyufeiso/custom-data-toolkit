@@ -16,15 +16,12 @@ import {
 } from '@tendata-ui/icon';
 import {
   Button,
-  Card,
-  Checkbox,
   Drawer,
   Form,
   Input,
   Modal,
   Select,
   Space,
-  Typography,
   message,
 } from 'tendata-ui';
 import {
@@ -40,9 +37,10 @@ import {
   type CustomsDictMapping,
   type CustomsDictTypeOption,
 } from '@/services/customsDict';
+import QueryListCard from '@/shared/components/queryListCard';
 import { useTranslate } from '@/shared/hooks';
+import listStyles from '@/shared/styles/listPage.module.less';
 import { getApiErrorCode, getApiErrorMessage } from '@/shared/utils/apiError';
-import styles from './index.module.less';
 
 type ColumnsType = NonNullable<ComponentProps<typeof BizTable>['columns']>;
 
@@ -56,16 +54,6 @@ const downloadBlob = (blob: Blob, filename: string) => {
   anchor.click();
   URL.revokeObjectURL(url);
 };
-
-type CheckboxProps = {
-  checked?: boolean;
-  children?: React.ReactNode;
-  onChange?: (event: { target: { checked: boolean } }) => void;
-};
-
-const TendataCheckbox = Checkbox as unknown as (
-  props: CheckboxProps,
-) => React.ReactElement;
 
 type FilterDraft = {
   dictType?: string;
@@ -101,17 +89,19 @@ const CustomsDictMappingsView = () => {
   });
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [batchLoading, setBatchLoading] = useState(false);
+  const [batchDeleteLoading, setBatchDeleteLoading] = useState(false);
+  const [batchResyncLoading, setBatchResyncLoading] = useState(false);
   const [selectedRowKeys, setSelectedRowKeys] = useState<Key[]>([]);
   const [formOpen, setFormOpen] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
-  const [detailEditing, setDetailEditing] = useState(false);
   const [detail, setDetail] = useState<CustomsDictMapping | null>(null);
-  const [editStandardValue, setEditStandardValue] = useState('');
   const [importing, setImporting] = useState(false);
   const [typeOptionsRaw, setTypeOptionsRaw] = useState<CustomsDictTypeOption[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [form] = Form.useForm<FormState>();
+
+  const batchBusy = batchDeleteLoading || batchResyncLoading;
 
   const typeOptions = useMemo(
     () => typeOptionsRaw.map((item) => ({ label: item.name, value: item.code })),
@@ -167,70 +157,55 @@ const CustomsDictMappingsView = () => {
 
   const closeDetail = () => {
     setDetailOpen(false);
-    setDetailEditing(false);
-    setEditStandardValue('');
+    setDetail(null);
   };
 
   const openDetail = (row: CustomsDictMapping) => {
     setDetail(row);
-    setDetailEditing(false);
-    setEditStandardValue(row.standardValue);
     setDetailOpen(true);
   };
 
-  const startDetailEdit = () => {
-    if (!detail) return;
-    setEditStandardValue(detail.standardValue);
-    setDetailEditing(true);
-  };
-
-  const cancelDetailEdit = () => {
-    if (detail) {
-      setEditStandardValue(detail.standardValue);
-    }
-    setDetailEditing(false);
-  };
-
-  const saveDetailEdit = async () => {
-    if (!detail) return;
-    const nextValue = editStandardValue.trim();
-    if (!nextValue) {
-      message.warning(t('customsDict.message.standardRequired'));
-      return;
-    }
-    setSubmitting(true);
-    try {
-      const updated = await updateCustomsDictMapping(detail.id, {
-        standardValue: nextValue,
-      });
-      setDetail(updated);
-      setEditStandardValue(updated.standardValue);
-      setDetailEditing(false);
-      message.success(t('customsDict.message.saveSuccess'));
-      await load();
-    } catch (error) {
-      message.error(getApiErrorMessage(error, t('customsDict.message.loadFailed')));
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
   const openCreate = () => {
+    setEditingId(null);
     form.setFieldsValue(emptyForm);
     setFormOpen(true);
+  };
+
+  const openEdit = () => {
+    if (!detail) return;
+    setEditingId(detail.id);
+    form.setFieldsValue({
+      dictType: detail.dictType,
+      rawValue: detail.rawValue,
+      standardValue: detail.standardValue,
+    });
+    setFormOpen(true);
+  };
+
+  const closeForm = () => {
+    setFormOpen(false);
+    setEditingId(null);
+    form.resetFields();
   };
 
   const submitForm = async () => {
     const values = await form.validateFields();
     setSubmitting(true);
     try {
-      await createCustomsDictMapping({
-        dictType: values.dictType,
-        rawValue: values.rawValue.trim(),
-        standardValue: values.standardValue.trim(),
-      });
+      if (editingId != null) {
+        const updated = await updateCustomsDictMapping(editingId, {
+          standardValue: values.standardValue.trim(),
+        });
+        setDetail(updated);
+      } else {
+        await createCustomsDictMapping({
+          dictType: values.dictType,
+          rawValue: values.rawValue.trim(),
+          standardValue: values.standardValue.trim(),
+        });
+      }
       message.success(t('customsDict.message.saveSuccess'));
-      setFormOpen(false);
+      closeForm();
       await load();
     } catch (error) {
       message.error(getApiErrorMessage(error, t('customsDict.message.loadFailed')));
@@ -242,7 +217,7 @@ const CustomsDictMappingsView = () => {
   const onBatchDelete = async () => {
     const ids = selectedRowKeys.map(Number);
     if (ids.length === 0) return;
-    setBatchLoading(true);
+    setBatchDeleteLoading(true);
     try {
       const result = await batchDisableCustomsDictMappings(ids);
       message.success(t('customsDict.batchDelete.success', { count: result.disabled }));
@@ -260,14 +235,14 @@ const CustomsDictMappingsView = () => {
         await load();
       }
     } finally {
-      setBatchLoading(false);
+      setBatchDeleteLoading(false);
     }
   };
 
   const onBatchResync = async () => {
     const ids = selectedRowKeys.map(Number);
     if (ids.length === 0) return;
-    setBatchLoading(true);
+    setBatchResyncLoading(true);
     try {
       const result = await batchResyncCustomsDictMappings(ids);
       message.success(t('customsDict.batchResync.success', {
@@ -283,7 +258,7 @@ const CustomsDictMappingsView = () => {
         await load();
       }
     } finally {
-      setBatchLoading(false);
+      setBatchResyncLoading(false);
     }
   };
 
@@ -326,7 +301,7 @@ const CustomsDictMappingsView = () => {
       render: (value: string, row: CustomsDictMapping) => (
         <button
           type="button"
-          className={styles.rawValueLink}
+          className={listStyles.rawValueLink}
           onClick={(event) => {
             event.stopPropagation();
             openDetail(row);
@@ -346,7 +321,7 @@ const CustomsDictMappingsView = () => {
       dataIndex: 'syncStatus',
       key: 'syncStatus',
       render: (status: string) => (
-        <span className={status === 'failed' ? styles.syncFailed : undefined}>
+        <span className={status === 'failed' ? listStyles.syncFailed : undefined}>
           {syncLabel(status)}
         </span>
       ),
@@ -410,44 +385,11 @@ const CustomsDictMappingsView = () => {
   };
 
   return (
-    <div className={styles.page}>
-      <div className={styles.pageAction}>
-        <Space>
-          <Button icon={<DownloadOutlined />} onClick={onDownloadTemplate}>
-            {t('customsDict.action.importTemplate')}
-          </Button>
-          <Button icon={<DownloadOutlined />} onClick={onExport}>
-            {t('customsDict.action.export')}
-          </Button>
-          <Button
-            icon={<UploadOutlined />}
-            loading={importing}
-            onClick={() => fileInputRef.current?.click()}
-          >
-            {t('customsDict.action.import')}
-          </Button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            style={{ display: 'none' }}
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-              if (file) {
-                void onImportFile(file);
-              }
-            }}
-          />
-          <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
-            {t('customsDict.action.create')}
-          </Button>
-        </Space>
-      </div>
-
-      <div className={styles.toolbar}>
-        <Typography.Text strong className={styles.toolbarTitle}>
-          {t('customsDict.mappings.title')}
-        </Typography.Text>
+    <div className={listStyles.page}>
+      <div className={listStyles.toolbar}>
+        <strong className={listStyles.toolbarTitle}>
+          {t('common.filters.title')}
+        </strong>
         <Space wrap>
           <Select
             allowClear
@@ -506,61 +448,73 @@ const CustomsDictMappingsView = () => {
             {t('customsDict.action.refresh')}
           </Button>
         </Space>
-        <div className={styles.batchToolbar}>
-          <strong>{t('customsDict.batchActions.title')}</strong>
-          <div className={styles.batchToolbarActions}>
-            <Space wrap>
-              <TendataCheckbox
-                checked={
-                  items.length > 0
-                  && items.every((item) => selectedRowKeys.includes(item.id))
-                }
-                onChange={({ target }) => {
-                  setSelectedRowKeys(target.checked ? items.map((item) => item.id) : []);
-                }}
-              >
-                {t('customsDict.batchActions.selectPage')}
-              </TendataCheckbox>
-              <span>
-                {t('customsDict.batchActions.selected', {
-                  count: selectedRowKeys.length,
-                })}
-              </span>
-              <fieldset
-                disabled={selectedRowKeys.length === 0 || batchLoading}
-                className={styles.batchDeleteFieldset}
-              >
-                <Space>
-                  <Button
-                    danger
-                    loading={batchLoading}
-                    disabled={selectedRowKeys.length === 0}
-                    onClick={openBatchDeleteConfirm}
-                  >
-                    {t('customsDict.batchDelete.button')}
-                  </Button>
-                  <Button
-                    loading={batchLoading}
-                    disabled={selectedRowKeys.length === 0}
-                    onClick={openBatchResyncConfirm}
-                  >
-                    {t('customsDict.batchResync.button')}
-                  </Button>
-                </Space>
-              </fieldset>
-            </Space>
-          </div>
-        </div>
       </div>
 
-      <Card>
+      <QueryListCard
+        title={t('common.queryList')}
+        actions={(
+          <Space>
+            <Button icon={<DownloadOutlined />} onClick={onDownloadTemplate}>
+              {t('customsDict.action.importTemplate')}
+            </Button>
+            <Button icon={<DownloadOutlined />} onClick={onExport}>
+              {t('customsDict.action.export')}
+            </Button>
+            <Button
+              icon={<UploadOutlined />}
+              loading={importing}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              {t('customsDict.action.import')}
+            </Button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+              style={{ display: 'none' }}
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) {
+                  void onImportFile(file);
+                }
+              }}
+            />
+            <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
+              {t('customsDict.action.create')}
+            </Button>
+          </Space>
+        )}
+        selectionCount={selectedRowKeys.length}
+        selectionLabel={t('common.batchActions.selected', {
+          count: selectedRowKeys.length,
+        })}
+        selectionActions={(
+          <>
+            <Button
+              danger
+              loading={batchDeleteLoading}
+              disabled={batchBusy}
+              onClick={openBatchDeleteConfirm}
+            >
+              {t('customsDict.batchDelete.button')}
+            </Button>
+            <Button
+              loading={batchResyncLoading}
+              disabled={batchBusy}
+              onClick={openBatchResyncConfirm}
+            >
+              {t('customsDict.batchResync.button')}
+            </Button>
+          </>
+        )}
+      >
         <BizTable
           rowKey="id"
           columns={columns}
           dataSource={items}
           tdLoading={loading}
           locale={{ emptyText: t('customsDict.empty') }}
-          rowClassName={() => styles.clickableRow}
+          rowClassName={() => listStyles.clickableRow}
           rowSelection={{
             columnWidth: 32,
             selectedRowKeys,
@@ -585,13 +539,15 @@ const CustomsDictMappingsView = () => {
             setPageSize(pagination.pageSize ?? DEFAULT_PAGE_SIZE);
           }}
         />
-      </Card>
+      </QueryListCard>
 
       <Modal
         open={formOpen}
-        title={t('customsDict.modal.createTitle')}
-        onCancel={() => setFormOpen(false)}
-        onOk={submitForm}
+        title={editingId != null
+          ? t('customsDict.modal.editTitle')
+          : t('customsDict.modal.createTitle')}
+        onCancel={closeForm}
+        onOk={() => void submitForm()}
         confirmLoading={submitting}
         destroyOnClose
         maskClosable={false}
@@ -604,14 +560,14 @@ const CustomsDictMappingsView = () => {
             label={t('customsDict.form.dictType')}
             rules={[{ required: true, message: t('customsDict.message.dictTypeRequired') }]}
           >
-            <Select options={typeOptions} />
+            <Select options={typeOptions} disabled={editingId != null} />
           </Form.Item>
           <Form.Item
             name="rawValue"
             label={t('customsDict.form.rawValue')}
             rules={[{ required: true, message: t('customsDict.message.rawRequired') }]}
           >
-            <Input />
+            <Input disabled={editingId != null} />
           </Form.Item>
           <Form.Item
             name="standardValue"
@@ -628,63 +584,39 @@ const CustomsDictMappingsView = () => {
         title={t('customsDict.modal.detailTitle')}
         width={480}
         destroyOnClose
-        maskClosable={!detailEditing}
         onClose={closeDetail}
-        footer={(
-          <div className={styles.detailFooter}>
-            {detailEditing ? (
-              <Space>
-                <Button onClick={cancelDetailEdit} disabled={submitting}>
-                  {t('customsDict.action.cancel')}
-                </Button>
-                <Button type="primary" loading={submitting} onClick={saveDetailEdit}>
-                  {t('customsDict.action.save')}
-                </Button>
-              </Space>
-            ) : (
-              <Button type="primary" onClick={startDetailEdit}>
-                {t('customsDict.action.edit')}
-              </Button>
-            )}
-          </div>
-        )}
       >
         {detail && (
-          <div className={styles.detailGrid}>
-            <div className={styles.detailRow}>
-              <span className={styles.detailLabel}>{t('customsDict.column.dictType')}</span>
-              <span className={styles.detailValue}>{typeLabel(detail.dictType)}</span>
+          <div className={listStyles.detailGrid}>
+            <div className={listStyles.detailRow}>
+              <span className={listStyles.detailLabel}>{t('customsDict.column.dictType')}</span>
+              <span className={listStyles.detailValue}>{typeLabel(detail.dictType)}</span>
             </div>
-            <div className={styles.detailRow}>
-              <span className={styles.detailLabel}>{t('customsDict.column.rawValue')}</span>
-              <span className={styles.detailValue}>{detail.rawValue}</span>
+            <div className={listStyles.detailRow}>
+              <span className={listStyles.detailLabel}>{t('customsDict.column.rawValue')}</span>
+              <span className={listStyles.detailValue}>{detail.rawValue}</span>
             </div>
-            <div className={styles.detailRow}>
-              <span className={styles.detailLabel}>{t('customsDict.column.standardValue')}</span>
-              <span className={styles.detailValue}>
-                {detailEditing ? (
-                  <Input
-                    value={editStandardValue}
-                    onChange={(event) => setEditStandardValue(event.target.value)}
-                    aria-label={t('customsDict.form.standardValue')}
-                  />
-                ) : (
-                  detail.standardValue
-                )}
-              </span>
+            <div className={listStyles.detailRow}>
+              <span className={listStyles.detailLabel}>{t('customsDict.column.standardValue')}</span>
+              <span className={listStyles.detailValue}>{detail.standardValue}</span>
             </div>
-            <div className={styles.detailRow}>
-              <span className={styles.detailLabel}>{t('customsDict.column.syncStatus')}</span>
-              <span className={styles.detailValue}>
+            <div className={listStyles.detailRow}>
+              <span className={listStyles.detailLabel}>{t('customsDict.column.syncStatus')}</span>
+              <span className={listStyles.detailValue}>
                 {syncLabel(detail.syncStatus)}
                 {detail.syncError ? (
-                  <div className={styles.syncFailed}>{detail.syncError}</div>
+                  <div className={listStyles.syncFailed}>{detail.syncError}</div>
                 ) : null}
               </span>
             </div>
-            <div className={styles.detailRow}>
-              <span className={styles.detailLabel}>{t('customsDict.column.source')}</span>
-              <span className={styles.detailValue}>{detail.source}</span>
+            <div className={listStyles.detailRow}>
+              <span className={listStyles.detailLabel}>{t('customsDict.column.source')}</span>
+              <span className={listStyles.detailValue}>{detail.source}</span>
+            </div>
+            <div className={listStyles.detailActions}>
+              <Button type="primary" onClick={openEdit}>
+                {t('customsDict.action.edit')}
+              </Button>
             </div>
           </div>
         )}

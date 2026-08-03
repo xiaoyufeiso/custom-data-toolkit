@@ -54,6 +54,28 @@ vi.mock('tendata-ui', async (importOriginal) => {
         ))}
       </div>
     ),
+    Drawer: ({
+      open,
+      title,
+      onClose,
+      children,
+      maskClosable = true,
+    }: {
+      open?: boolean;
+      title?: React.ReactNode;
+      onClose?: () => void;
+      children?: React.ReactNode;
+      maskClosable?: boolean;
+    }) => (open ? (
+      <div data-testid="detail-drawer">
+        <div>{title}</div>
+        <button type="button" onClick={onClose}>关闭</button>
+        {maskClosable ? (
+          <button type="button" onClick={onClose}>遮罩</button>
+        ) : null}
+        {children}
+      </div>
+    ) : null),
   };
 });
 
@@ -62,15 +84,18 @@ vi.mock('@tendata-biz-components/biz-table', () => ({
     columns = [],
     dataSource = [],
     onChange,
+    onRow,
     page,
     rowSelection,
   }: {
     columns?: Array<{
       key?: string;
+      dataIndex?: string;
       render?: (value: unknown, row: Record<string, unknown>) => React.ReactNode;
     }>;
     dataSource?: Array<Record<string, unknown>>;
     onChange?: (pagination: { current?: number; pageSize?: number }) => void;
+    onRow?: (row: Record<string, unknown>) => { onClick?: () => void };
     page?: {
       current?: number;
       pageSize?: number;
@@ -83,7 +108,7 @@ vi.mock('@tendata-biz-components/biz-table', () => ({
       onChange?: (keys: React.Key[]) => void;
     };
   }) => {
-    const actionColumn = columns.find((column) => column.key === 'actions');
+    const nameColumn = columns.find((column) => column.key === 'name');
     const selectedKeys = rowSelection?.selectedRowKeys ?? [];
     return (
       <div
@@ -101,23 +126,35 @@ vi.mock('@tendata-biz-components/biz-table', () => ({
           />
           全选当前页
         </div>
-        {dataSource.map((row) => (
-          <div key={String(row.id)}>
-            <input
-              type="checkbox"
-              aria-label={`选择${String(row.name)}`}
-              checked={selectedKeys.includes(row.id as React.Key)}
-              onChange={(event) => rowSelection?.onChange?.(
-                event.target.checked
-                  ? [...selectedKeys, row.id as React.Key]
-                  : selectedKeys.filter((key) => key !== row.id),
-              )}
-            />
-            <span>{String(row.name)}</span>
-            <span>{String(row.code ?? '—')}</span>
-            {actionColumn?.render?.(undefined, row)}
-          </div>
-        ))}
+        {dataSource.map((row) => {
+          const rowProps = onRow?.(row);
+          return (
+            <div
+              key={String(row.id)}
+              data-testid={`row-${String(row.id)}`}
+              onClick={rowProps?.onClick}
+              onKeyDown={undefined}
+              role="button"
+              tabIndex={0}
+            >
+              <input
+                type="checkbox"
+                aria-label={`选择${String(row.name)}`}
+                checked={selectedKeys.includes(row.id as React.Key)}
+                onClick={(event) => event.stopPropagation()}
+                onChange={(event) => rowSelection?.onChange?.(
+                  event.target.checked
+                    ? [...selectedKeys, row.id as React.Key]
+                    : selectedKeys.filter((key) => key !== row.id),
+                )}
+              />
+              {nameColumn?.render
+                ? nameColumn.render(row.name, row)
+                : <span>{String(row.name)}</span>}
+              <span>{String(row.code ?? '—')}</span>
+            </div>
+          );
+        })}
         {page?.showTotal?.(page.total ?? 0)}
         {(page?.total ?? 0) > (page?.pageSize ?? 20) ? (
           <button
@@ -156,21 +193,18 @@ describe('CurrenciesView', () => {
 
     renderWithProviders(<CurrenciesView />);
 
-    expect(await screen.findByText('人民币')).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: '人民币' })).toBeInTheDocument();
     expect(screen.getByText('CNY')).toBeInTheDocument();
     expect(screen.getByText('共 2 条')).toBeInTheDocument();
     expect(screen.getByText('筛选条件')).toBeInTheDocument();
-    expect(screen.getByText('批量操作')).toBeInTheDocument();
-    expect(screen.getByRole('checkbox', { name: '全选本页' })).toBeInTheDocument();
-    expect(screen.getByText('已选择 0 项')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '批量核对' })).not.toBeInTheDocument();
+    expect(screen.getByText('查询列表')).toBeInTheDocument();
+    expect(screen.queryByText('批量操作')).not.toBeInTheDocument();
+    expect(screen.queryByText('已选择 0 项')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '批量删除' })).not.toBeInTheDocument();
     expect(screen.getByTestId('biz-table')).toHaveAttribute(
       'data-selection-column-width',
       '32',
     );
-    expect(
-      screen.getByRole('button', { name: '批量删除' }).closest('fieldset'),
-    ).toBeDisabled();
   });
 
   it('shows case-insensitive prefix suggestions without searching automatically', async () => {
@@ -285,7 +319,7 @@ describe('CurrenciesView', () => {
     });
   });
 
-  it('updates a currency through the edit modal', async () => {
+  it('updates a currency through edit modal from detail', async () => {
     const user = userEvent.setup();
     const updatePayload = vi.fn();
     server.use(
@@ -297,12 +331,13 @@ describe('CurrenciesView', () => {
     );
 
     renderWithProviders(<CurrenciesView />);
-    await screen.findByText('人民币');
+    await user.click(await screen.findByRole('button', { name: '人民币' }));
+    expect(await screen.findByTestId('detail-drawer')).toBeInTheDocument();
+    expect(screen.getByText('货币详情')).toBeInTheDocument();
 
-    const editButtons = screen.getAllByRole('button', { name: '编辑' });
-    await user.click(editButtons[0]!);
+    await user.click(screen.getByRole('button', { name: '编辑' }));
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
     expect(screen.getByText('编辑货币')).toBeInTheDocument();
-
     const nameInput = screen.getByLabelText('名称');
     await user.clear(nameInput);
     await user.type(nameInput, '人民币新版');
@@ -384,7 +419,7 @@ describe('CurrenciesView', () => {
     await user.click(screen.getByRole('button', { name: '下一页' }));
 
     expect(await screen.findByText('欧元')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '批量删除' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '批量删除' })).not.toBeInTheDocument();
   });
 
   it('returns to the previous page when all rows on the current page are deleted', async () => {
@@ -450,6 +485,6 @@ describe('CurrenciesView', () => {
     await waitFor(() => {
       expect(listRequests).toBeGreaterThan(1);
     });
-    expect(screen.getByRole('button', { name: '批量删除' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '批量删除' })).not.toBeInTheDocument();
   });
 });

@@ -9,12 +9,12 @@ import BizTable from '@tendata-biz-components/biz-table';
 import { DownloadOutlined, ReloadOutlined } from '@tendata-ui/icon';
 import {
   Button,
-  Card,
   Drawer,
+  Form,
   Input,
+  Modal,
   Select,
   Space,
-  Typography,
   message,
 } from 'tendata-ui';
 import {
@@ -25,9 +25,10 @@ import {
   type CustomsDictMissingItem,
   type CustomsDictTypeOption,
 } from '@/services/customsDict';
+import QueryListCard from '@/shared/components/queryListCard';
 import { useTranslate } from '@/shared/hooks';
+import listStyles from '@/shared/styles/listPage.module.less';
 import { getApiErrorMessage } from '@/shared/utils/apiError';
-import styles from './index.module.less';
 
 type ColumnsType = NonNullable<ComponentProps<typeof BizTable>['columns']>;
 
@@ -64,11 +65,15 @@ const CustomsDictMissingView = () => {
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
-  const [detailHandling, setDetailHandling] = useState(false);
+  const [handleOpen, setHandleOpen] = useState(false);
   const [detail, setDetail] = useState<CustomsDictMissingItem | null>(null);
-  const [standardValue, setStandardValue] = useState('');
   const [typeOptionsRaw, setTypeOptionsRaw] = useState<CustomsDictTypeOption[]>([]);
   const [typesReady, setTypesReady] = useState(false);
+  const [form] = Form.useForm<{
+    dictType: string;
+    rawValue: string;
+    standardValue: string;
+  }>();
 
   const typeOptions = useMemo(
     () => typeOptionsRaw.map((item) => ({ label: item.name, value: item.code })),
@@ -118,31 +123,33 @@ const CustomsDictMissingView = () => {
 
   const closeDetail = () => {
     setDetailOpen(false);
-    setDetailHandling(false);
-    setStandardValue('');
     setDetail(null);
   };
 
   const openDetail = (row: CustomsDictMissingItem) => {
     setDetail(row);
-    setDetailHandling(false);
-    setStandardValue('');
     setDetailOpen(true);
   };
 
-  const startHandle = () => {
-    setStandardValue('');
-    setDetailHandling(true);
+  const openHandle = () => {
+    if (!detail) return;
+    form.setFieldsValue({
+      dictType: detail.dictType,
+      rawValue: detail.rawValue,
+      standardValue: '',
+    });
+    setHandleOpen(true);
   };
 
-  const cancelHandle = () => {
-    setStandardValue('');
-    setDetailHandling(false);
+  const closeHandle = () => {
+    setHandleOpen(false);
+    form.resetFields();
   };
 
   const submitHandle = async () => {
     if (!detail) return;
-    const nextValue = standardValue.trim();
+    const values = await form.validateFields();
+    const nextValue = values.standardValue.trim();
     if (!nextValue) {
       message.warning(t('customsDict.message.standardRequired'));
       return;
@@ -155,12 +162,30 @@ const CustomsDictMissingView = () => {
         standardValue: nextValue,
       });
       message.success(t('customsDict.message.handleSuccess'));
+      closeHandle();
       closeDetail();
       await load();
     } catch (error) {
       message.error(getApiErrorMessage(error, t('customsDict.message.loadFailed')));
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const onExport = async () => {
+    if (!applied.dictType) {
+      message.warning(t('customsDict.message.dictTypeRequired'));
+      return;
+    }
+    try {
+      const blob = await exportCustomsDictMissing({
+        dictType: applied.dictType,
+        rawValue: applied.rawValue || undefined,
+      });
+      downloadBlob(blob, `customs-dict-missing-${applied.dictType}.xlsx`);
+      message.success(t('customsDict.message.exportSuccess'));
+    } catch (error) {
+      message.error(getApiErrorMessage(error, t('customsDict.message.loadFailed')));
     }
   };
 
@@ -177,7 +202,7 @@ const CustomsDictMissingView = () => {
       render: (value: string, row: CustomsDictMissingItem) => (
         <button
           type="button"
-          className={styles.rawValueLink}
+          className={listStyles.rawValueLink}
           onClick={(event) => {
             event.stopPropagation();
             openDetail(row);
@@ -195,35 +220,11 @@ const CustomsDictMissingView = () => {
   ];
 
   return (
-    <div className={styles.page}>
-      <div className={styles.pageAction}>
-        <Button
-          icon={<DownloadOutlined />}
-          onClick={async () => {
-            if (!applied.dictType) {
-              message.warning(t('customsDict.message.dictTypeRequired'));
-              return;
-            }
-            try {
-              const blob = await exportCustomsDictMissing({
-                dictType: applied.dictType,
-                rawValue: applied.rawValue || undefined,
-              });
-              downloadBlob(blob, `customs-dict-missing-${applied.dictType}.xlsx`);
-              message.success(t('customsDict.message.exportSuccess'));
-            } catch (error) {
-              message.error(getApiErrorMessage(error, t('customsDict.message.loadFailed')));
-            }
-          }}
-        >
-          {t('customsDict.action.export')}
-        </Button>
-      </div>
-
-      <div className={styles.toolbar}>
-        <Typography.Text strong className={styles.toolbarTitle}>
-          {t('customsDict.missing.title')}
-        </Typography.Text>
+    <div className={listStyles.page}>
+      <div className={listStyles.toolbar}>
+        <strong className={listStyles.toolbarTitle}>
+          {t('common.filters.title')}
+        </strong>
         <Space wrap>
           <Select
             placeholder={t('customsDict.filter.dictType')}
@@ -271,14 +272,21 @@ const CustomsDictMissingView = () => {
         </Space>
       </div>
 
-      <Card>
+      <QueryListCard
+        title={t('common.queryList')}
+        actions={(
+          <Button icon={<DownloadOutlined />} onClick={() => void onExport()}>
+            {t('customsDict.action.export')}
+          </Button>
+        )}
+      >
         <BizTable
           rowKey={(row: CustomsDictMissingItem) => `${row.dictType}:${row.rawValue}`}
           columns={columns}
           dataSource={items}
           tdLoading={loading}
           locale={{ emptyText: t('customsDict.empty') }}
-          rowClassName={() => styles.clickableRow}
+          rowClassName={() => listStyles.clickableRow}
           onRow={(row: CustomsDictMissingItem) => ({
             onClick: () => openDetail(row),
           })}
@@ -294,65 +302,70 @@ const CustomsDictMissingView = () => {
             setPageSize(pagination.pageSize ?? DEFAULT_PAGE_SIZE);
           }}
         />
-      </Card>
+      </QueryListCard>
+
+      <Modal
+        open={handleOpen}
+        title={t('customsDict.modal.handleTitle')}
+        okText={t('customsDict.action.save')}
+        cancelText={t('customsDict.action.cancel')}
+        confirmLoading={submitting}
+        destroyOnClose
+        maskClosable={false}
+        onOk={() => void submitHandle()}
+        onCancel={closeHandle}
+      >
+        <Form form={form} layout="vertical">
+          <Form.Item
+            name="dictType"
+            label={t('customsDict.form.dictType')}
+          >
+            <Select options={typeOptions} disabled />
+          </Form.Item>
+          <Form.Item
+            name="rawValue"
+            label={t('customsDict.form.rawValue')}
+          >
+            <Input disabled />
+          </Form.Item>
+          <Form.Item
+            name="standardValue"
+            label={t('customsDict.form.standardValue')}
+            rules={[{ required: true, message: t('customsDict.message.standardRequired') }]}
+          >
+            <Input />
+          </Form.Item>
+        </Form>
+      </Modal>
 
       <Drawer
         open={detailOpen}
         title={t('customsDict.modal.missingDetailTitle')}
         width={480}
         destroyOnClose
-        maskClosable={!detailHandling}
         onClose={closeDetail}
-        footer={(
-          <div className={styles.detailFooter}>
-            {detailHandling ? (
-              <Space>
-                <Button onClick={cancelHandle} disabled={submitting}>
-                  {t('customsDict.action.cancel')}
-                </Button>
-                <Button type="primary" loading={submitting} onClick={submitHandle}>
-                  {t('customsDict.action.save')}
-                </Button>
-              </Space>
-            ) : (
-              <Button type="primary" onClick={startHandle}>
-                {t('customsDict.action.handle')}
-              </Button>
-            )}
-          </div>
-        )}
       >
         {detail && (
-          <div className={styles.detailGrid}>
-            <div className={styles.detailRow}>
-              <span className={styles.detailLabel}>{t('customsDict.column.dictType')}</span>
-              <span className={styles.detailValue}>{detail.dictTypeLabel}</span>
+          <div className={listStyles.detailGrid}>
+            <div className={listStyles.detailRow}>
+              <span className={listStyles.detailLabel}>{t('customsDict.column.dictType')}</span>
+              <span className={listStyles.detailValue}>{detail.dictTypeLabel}</span>
             </div>
-            <div className={styles.detailRow}>
-              <span className={styles.detailLabel}>{t('customsDict.column.rawValue')}</span>
-              <span className={styles.detailValue}>{detail.rawValue}</span>
+            <div className={listStyles.detailRow}>
+              <span className={listStyles.detailLabel}>{t('customsDict.column.rawValue')}</span>
+              <span className={listStyles.detailValue}>{detail.rawValue}</span>
             </div>
-            <div className={styles.detailRow}>
-              <span className={styles.detailLabel}>
+            <div className={listStyles.detailRow}>
+              <span className={listStyles.detailLabel}>
                 {t('customsDict.column.occurrenceCount')}
               </span>
-              <span className={styles.detailValue}>{detail.occurrenceCount}</span>
+              <span className={listStyles.detailValue}>{detail.occurrenceCount}</span>
             </div>
-            {detailHandling ? (
-              <div className={styles.detailRow}>
-                <span className={styles.detailLabel}>
-                  {t('customsDict.column.standardValue')}
-                </span>
-                <span className={styles.detailValue}>
-                  <Input
-                    value={standardValue}
-                    onChange={(event) => setStandardValue(event.target.value)}
-                    aria-label={t('customsDict.form.standardValue')}
-                    placeholder={t('customsDict.form.standardValue')}
-                  />
-                </span>
-              </div>
-            ) : null}
+            <div className={listStyles.detailActions}>
+              <Button type="primary" onClick={openHandle}>
+                {t('customsDict.action.handle')}
+              </Button>
+            </div>
           </div>
         )}
       </Drawer>

@@ -61,14 +61,12 @@ vi.mock('tendata-ui', async (importOriginal) => {
       title,
       onClose,
       children,
-      footer,
       maskClosable = true,
     }: {
       open?: boolean;
       title?: React.ReactNode;
       onClose?: () => void;
       children?: React.ReactNode;
-      footer?: React.ReactNode;
       maskClosable?: boolean;
     }) => (open ? (
       <div data-testid="detail-drawer">
@@ -78,7 +76,6 @@ vi.mock('tendata-ui', async (importOriginal) => {
           <button type="button" onClick={onClose}>遮罩</button>
         ) : null}
         {children}
-        <div data-testid="detail-footer">{footer}</div>
       </div>
     ) : null),
   };
@@ -215,14 +212,18 @@ describe('CustomsDictMappingsView', () => {
     renderWithProviders(<CustomsDictMappingsView />);
 
     expect(await screen.findByText('美国')).toBeInTheDocument();
+    expect(screen.getByText('查询列表')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'USA' })).toBeInTheDocument();
     expect(screen.getByText('共 1 条')).toBeInTheDocument();
     expect(requestedEnabled).toBe('true');
     expect(screen.queryByPlaceholderText('启停状态')).not.toBeInTheDocument();
     expect(screen.queryByText('启用')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '编辑' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '停用' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '删除' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '重新同步' })).not.toBeInTheDocument();
+    expect(screen.queryByText('批量操作')).not.toBeInTheDocument();
+    expect(screen.queryByText('已选择 0 项')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '批量删除' })).not.toBeInTheDocument();
   });
 
   it('opens detail drawer from raw value link and closes via mask', async () => {
@@ -258,7 +259,7 @@ describe('CustomsDictMappingsView', () => {
     expect(await screen.findByTestId('detail-drawer')).toBeInTheDocument();
   });
 
-  it('edits standard value inside detail drawer', async () => {
+  it('edits standard value through edit modal from detail', async () => {
     const user = userEvent.setup();
     const patchPayload = vi.fn();
     server.use(
@@ -277,6 +278,8 @@ describe('CustomsDictMappingsView', () => {
     expect(await screen.findByTestId('detail-drawer')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: '编辑' }));
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(screen.getByText('编辑映射')).toBeInTheDocument();
     const input = screen.getByLabelText('标准值');
     await user.clear(input);
     await user.type(input, '美利坚');
@@ -307,11 +310,10 @@ describe('CustomsDictMappingsView', () => {
     renderWithProviders(<CustomsDictMappingsView />);
     await screen.findByText('美国');
 
-    expect(
-      screen.getByRole('button', { name: '批量删除' }).closest('fieldset'),
-    ).toBeDisabled();
+    expect(screen.queryByRole('button', { name: '批量删除' })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('checkbox', { name: '选择USA' }));
+    expect(screen.getByText('已选择 1 项')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: '批量删除' }));
 
     await waitFor(() => {
@@ -351,7 +353,8 @@ describe('CustomsDictMappingsView', () => {
     renderWithProviders(<CustomsDictMappingsView />);
     await screen.findByText('日本');
 
-    await user.click(screen.getByRole('checkbox', { name: '全选本页' }));
+    await user.click(screen.getByRole('checkbox', { name: '选择USA' }));
+    await user.click(screen.getByRole('checkbox', { name: '选择JPN' }));
     await user.click(screen.getByRole('button', { name: '批量同步' }));
 
     await waitFor(() => {

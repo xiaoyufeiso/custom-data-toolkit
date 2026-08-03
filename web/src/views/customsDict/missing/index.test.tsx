@@ -51,14 +51,12 @@ vi.mock('tendata-ui', async (importOriginal) => {
       title,
       onClose,
       children,
-      footer,
       maskClosable = true,
     }: {
       open?: boolean;
       title?: React.ReactNode;
       onClose?: () => void;
       children?: React.ReactNode;
-      footer?: React.ReactNode;
       maskClosable?: boolean;
     }) => (open ? (
       <div data-testid="detail-drawer">
@@ -68,7 +66,6 @@ vi.mock('tendata-ui', async (importOriginal) => {
           <button type="button" onClick={onClose}>遮罩</button>
         ) : null}
         {children}
-        <div data-testid="detail-footer">{footer}</div>
       </div>
     ) : null),
   };
@@ -80,6 +77,7 @@ vi.mock('@tendata-biz-components/biz-table', () => ({
     dataSource = [],
     onRow,
     page,
+    rowSelection,
   }: {
     columns?: Array<{
       key?: string;
@@ -92,8 +90,9 @@ vi.mock('@tendata-biz-components/biz-table', () => ({
       total?: number;
       showTotal?: (total: number) => React.ReactNode;
     };
+    rowSelection?: unknown;
   }) => (
-    <div data-testid="biz-table">
+    <div data-testid="biz-table" data-has-selection={rowSelection ? 'yes' : 'no'}>
       {dataSource.map((row) => {
         const rawColumn = columns.find((column) => column.key === 'rawValue');
         const rowProps = onRow?.(row);
@@ -159,11 +158,16 @@ describe('CustomsDictMissingView', () => {
     renderWithProviders(<CustomsDictMissingView />);
 
     expect(await screen.findByRole('button', { name: 'KOR' })).toBeInTheDocument();
+    expect(screen.getByText('查询列表')).toBeInTheDocument();
     expect(screen.getByText('12')).toBeInTheDocument();
     expect(screen.getByText('共 1 条')).toBeInTheDocument();
-    expect(screen.getByText('缺失字典')).toBeInTheDocument();
+    expect(screen.getByText('筛选条件')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '导出' })).toBeInTheDocument();
     expect(requestedType).toBe('country');
     expect(screen.queryByRole('button', { name: '处理' })).not.toBeInTheDocument();
+    expect(screen.queryByText('批量操作')).not.toBeInTheDocument();
+    expect(screen.queryByText('已选择 0 项')).not.toBeInTheDocument();
+    expect(screen.getByTestId('biz-table')).toHaveAttribute('data-has-selection', 'no');
   });
 
   it('uses bordered reset and link-style refresh', async () => {
@@ -211,6 +215,8 @@ describe('CustomsDictMissingView', () => {
     expect(screen.getByText('缺失详情')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: '处理' }));
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(screen.getByText('处理缺失')).toBeInTheDocument();
     await user.type(screen.getByLabelText('标准值'), '韩国');
     await user.click(screen.getByRole('button', { name: '保存' }));
 
