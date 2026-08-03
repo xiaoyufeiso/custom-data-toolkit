@@ -161,3 +161,47 @@ export async function exportCustomsDictMissing(params: {
   });
   return data;
 }
+
+export type CustomsDictImportResult = {
+  created: number;
+  updated: number;
+  failed: number;
+  errors: Array<{ row: number; message: string }>;
+};
+
+export async function exportCustomsDictMappings(params: {
+  dictType?: string;
+  rawValue?: string;
+  standardValue?: string;
+  enabled?: boolean;
+}): Promise<Blob> {
+  const { data } = await http.get<Blob>('/customs-dict/mappings/export', {
+    params: {
+      ...params,
+      enabled: params.enabled ?? true,
+    },
+    responseType: 'blob',
+  });
+  return data;
+}
+
+export async function downloadCustomsDictImportTemplate(): Promise<Blob> {
+  const { data } = await http.get<Blob>('/customs-dict/mappings/import-template', {
+    responseType: 'blob',
+  });
+  return data;
+}
+
+export async function importCustomsDictMappings(file: File): Promise<CustomsDictImportResult> {
+  const formData = new FormData();
+  formData.append('file', file);
+  const { data } = await http.post<CustomsDictImportResult>(
+    '/customs-dict/mappings/import',
+    formData,
+    {
+      // 去掉实例默认 application/json，让浏览器为 FormData 带上 boundary
+      headers: { 'Content-Type': undefined },
+    },
+  );
+  return data;
+}

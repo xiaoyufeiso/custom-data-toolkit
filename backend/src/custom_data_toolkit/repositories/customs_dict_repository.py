@@ -7,16 +7,14 @@ class CustomsDictRepository:
     def __init__(self, session: Session) -> None:
         self.session = session
 
-    def list_page(
+    def _filtered_statements(
         self,
         *,
         dict_type: str | None,
         raw_value: str | None,
         standard_value: str | None,
         enabled: bool | None,
-        page: int,
-        page_size: int,
-    ) -> tuple[list[CustomsDictMapping], int]:
+    ):
         statement = select(CustomsDictMapping)
         count_statement = select(func.count()).select_from(CustomsDictMapping)
         if dict_type:
@@ -35,6 +33,24 @@ class CustomsDictRepository:
         if enabled is not None:
             statement = statement.where(CustomsDictMapping.enabled == enabled)
             count_statement = count_statement.where(CustomsDictMapping.enabled == enabled)
+        return statement, count_statement
+
+    def list_page(
+        self,
+        *,
+        dict_type: str | None,
+        raw_value: str | None,
+        standard_value: str | None,
+        enabled: bool | None,
+        page: int,
+        page_size: int,
+    ) -> tuple[list[CustomsDictMapping], int]:
+        statement, count_statement = self._filtered_statements(
+            dict_type=dict_type,
+            raw_value=raw_value,
+            standard_value=standard_value,
+            enabled=enabled,
+        )
         total = int(self.session.exec(count_statement).one())
         statement = (
             statement.order_by(col(CustomsDictMapping.id).desc())
@@ -42,6 +58,23 @@ class CustomsDictRepository:
             .limit(page_size)
         )
         return list(self.session.exec(statement).all()), total
+
+    def list_all_filtered(
+        self,
+        *,
+        dict_type: str | None,
+        raw_value: str | None,
+        standard_value: str | None,
+        enabled: bool | None,
+    ) -> list[CustomsDictMapping]:
+        statement, _ = self._filtered_statements(
+            dict_type=dict_type,
+            raw_value=raw_value,
+            standard_value=standard_value,
+            enabled=enabled,
+        )
+        statement = statement.order_by(col(CustomsDictMapping.id).desc())
+        return list(self.session.exec(statement).all())
 
     def list_by_dict_type(self, dict_type: str) -> list[CustomsDictMapping]:
         statement = select(CustomsDictMapping).where(CustomsDictMapping.dict_type == dict_type)

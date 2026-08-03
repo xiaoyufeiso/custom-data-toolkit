@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, File, Query, UploadFile, status
+from fastapi.responses import Response
 
 from custom_data_toolkit.deps import CurrentAuthDep, SessionDep, require_session_csrf
 from custom_data_toolkit.models.customs_dict import CustomsDictMapping
@@ -7,6 +8,8 @@ from custom_data_toolkit.routers.common_schemas import BatchIdsRequest
 from custom_data_toolkit.routers.customs_dict_schemas import (
     CustomsDictBatchDisableResponse,
     CustomsDictBatchResyncResponse,
+    CustomsDictImportErrorItem,
+    CustomsDictImportResponse,
     CustomsDictMappingCreateRequest,
     CustomsDictMappingListResponse,
     CustomsDictMappingPublic,
@@ -118,6 +121,68 @@ def batch_resync_mappings(
     _ = auth
     result = service.batch_resync(body.ids)
     return CustomsDictBatchResyncResponse(**result)
+
+
+@router.get("/export")
+def export_mappings(
+    _auth: CurrentAuthDep,
+    service: CustomsDictService = CustomsDictServiceDep,
+    dict_type: str | None = Query(default=None, alias="dictType"),
+    raw_value: str | None = Query(default=None, alias="rawValue"),
+    standard_value: str | None = Query(default=None, alias="standardValue"),
+    enabled: bool | None = True,
+) -> Response:
+    content = service.export_mappings_xlsx(
+        dict_type=dict_type,
+        raw_value=raw_value,
+        standard_value=standard_value,
+        enabled=enabled,
+    )
+    return Response(
+        content=content,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": 'attachment; filename="customs-dict-mappings.xlsx"',
+        },
+    )
+
+
+@router.get("/import-template")
+def import_template(
+    _auth: CurrentAuthDep,
+    service: CustomsDictService = CustomsDictServiceDep,
+) -> Response:
+    content = service.import_template_xlsx()
+    return Response(
+        content=content,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": 'attachment; filename="customs-dict-import-template.xlsx"',
+        },
+    )
+
+
+@router.post(
+    "/import",
+    response_model=CustomsDictImportResponse,
+)
+async def import_mappings(
+    auth: CurrentAuthDep,
+    _csrf: None = Depends(require_session_csrf),
+    service: CustomsDictService = CustomsDictServiceDep,
+    file: UploadFile = File(...),
+) -> CustomsDictImportResponse:
+    content = await file.read()
+    result = service.import_mappings_xlsx(content=content, actor_id=auth.user.id)
+    return CustomsDictImportResponse(
+        created=int(result["created"]),
+        updated=int(result["updated"]),
+        failed=int(result["failed"]),
+        errors=[
+            CustomsDictImportErrorItem(row=int(item["row"]), message=str(item["message"]))
+            for item in result["errors"]  # type: ignore[union-attr]
+        ],
+    )
 
 
 @router.get("/{mapping_id}", response_model=CustomsDictMappingPublic)

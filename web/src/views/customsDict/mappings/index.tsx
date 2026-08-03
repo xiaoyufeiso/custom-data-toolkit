@@ -4,10 +4,16 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import BizTable from '@tendata-biz-components/biz-table';
-import { PlusOutlined, ReloadOutlined } from '@tendata-ui/icon';
+import {
+  DownloadOutlined,
+  PlusOutlined,
+  ReloadOutlined,
+  UploadOutlined,
+} from '@tendata-ui/icon';
 import {
   Button,
   Card,
@@ -25,6 +31,9 @@ import {
   batchDisableCustomsDictMappings,
   batchResyncCustomsDictMappings,
   createCustomsDictMapping,
+  downloadCustomsDictImportTemplate,
+  exportCustomsDictMappings,
+  importCustomsDictMappings,
   listCustomsDictMappings,
   updateCustomsDictMapping,
   type CustomsDictMapping,
@@ -36,6 +45,15 @@ import styles from './index.module.less';
 type ColumnsType = NonNullable<ComponentProps<typeof BizTable>['columns']>;
 
 const DEFAULT_PAGE_SIZE = 20;
+
+const downloadBlob = (blob: Blob, filename: string) => {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
+};
 
 type CheckboxProps = {
   checked?: boolean;
@@ -88,6 +106,8 @@ const CustomsDictMappingsView = () => {
   const [detailEditing, setDetailEditing] = useState(false);
   const [detail, setDetail] = useState<CustomsDictMapping | null>(null);
   const [editStandardValue, setEditStandardValue] = useState('');
+  const [importing, setImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [form] = Form.useForm<FormState>();
 
   const typeOptions = useMemo(
@@ -324,12 +344,95 @@ const CustomsDictMappingsView = () => {
     },
   ];
 
+  const onExport = async () => {
+    try {
+      const blob = await exportCustomsDictMappings({
+        dictType: applied.dictType,
+        rawValue: applied.rawValue || undefined,
+        standardValue: applied.standardValue || undefined,
+        enabled: true,
+      });
+      downloadBlob(blob, 'customs-dict-mappings.xlsx');
+      message.success(t('customsDict.message.exportSuccess'));
+    } catch (error) {
+      message.error(getApiErrorMessage(error, t('customsDict.message.loadFailed')));
+    }
+  };
+
+  const onDownloadTemplate = async () => {
+    try {
+      const blob = await downloadCustomsDictImportTemplate();
+      downloadBlob(blob, 'customs-dict-import-template.xlsx');
+      message.success(t('customsDict.message.exportSuccess'));
+    } catch (error) {
+      message.error(getApiErrorMessage(error, t('customsDict.message.loadFailed')));
+    }
+  };
+
+  const onImportFile = async (file: File) => {
+    setImporting(true);
+    try {
+      const result = await importCustomsDictMappings(file);
+      message.success(t('customsDict.message.importSuccess', {
+        created: result.created,
+        updated: result.updated,
+        failed: result.failed,
+      }));
+      if (result.failed > 0) {
+        const preview = (result.errors ?? [])
+          .slice(0, 3)
+          .map((item) => `第${item.row}行：${item.message}`)
+          .join('；');
+        message.warning(
+          preview
+            ? `${t('customsDict.message.importPartial')} ${preview}`
+            : t('customsDict.message.importPartial'),
+        );
+      }
+      await load();
+    } catch (error) {
+      message.error(getApiErrorMessage(error, t('customsDict.message.importFailed')));
+    } finally {
+      setImporting(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
   return (
     <div className={styles.page}>
       <div className={styles.pageAction}>
-        <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
-          {t('customsDict.action.create')}
-        </Button>
+        <Space>
+          <Button icon={<DownloadOutlined />} onClick={onDownloadTemplate}>
+            {t('customsDict.action.importTemplate')}
+          </Button>
+          <Button icon={<DownloadOutlined />} onClick={onExport}>
+            {t('customsDict.action.export')}
+          </Button>
+          <Button
+            icon={<UploadOutlined />}
+            loading={importing}
+            onClick={() => fileInputRef.current?.click()}
+          >
+            {t('customsDict.action.import')}
+          </Button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            style={{ display: 'none' }}
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (file) {
+                void onImportFile(file);
+              }
+            }}
+          />
+          <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
+            {t('customsDict.action.create')}
+          </Button>
+        </Space>
       </div>
 
       <div className={styles.toolbar}>

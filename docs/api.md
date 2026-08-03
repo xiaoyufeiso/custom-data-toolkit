@@ -272,6 +272,9 @@
 | 方法 | 路径 | 说明 |
 |---|---|---|
 | GET | `/customs-dict/mappings` | 列表；query：`dictType`、`rawValue`、`standardValue`、`enabled`、`page`、`pageSize` |
+| GET | `/customs-dict/mappings/export` | 导出当前筛选全量 xlsx（默认 `enabled=true`）；表头与缺失导出同构 |
+| GET | `/customs-dict/mappings/import-template` | 下载仅含表头的导入模板 xlsx |
+| POST | `/customs-dict/mappings/import` | multipart 上传 xlsx；upsert；单行失败不整批回滚；`source=import` |
 | GET | `/customs-dict/mappings/{id}` | 详情 |
 | POST | `/customs-dict/mappings` | 新建（默认启用，source=`manual`） |
 | PATCH | `/customs-dict/mappings/{id}` | 仅更新 `standardValue`；若提交不同 `rawValue` → 400 `CustomsDict.RawValueImmutable` |
@@ -300,6 +303,10 @@
 
 常见错误码：`CustomsDict.NotFound`、`CustomsDict.DuplicateRawValue`、`CustomsDict.RawValueImmutable`、`CustomsDict.InvalidType`、`CustomsDict.EmptyValue`。  
 Redis 失败时 MySQL 仍保存，`syncStatus` 为 `failed`/`pending`，`syncError` 脱敏。
+
+导入/导出 xlsx 表头（与缺失导出一致）：`字典类型编码 | 字典类型名称 | 原始值 | 出现次数 | 标准值 | 备注`。  
+导入必填：`字典类型编码`、`原始值`、`标准值`（类型仅 `country`/`continent`）；忽略名称/次数/备注。同类型原始值已存在则更新标准值并增量同步 Redis；不存在则新建（`source=import`，默认启用）。导入**不**自动 ZREM missing。建议单文件 ≤1000 行数据。  
+导入成功 body：`{ "created": 1, "updated": 2, "failed": 1, "errors": [{ "row": 3, "message": "..." }] }`。整文件表头非法等 → 4xx；单行失败计入 `failed`，其它行继续。
 
 ### 8.1 缺失字典
 

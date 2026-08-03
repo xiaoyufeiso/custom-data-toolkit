@@ -16,7 +16,9 @@ from custom_data_toolkit.models.customs_dict import (
 )
 from custom_data_toolkit.repositories.customs_dict_repository import CustomsDictRepository
 from custom_data_toolkit.services.customs_dict_redis import (
+    CUSTOMS_DICT_XLSX_HEADERS,
     DICT_TYPE_LABELS,
+    IMPORT_MAX_ROWS,
     CustomsDictRedisStore,
     sanitize_redis_error,
 )
@@ -82,6 +84,7 @@ class CustomsDictService:
         raw_value: str,
         standard_value: str,
         actor_id: int | None,
+        source: str = CustomsDictSource.MANUAL.value,
     ) -> CustomsDictMapping:
         cleaned_type = _parse_dict_type(dict_type.strip())
         cleaned_raw = self._require_text(raw_value, field="原始值")
@@ -98,7 +101,7 @@ class CustomsDictService:
             raw_value=cleaned_raw,
             standard_value=cleaned_standard,
             enabled=True,
-            source=CustomsDictSource.MANUAL.value,
+            source=source,
             sync_status=CustomsDictSyncStatus.PENDING.value,
             created_by=actor_id,
             updated_by=actor_id,
@@ -327,15 +330,191 @@ class CustomsDictService:
         workbook = Workbook()
         sheet = workbook.active
         sheet.title = "missing"
-        sheet.append(
-            ["字典类型编码", "字典类型名称", "原始值", "出现次数", "标准值", "备注"]
-        )
+        sheet.append(list(CUSTOMS_DICT_XLSX_HEADERS))
         label = DICT_TYPE_LABELS[cleaned_type]
         for member, score in items:
             sheet.append([cleaned_type, label, member, int(score), "", ""])
         buffer = BytesIO()
         workbook.save(buffer)
         return buffer.getvalue()
+
+    def export_mappings_xlsx(
+        self,
+        *,
+        dict_type: str | None,
+        raw_value: str | None,
+        standard_value: str | None,
+        enabled: bool | None,
+    ) -> bytes:
+        from io import BytesIO
+
+        from openpyxl import Workbook
+
+        cleaned_type = None
+        if dict_type is not None and dict_type.strip():
+            cleaned_type = _parse_dict_type(dict_type.strip())
+        cleaned_raw = normalize_dict_text(raw_value) if raw_value else None
+        cleaned_standard = normalize_dict_text(standard_value) if standard_value else None
+        if cleaned_raw == "":
+            cleaned_raw = None
+        if cleaned_standard == "":
+            cleaned_standard = None
+
+        mappings = self.repository.list_all_filtered(
+            dict_type=cleaned_type,
+            raw_value=cleaned_raw,
+            standard_value=cleaned_standard,
+            enabled=enabled,
+        )
+        workbook = Workbook()
+        sheet = workbook.active
+        sheet.title = "mappings"
+        sheet.append(list(CUSTOMS_DICT_XLSX_HEADERS))
+        for mapping in mappings:
+            sheet.append(
+                [
+                    mapping.dict_type,
+                    DICT_TYPE_LABELS.get(mapping.dict_type, mapping.dict_type),
+                    mapping.raw_value,
+                    "",
+                    mapping.standard_value,
+                    "",
+                ]
+            )
+        buffer = BytesIO()
+        workbook.save(buffer)
+        return buffer.getvalue()
+
+    def import_template_xlsx(self) -> bytes:
+        from io import BytesIO
+
+        from openpyxl import Workbook
+
+        workbook = Workbook()
+        sheet = workbook.active
+        sheet.title = "mappings"
+        sheet.append(list(CUSTOMS_DICT_XLSX_HEADERS))
+        buffer = BytesIO()
+        workbook.save(buffer)
+        return buffer.getvalue()
+
+    def import_mappings_xlsx(
+        self,
+        *,
+        content: bytes,
+        actor_id: int | None,
+    ) -> dict[str, object]:
+        from io import BytesIO
+
+        from openpyxl import load_workbook
+
+        try:
+            workbook = load_workbook(BytesIO(content), read_only=True, data_only=True)
+        except Exception as exc:  # noqa: BLE001
+            raise AppException(
+                "无法解析 Excel 文件，请上传有效的 xlsx。",
+                error_code="CustomsDict.ImportInvalidFile",
+            ) from exc
+
+        sheet = workbook.active
+        rows = sheet.iter_rows(values_only=True)
+        try:
+            header_row = next(rows)
+        except StopIteration as exc:
+            raise AppException(
+                "导入文件为空。",
+                error_code="CustomsDict.ImportEmpty",
+            ) from exc
+
+        header_map = self._xlsx_header_map(header_row)
+        created = 0
+        updated = 0
+        failed = 0
+        errors: list[dict[str, object]] = []
+        data_rows = 0
+
+        for excel_row_number, row in enumerate(rows, start=2):
+            if self._xlsx_row_empty(row):
+                continue
+            data_rows += 1
+            if data_rows > IMPORT_MAX_ROWS:
+                errors.append(
+                    {
+                        "row": excel_row_number,
+                        "message": f"超过单次导入上限 {IMPORT_MAX_ROWS} 行。",
+                    }
+                )
+                failed += 1
+                break
+            try:
+                dict_type = self._xlsx_cell(row, header_map["字典类型编码"])
+                raw_value = self._xlsx_cell(row, header_map["原始值"])
+                standard_value = self._xlsx_cell(row, header_map["标准值"])
+                cleaned_type = _parse_dict_type(dict_type)
+                cleaned_raw = self._require_text(raw_value, field="原始值")
+                cleaned_standard = self._require_text(standard_value, field="标准值")
+                existing = self.repository.get_by_type_raw(cleaned_type, cleaned_raw)
+                if existing is None:
+                    self.create(
+                        dict_type=cleaned_type,
+                        raw_value=cleaned_raw,
+                        standard_value=cleaned_standard,
+                        actor_id=actor_id,
+                        source=CustomsDictSource.IMPORT.value,
+                    )
+                    created += 1
+                else:
+                    assert existing.id is not None
+                    self.update_standard_value(
+                        existing.id,
+                        standard_value=cleaned_standard,
+                        raw_value=None,
+                        actor_id=actor_id,
+                    )
+                    updated += 1
+            except AppException as exc:
+                failed += 1
+                errors.append({"row": excel_row_number, "message": exc.message})
+            except Exception as exc:  # noqa: BLE001
+                failed += 1
+                errors.append({"row": excel_row_number, "message": str(exc)[:200]})
+
+        return {
+            "created": created,
+            "updated": updated,
+            "failed": failed,
+            "errors": errors,
+        }
+
+    @staticmethod
+    def _xlsx_header_map(header_row: tuple[object, ...] | list[object]) -> dict[str, int]:
+        normalized = {
+            str(cell).strip(): index
+            for index, cell in enumerate(header_row)
+            if cell is not None and str(cell).strip()
+        }
+        missing = [name for name in ("字典类型编码", "原始值", "标准值") if name not in normalized]
+        if missing:
+            raise AppException(
+                f"表头缺少列：{', '.join(missing)}。请使用与导出相同的模板。",
+                error_code="CustomsDict.ImportBadHeader",
+            )
+        return normalized
+
+    @staticmethod
+    def _xlsx_cell(row: tuple[object, ...] | list[object], index: int) -> str:
+        if index >= len(row):
+            return ""
+        value = row[index]
+        if value is None:
+            return ""
+        return str(value)
+
+    @staticmethod
+    def _xlsx_row_empty(row: tuple[object, ...] | list[object] | None) -> bool:
+        if row is None:
+            return True
+        return all(cell is None or str(cell).strip() == "" for cell in row)
 
     def replay_sync(self, *, dict_type: str) -> dict[str, int]:
         cleaned_type = _parse_dict_type(dict_type.strip())

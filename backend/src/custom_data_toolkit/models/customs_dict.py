@@ -15,6 +15,7 @@ class CustomsDictType(StrEnum):
 class CustomsDictSource(StrEnum):
     MANUAL = "manual"
     MISSING = "missing"
+    IMPORT = "import"
 
 
 class CustomsDictSyncStatus(StrEnum):

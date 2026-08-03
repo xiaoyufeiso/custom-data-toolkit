@@ -60,6 +60,18 @@ class CustomsDictBatchResyncResponse(CamelModel):
     total: int
 
 
+class CustomsDictImportErrorItem(CamelModel):
+    row: int
+    message: str
+
+
+class CustomsDictImportResponse(CamelModel):
+    created: int
+    updated: int
+    failed: int
+    errors: list[CustomsDictImportErrorItem]
+
+
 class CustomsDictMissingPublic(CamelModel):
     dict_type: str = Field(alias="dictType")
     dict_type_label: str = Field(alias="dictTypeLabel")

@@ -14,6 +14,18 @@ DICT_TYPE_LABELS = {
     "continent": "洲",
 }
 
+# 标准字典导出/导入与缺失导出共用表头（按列名匹配）
+CUSTOMS_DICT_XLSX_HEADERS = (
+    "字典类型编码",
+    "字典类型名称",
+    "原始值",
+    "出现次数",
+    "标准值",
+    "备注",
+)
+
+IMPORT_MAX_ROWS = 1000
+
 
 class RedisClient(Protocol):
     def hset(self, name: str, key: str | None = None, value: str | None = None) -> int: ...

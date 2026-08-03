@@ -403,4 +403,105 @@ describe('CustomsDictMappingsView', () => {
       standardValue: '日本',
     });
   });
+
+  it('exports mappings with current filters', async () => {
+    const user = userEvent.setup();
+    const exportUrl = vi.fn();
+    const createObjectURL = vi.fn(() => 'blob:mock');
+    const revokeObjectURL = vi.fn();
+    Object.defineProperty(URL, 'createObjectURL', { value: createObjectURL, configurable: true });
+    Object.defineProperty(URL, 'revokeObjectURL', { value: revokeObjectURL, configurable: true });
+
+    server.use(
+      http.get(MAPPINGS_URL, () => HttpResponse.json(listResponse)),
+      http.get(`${MAPPINGS_URL}/export`, ({ request }) => {
+        exportUrl(request.url);
+        return new HttpResponse(new Blob(['xlsx']), {
+          headers: {
+            'Content-Type':
+              'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          },
+        });
+      }),
+    );
+
+    renderWithProviders(<CustomsDictMappingsView />);
+    await screen.findByText('美国');
+    await user.click(screen.getByRole('button', { name: '导出' }));
+
+    await waitFor(() => {
+      expect(exportUrl).toHaveBeenCalled();
+    });
+    const url = String(exportUrl.mock.calls[0][0]);
+    expect(url).toContain('enabled=true');
+  });
+
+  it('imports xlsx and shows result summary', async () => {
+    const user = userEvent.setup();
+    const importBody = vi.fn();
+    server.use(
+      http.get(MAPPINGS_URL, () => HttpResponse.json(listResponse)),
+      http.post(`${MAPPINGS_URL}/import`, async ({ request }) => {
+        const form = await request.formData();
+        importBody(form.get('file'));
+        return HttpResponse.json({
+          created: 1,
+          updated: 0,
+          failed: 1,
+          errors: [{ row: 3, message: '标准值不能为空' }],
+        });
+      }),
+    );
+
+    renderWithProviders(<CustomsDictMappingsView />);
+    await screen.findByText('美国');
+
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    expect(fileInput).toBeTruthy();
+    const file = new File(['dummy'], 'mappings.xlsx', {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+    await user.upload(fileInput, file);
+
+    await waitFor(() => {
+      expect(importBody).toHaveBeenCalled();
+    });
+    const uploaded = importBody.mock.calls[0][0] as Blob;
+    expect(uploaded).toBeTruthy();
+    expect(uploaded.size).toBeGreaterThan(0);
+  });
+
+  it('downloads import template', async () => {
+    const user = userEvent.setup();
+    const templateHit = vi.fn();
+    Object.defineProperty(URL, 'createObjectURL', {
+      value: vi.fn(() => 'blob:tpl'),
+      configurable: true,
+    });
+    Object.defineProperty(URL, 'revokeObjectURL', {
+      value: vi.fn(),
+      configurable: true,
+    });
+
+    server.use(
+      http.get(MAPPINGS_URL, () => HttpResponse.json(listResponse)),
+      http.get(`${MAPPINGS_URL}/import-template`, () => {
+        templateHit();
+        return new HttpResponse(new Blob(['tpl']), {
+          headers: {
+            'Content-Type':
+              'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          },
+        });
+      }),
+    );
+
+    renderWithProviders(<CustomsDictMappingsView />);
+    await screen.findByText('美国');
+    await user.click(screen.getByRole('button', { name: '下载模板' }));
+
+    await waitFor(() => {
+      expect(templateHit).toHaveBeenCalled();
+    });
+  });
 });

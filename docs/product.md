@@ -65,9 +65,14 @@ MVP 仅预置管理员账号，**不开放自助注册**。
 - 标准字典映射管理 + 增量 Redis 同步
 - 缺失字典（读 ZSET、处理、导出）
 
+### In Scope（标准字典导入/导出 — change `add-customs-dict-import`）
+
+- 标准字典 xlsx 导出 / 导入（表头与缺失导出同构；upsert；`source=import`）
+- 导入模板下载
+
 ### Out of Scope（除非新 change / 明确解冻）
 
-- 标准字典**导入**、操作日志、处理历史、整表覆盖式全量同步
+- 操作日志、处理历史、整表覆盖式全量同步
 - 货币名称字典、字典类型编辑、物理删除映射、标准值强制列表
 - 爬虫采集逻辑
 - Casdoor / Casbin / SSO / 自助注册
@@ -91,4 +96,4 @@ MVP 仅预置管理员账号，**不开放自助注册**。
 | 外部表语义 | `docs/data-contract.md` |
 | API 契约（过渡） | `docs/api.md`（目标迁 OpenAPI） |
 | 决策 | `docs/decisions.md` |
-| 海关字典 | `openspec/specs/customs-dict/spec.md`；交付中：`openspec/changes/add-customs-dict-mgmt/` |
+| 海关字典 | `openspec/specs/customs-dict/spec.md`；导入导出：`openspec/changes/add-customs-dict-import/` |

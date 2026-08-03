@@ -4,8 +4,8 @@
 
 ## 当前状态
 
-- 阶段：海关字典第一版 — **包 5 验收归档完成**
-- 整体状态：功能开发完成，待合并 `feat/customs-dict-mapping-model` → main（按需）
+- 阶段：标准字典导入/导出 — change `add-customs-dict-import`
+- 整体状态：实现完成，待合并 `feat/customs-dict-import`（基于 `feat/customs-dict-mapping-model`）
 - 最后更新：2026-08-03
 
 ## 里程碑
@@ -15,19 +15,24 @@
 | M0–M6 汇率 MVP 及发布整理 | 完成 |
 | 海关字典第一版文档 / Redis 默认假设 | 完成 |
 | 海关字典第一版开发（包 1–5） | 完成 |
+| 标准字典导入/导出 | 完成 |
 
 ## 阻塞
 
-无。导入 / 类型管理 / 整表覆盖等仍为 Deferred。
+无。类型管理 / 整表覆盖 / 处理历史等仍为 Deferred。
 
 ## 下一步
 
-1. 合并 `feat/customs-dict-mapping-model` 至 main（按需）
-2. 可选：E5 Redis 友好错误文案；另立 change 做导入
+1. 合并 `feat/customs-dict-import`（或先合并 mapping-model）至 main（按需）
+2. 可选：E5 Redis 友好错误文案；归档 `add-customs-dict-import`
 
-切片：`openspec/changes/archive/add-customs-dict-mgmt/tasks.md`
+切片：`openspec/changes/add-customs-dict-import/tasks.md`
 
 ## 日志（摘录）
+
+### 2026-08-03（导入/导出）
+
+- 共享表头；标准字典 export / import-template / import（upsert，`source=import`）；前端标准页按钮；api/product 更新
 
 ### 2026-08-03（包 5）
 
