@@ -164,3 +164,43 @@ def test_customs_dict_mapping_crud_and_redis_sync(
     assert replay.status_code == 200
     assert replay.json()["total"] >= 1
     assert fake_redis.hget(formal_dict_key("country"), "第三方字段") == "XXX"
+
+
+def test_mappings_q_or_filter_and_suggestions(client: TestClient) -> None:
+    headers = _login(client)
+    suffix = datetime.now(UTC).strftime("%H%M%S%f")
+    raw = f"QRaw-{suffix}"
+    standard = f"QStd-{suffix}"
+
+    created = client.post(
+        "/api/v1/customs-dict/mappings",
+        json={"dictType": "country", "rawValue": raw, "standardValue": standard},
+        headers=headers,
+    )
+    assert created.status_code == 201, created.text
+
+    by_raw = client.get(
+        "/api/v1/customs-dict/mappings",
+        params={"q": raw[-8:], "enabled": True},
+        headers=headers,
+    )
+    assert by_raw.status_code == 200
+    assert any(item["rawValue"] == raw for item in by_raw.json()["items"])
+
+    by_std = client.get(
+        "/api/v1/customs-dict/mappings",
+        params={"q": standard[-8:], "enabled": True},
+        headers=headers,
+    )
+    assert by_std.status_code == 200
+    assert any(item["standardValue"] == standard for item in by_std.json()["items"])
+
+    suggestions = client.get(
+        "/api/v1/customs-dict/mappings/suggestions",
+        params={"prefix": raw[:5], "dictType": "country"},
+        headers=headers,
+    )
+    assert suggestions.status_code == 200
+    body = suggestions.json()
+    assert len(body) <= 10
+    assert any(item["rawValue"] == raw and item["matchField"] == "rawValue" for item in body)

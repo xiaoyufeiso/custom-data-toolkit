@@ -71,6 +71,7 @@ class CustomsDictService:
         self,
         *,
         dict_type: str | None,
+        q: str | None = None,
         raw_value: str | None,
         standard_value: str | None,
         enabled: bool | None,
@@ -81,6 +82,9 @@ class CustomsDictService:
         if dict_type is not None and dict_type.strip():
             # 列表筛选允许历史/停用类型 code
             cleaned_type = normalize_dict_type_code(dict_type)
+        cleaned_q = normalize_dict_text(q) if q else None
+        if cleaned_q == "":
+            cleaned_q = None
         cleaned_raw = normalize_dict_text(raw_value) if raw_value else None
         cleaned_standard = normalize_dict_text(standard_value) if standard_value else None
         if cleaned_raw == "":
@@ -89,12 +93,45 @@ class CustomsDictService:
             cleaned_standard = None
         return self.repository.list_page(
             dict_type=cleaned_type,
+            q=cleaned_q,
             raw_value=cleaned_raw,
             standard_value=cleaned_standard,
             enabled=enabled,
             page=page,
             page_size=page_size,
         )
+
+    def list_suggestions(
+        self,
+        *,
+        prefix: str,
+        dict_type: str | None,
+        limit: int,
+    ) -> list[tuple[CustomsDictMapping, str]]:
+        cleaned_prefix = prefix.strip()
+        if not cleaned_prefix:
+            raise AppException("推荐前缀不能为空。")
+        cleaned_type = None
+        if dict_type is not None and dict_type.strip():
+            cleaned_type = normalize_dict_type_code(dict_type)
+        mappings = self.repository.list_suggestions(
+            prefix=cleaned_prefix,
+            dict_type=cleaned_type,
+            limit=limit,
+        )
+        normalized_prefix = cleaned_prefix.casefold()
+        suggestions: list[tuple[CustomsDictMapping, str]] = []
+        for mapping in mappings:
+            normalized_raw = mapping.raw_value.strip().casefold()
+            normalized_standard = mapping.standard_value.strip().casefold()
+            if normalized_raw == normalized_prefix or normalized_raw.startswith(
+                normalized_prefix,
+            ):
+                match_field = "rawValue"
+            else:
+                match_field = "standardValue"
+            suggestions.append((mapping, match_field))
+        return suggestions
 
     def get(self, mapping_id: int) -> CustomsDictMapping:
         mapping = self.repository.get_by_id(mapping_id)
@@ -291,6 +328,36 @@ class CustomsDictService:
             for member, score in items
         ], total
 
+    def list_missing_suggestions(
+        self,
+        *,
+        dict_type: str,
+        prefix: str,
+        limit: int,
+    ) -> list[dict[str, object]]:
+        cleaned_type = self._require_existing_type(dict_type)
+        cleaned_prefix = prefix.strip()
+        if not cleaned_prefix:
+            raise AppException("推荐前缀不能为空。")
+        try:
+            items = self.redis_store.list_missing_suggestions(
+                dict_type=cleaned_type,
+                prefix=cleaned_prefix,
+                limit=limit,
+            )
+        except Exception as exc:  # noqa: BLE001
+            raise AppException(
+                f"读取缺失字典失败：{sanitize_redis_error(exc)}",
+                error_code="CustomsDict.MissingReadFailed",
+            ) from exc
+        return [
+            {
+                "raw_value": member,
+                "occurrence_count": int(score),
+            }
+            for member, score in items
+        ]
+
     def handle_missing(
         self,
         *,
@@ -367,6 +434,7 @@ class CustomsDictService:
         self,
         *,
         dict_type: str | None,
+        q: str | None = None,
         raw_value: str | None,
         standard_value: str | None,
         enabled: bool | None,
@@ -378,6 +446,9 @@ class CustomsDictService:
         cleaned_type = None
         if dict_type is not None and dict_type.strip():
             cleaned_type = normalize_dict_type_code(dict_type)
+        cleaned_q = normalize_dict_text(q) if q else None
+        if cleaned_q == "":
+            cleaned_q = None
         cleaned_raw = normalize_dict_text(raw_value) if raw_value else None
         cleaned_standard = normalize_dict_text(standard_value) if standard_value else None
         if cleaned_raw == "":
@@ -387,6 +458,7 @@ class CustomsDictService:
 
         mappings = self.repository.list_all_filtered(
             dict_type=cleaned_type,
+            q=cleaned_q,
             raw_value=cleaned_raw,
             standard_value=cleaned_standard,
             enabled=enabled,

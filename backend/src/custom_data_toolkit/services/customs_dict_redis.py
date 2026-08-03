@@ -112,5 +112,29 @@ class CustomsDictRedisStore:
         )
         return items
 
+    def list_missing_suggestions(
+        self,
+        *,
+        dict_type: str,
+        prefix: str,
+        limit: int,
+    ) -> list[tuple[str, float]]:
+        key = missing_dict_key(dict_type)
+        all_items = self._client.zrevrange(key, 0, -1, withscores=True)
+        prefix_cf = prefix.casefold()
+        matched = [
+            (str(member), float(score))
+            for member, score in all_items
+            if str(member).casefold().startswith(prefix_cf)
+        ]
+        matched.sort(
+            key=lambda item: (
+                0 if item[0].casefold() == prefix_cf else 1,
+                -item[1],
+                item[0].casefold(),
+            ),
+        )
+        return matched[:limit]
+
     def remove_missing(self, *, dict_type: str, raw_value: str) -> None:
         self._client.zrem(missing_dict_key(dict_type), raw_value)

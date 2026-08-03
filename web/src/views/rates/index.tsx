@@ -554,7 +554,7 @@ const RatesView = () => {
           </Space>
           <Space wrap className={listStyles.toolbarActions}>
             <Button type="primary" onClick={onSearch}>
-              {t('rates.action.filter')}
+              {t('common.action.query')}
             </Button>
             <Button onClick={onResetFilters}>
               {t('rates.action.reset')}

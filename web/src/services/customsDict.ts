@@ -61,8 +61,27 @@ export type CustomsDictMissingListResponse = {
   total: number;
 };
 
+export type CustomsDictTypeSuggestion = {
+  code: string;
+  name: string;
+  matchField: 'code' | 'name';
+};
+
+export type CustomsDictMappingSuggestion = {
+  id: number;
+  rawValue: string;
+  standardValue: string;
+  matchField: 'rawValue' | 'standardValue';
+};
+
+export type CustomsDictMissingSuggestion = {
+  rawValue: string;
+  occurrenceCount: number;
+};
+
 export async function listCustomsDictMappings(params: {
   dictType?: string;
+  q?: string;
   rawValue?: string;
   standardValue?: string;
   enabled?: boolean;
@@ -72,6 +91,21 @@ export async function listCustomsDictMappings(params: {
   const { data } = await http.get<CustomsDictMappingListResponse>(
     '/customs-dict/mappings',
     { params },
+  );
+  return data;
+}
+
+export async function listCustomsDictMappingSuggestions(
+  prefix: string,
+  dictType?: string,
+  signal?: AbortSignal,
+): Promise<CustomsDictMappingSuggestion[]> {
+  const { data } = await http.get<CustomsDictMappingSuggestion[]>(
+    '/customs-dict/mappings/suggestions',
+    {
+      params: { prefix, dictType, limit: 10 },
+      signal,
+    },
   );
   return data;
 }
@@ -161,6 +195,21 @@ export async function listCustomsDictMissing(params: {
   return data;
 }
 
+export async function listCustomsDictMissingSuggestions(
+  dictType: string,
+  prefix: string,
+  signal?: AbortSignal,
+): Promise<CustomsDictMissingSuggestion[]> {
+  const { data } = await http.get<CustomsDictMissingSuggestion[]>(
+    '/customs-dict/missing/suggestions',
+    {
+      params: { dictType, prefix, limit: 10 },
+      signal,
+    },
+  );
+  return data;
+}
+
 export async function handleCustomsDictMissing(payload: {
   dictType: string;
   rawValue: string;
@@ -193,6 +242,7 @@ export type CustomsDictImportResult = {
 
 export async function exportCustomsDictMappings(params: {
   dictType?: string;
+  q?: string;
   rawValue?: string;
   standardValue?: string;
   enabled?: boolean;
@@ -242,6 +292,20 @@ export async function listCustomsDictTypes(params: {
   const { data } = await http.get<CustomsDictTypeListResponse>('/customs-dict/types', {
     params,
   });
+  return data;
+}
+
+export async function listCustomsDictTypeSuggestions(
+  prefix: string,
+  signal?: AbortSignal,
+): Promise<CustomsDictTypeSuggestion[]> {
+  const { data } = await http.get<CustomsDictTypeSuggestion[]>(
+    '/customs-dict/types/suggestions',
+    {
+      params: { prefix, limit: 10 },
+      signal,
+    },
+  );
   return data;
 }
 

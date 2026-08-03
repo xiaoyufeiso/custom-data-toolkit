@@ -44,6 +44,30 @@ class CustomsDictTypeService:
     def list_options(self) -> list[CustomsDictType]:
         return self.repository.list_enabled_options()
 
+    def list_suggestions(
+        self,
+        *,
+        prefix: str,
+        limit: int,
+    ) -> list[tuple[CustomsDictType, str]]:
+        cleaned_prefix = prefix.strip()
+        if not cleaned_prefix:
+            raise AppException("推荐前缀不能为空。")
+        rows = self.repository.list_suggestions(prefix=cleaned_prefix, limit=limit)
+        normalized_prefix = cleaned_prefix.casefold()
+        suggestions: list[tuple[CustomsDictType, str]] = []
+        for row in rows:
+            normalized_code = row.code.strip().casefold()
+            normalized_name = row.name.strip().casefold()
+            if normalized_code == normalized_prefix or normalized_code.startswith(
+                normalized_prefix,
+            ):
+                match_field = "code"
+            else:
+                match_field = "name"
+            suggestions.append((row, match_field))
+        return suggestions
+
     def get(self, type_id: int) -> tuple[CustomsDictType, int]:
         row = self.repository.get_by_id(type_id)
         if row is None:

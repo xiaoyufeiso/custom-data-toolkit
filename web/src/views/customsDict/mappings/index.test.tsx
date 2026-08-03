@@ -29,6 +29,39 @@ vi.mock('tendata-ui', async (importOriginal) => {
   return {
     ...original,
     Modal: ModalComponent,
+    AutoComplete: ({
+      onChange,
+      onKeyDown,
+      onSelect,
+      options = [],
+      placeholder,
+      value,
+    }: {
+      onChange?: (nextValue: string) => void;
+      onKeyDown?: (event: React.KeyboardEvent<HTMLInputElement>) => void;
+      onSelect?: (nextValue: string) => void;
+      options?: Array<{ key: string; label: React.ReactNode; value: string }>;
+      placeholder?: string;
+      value?: string;
+    }) => (
+      <div>
+        <input
+          placeholder={placeholder}
+          value={value}
+          onChange={(event) => onChange?.(event.target.value)}
+          onKeyDown={onKeyDown}
+        />
+        {options.map((option) => (
+          <button
+            type="button"
+            key={option.key}
+            onClick={() => onSelect?.(option.value)}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+    ),
     Select: ({
       onChange,
       options = [],
@@ -215,6 +248,9 @@ describe('CustomsDictMappingsView', () => {
     expect(screen.getByText('查询列表')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'USA' })).toBeInTheDocument();
     expect(screen.getByText('共 1 条')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('搜索原始值或标准值')).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText('原始值')).not.toBeInTheDocument();
+    expect(screen.queryByPlaceholderText('标准值')).not.toBeInTheDocument();
     expect(requestedEnabled).toBe('true');
     expect(screen.queryByPlaceholderText('启停状态')).not.toBeInTheDocument();
     expect(screen.queryByText('启用')).not.toBeInTheDocument();
@@ -224,6 +260,49 @@ describe('CustomsDictMappingsView', () => {
     expect(screen.queryByText('批量操作')).not.toBeInTheDocument();
     expect(screen.queryByRole('region', { name: '批量操作' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '批量删除' })).not.toBeInTheDocument();
+  });
+
+  it('queries with merged q keyword and keeps suggestions from auto-filling list', async () => {
+    const user = userEvent.setup();
+    const listParams: URLSearchParams[] = [];
+    let suggestionHits = 0;
+    server.use(
+      http.get(MAPPINGS_URL, ({ request }) => {
+        listParams.push(new URL(request.url).searchParams);
+        return HttpResponse.json(listResponse);
+      }),
+      http.get(`${MAPPINGS_URL}/suggestions`, () => {
+        suggestionHits += 1;
+        return HttpResponse.json([
+          {
+            id: 1,
+            rawValue: 'USA',
+            standardValue: '美国',
+            matchField: 'rawValue',
+          },
+        ]);
+      }),
+    );
+
+    renderWithProviders(<CustomsDictMappingsView />);
+    await screen.findByText('美国');
+    const initialListCalls = listParams.length;
+
+    await user.type(screen.getByPlaceholderText('搜索原始值或标准值'), 'US');
+    await waitFor(() => {
+      expect(suggestionHits).toBeGreaterThan(0);
+    });
+    expect(listParams).toHaveLength(initialListCalls);
+
+    await user.click(screen.getByRole('button', { name: 'USA (美国)' }));
+    expect(listParams).toHaveLength(initialListCalls);
+
+    await user.click(screen.getByRole('button', { name: '查询' }));
+    await waitFor(() => {
+      expect(listParams.some((params) => params.get('q') === 'USA')).toBe(true);
+      expect(listParams[listParams.length - 1]?.has('rawValue')).toBe(false);
+      expect(listParams[listParams.length - 1]?.has('standardValue')).toBe(false);
+    });
   });
 
   it('opens detail drawer from raw value link and closes via mask', async () => {
@@ -443,7 +522,8 @@ describe('CustomsDictMappingsView', () => {
 
     renderWithProviders(<CustomsDictMappingsView />);
     await screen.findByText('美国');
-    await user.click(screen.getByRole('button', { name: '导出' }));
+    await user.click(screen.getByRole('button', { name: /导入\/导出/ }));
+    await user.click(await screen.findByRole('menuitem', { name: '导出' }));
 
     await waitFor(() => {
       expect(exportUrl).toHaveBeenCalled();
@@ -514,7 +594,8 @@ describe('CustomsDictMappingsView', () => {
 
     renderWithProviders(<CustomsDictMappingsView />);
     await screen.findByText('美国');
-    await user.click(screen.getByRole('button', { name: '下载模板' }));
+    await user.click(screen.getByRole('button', { name: /导入\/导出/ }));
+    await user.click(await screen.findByRole('menuitem', { name: '下载模板' }));
 
     await waitFor(() => {
       expect(templateHit).toHaveBeenCalled();

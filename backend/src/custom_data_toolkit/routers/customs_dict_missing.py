@@ -8,6 +8,7 @@ from custom_data_toolkit.routers.customs_dict_schemas import (
     CustomsDictMissingHandleRequest,
     CustomsDictMissingListResponse,
     CustomsDictMissingPublic,
+    CustomsDictMissingSuggestion,
 )
 from custom_data_toolkit.services.customs_dict_service import CustomsDictService
 
@@ -43,6 +44,28 @@ def list_missing(
         page_size=page_size,
         total=total,
     )
+
+
+@missing_router.get("/suggestions", response_model=list[CustomsDictMissingSuggestion])
+def list_missing_suggestions(
+    _auth: CurrentAuthDep,
+    service: CustomsDictService = CustomsDictServiceDep,
+    dict_type: str = Query(..., alias="dictType"),
+    prefix: str = Query(..., min_length=1, max_length=100),
+    limit: int = Query(10, ge=1, le=10),
+) -> list[CustomsDictMissingSuggestion]:
+    items = service.list_missing_suggestions(
+        dict_type=dict_type,
+        prefix=prefix,
+        limit=limit,
+    )
+    return [
+        CustomsDictMissingSuggestion(
+            raw_value=str(item["raw_value"]),
+            occurrence_count=int(item["occurrence_count"]),  # type: ignore[arg-type]
+        )
+        for item in items
+    ]
 
 
 @missing_router.post("/handle", response_model=CustomsDictMappingPublic)

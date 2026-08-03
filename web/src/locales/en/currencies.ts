@@ -1,3 +1,4 @@
+
 const currencies = {
   'currencies.action.search': 'Query',
   'currencies.action.reset': 'Reset',
@@ -7,6 +8,13 @@ const currencies = {
   'currencies.action.save': 'Save',
   'currencies.action.cancel': 'Cancel',
   'currencies.filters.title': 'Filters',
+  'currencies.search.placeholder': 'Search name or code',
+  'currencies.column.name': 'Name',
+  'currencies.column.code': 'Code',
+  'currencies.column.id': 'ID',
+  'currencies.form.name': 'Name',
+  'currencies.form.code': 'Code (optional)',
+  'currencies.form.codePlaceholder': 'e.g. CNY, MYR_IM',
   'currencies.modal.createTitle': 'Create Currency',
   'currencies.modal.editTitle': 'Edit Currency',
   'currencies.modal.detailTitle': 'Currency Detail',
@@ -18,6 +26,15 @@ const currencies = {
   'currencies.batchDelete.confirmContent': 'This cannot be undone. If any currency has rates, nothing will be deleted.',
   'currencies.batchDelete.success': 'Deleted {count} currencies',
   'currencies.batchDelete.failed': 'Failed to delete currencies',
+  'currencies.empty': 'No data',
+  'currencies.total': '{total} items',
+  'currencies.message.loadFailed': 'Failed to load currencies',
+  'currencies.message.nameRequired': 'Please enter a currency name',
+  'currencies.message.codeInvalid': 'Code must be 1–10 letters or underscores, e.g. CNY',
+  'currencies.message.codePattern': 'Must be 1–10 letters or underscores, e.g. CNY',
+  'currencies.message.created': 'Created',
+  'currencies.message.updated': 'Updated',
+  'currencies.message.saveFailed': 'Failed to save',
 };
 
 export default currencies;

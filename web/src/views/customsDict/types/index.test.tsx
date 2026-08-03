@@ -19,8 +19,48 @@ import CustomsDictTypesView from '@/views/customsDict/types';
 
 vi.mock('tendata-ui', async (importOriginal) => {
   const original = await importOriginal<typeof import('tendata-ui')>();
+  const ModalComponent = original.Modal as typeof original.Modal & {
+    confirm: (config: { onOk?: (...args: never[]) => void | Promise<void> }) => void;
+  };
+  ModalComponent.confirm = ({ onOk }) => {
+    void (onOk as undefined | (() => void | Promise<void>))?.();
+  };
   return {
     ...original,
+    Modal: ModalComponent,
+    AutoComplete: ({
+      onChange,
+      onKeyDown,
+      onSelect,
+      options = [],
+      placeholder,
+      value,
+    }: {
+      onChange?: (nextValue: string) => void;
+      onKeyDown?: (event: React.KeyboardEvent<HTMLInputElement>) => void;
+      onSelect?: (nextValue: string) => void;
+      options?: Array<{ key: string; label: React.ReactNode; value: string }>;
+      placeholder?: string;
+      value?: string;
+    }) => (
+      <div>
+        <input
+          placeholder={placeholder}
+          value={value}
+          onChange={(event) => onChange?.(event.target.value)}
+          onKeyDown={onKeyDown}
+        />
+        {options.map((option) => (
+          <button
+            type="button"
+            key={option.key}
+            onClick={() => onSelect?.(option.value)}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+    ),
     Select: ({
       onChange,
       options = [],
@@ -155,8 +195,12 @@ describe('CustomsDictTypesView', () => {
   it('renders type list and creates a type', async () => {
     const user = userEvent.setup();
     const createPayload = vi.fn();
+    const listParams: Array<string | null> = [];
     server.use(
-      http.get(TYPES_URL, () => HttpResponse.json(listResponse)),
+      http.get(TYPES_URL, ({ request }) => {
+        listParams.push(new URL(request.url).searchParams.get('enabled'));
+        return HttpResponse.json(listResponse);
+      }),
       http.post(TYPES_URL, async ({ request }) => {
         createPayload(await request.json());
         return HttpResponse.json(
@@ -177,19 +221,59 @@ describe('CustomsDictTypesView', () => {
     expect(await screen.findByRole('button', { name: 'country' })).toBeInTheDocument();
     expect(screen.getByText('国家')).toBeInTheDocument();
     expect(screen.getByText('2')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('搜索类型编码或名称')).toBeInTheDocument();
     expect(screen.queryByText('状态')).not.toBeInTheDocument();
     expect(screen.queryByPlaceholderText('状态')).not.toBeInTheDocument();
     expect(screen.queryByText('批量操作')).not.toBeInTheDocument();
     expect(screen.queryByRole('region', { name: '批量操作' })).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(listParams.some((value) => value === 'true')).toBe(true);
+    });
 
     await user.click(screen.getByRole('button', { name: '新建类型' }));
-    await user.type(screen.getByPlaceholderText('country'), 'port');
+    await user.type(screen.getByPlaceholderText('如 country'), 'port');
     await user.type(screen.getByLabelText('类型名称'), '口岸');
     await user.click(screen.getByRole('button', { name: '保存' }));
 
     await waitFor(() => {
       expect(createPayload).toHaveBeenCalledWith({ code: 'port', name: '口岸' });
     }, { timeout: 8000 });
+  });
+
+  it('suggests type codes without querying until search', async () => {
+    const user = userEvent.setup();
+    const listParams: URLSearchParams[] = [];
+    let suggestionHits = 0;
+    server.use(
+      http.get(TYPES_URL, ({ request }) => {
+        listParams.push(new URL(request.url).searchParams);
+        return HttpResponse.json(listResponse);
+      }),
+      http.get(`${TYPES_URL}/suggestions`, () => {
+        suggestionHits += 1;
+        return HttpResponse.json([
+          { code: 'country', name: '国家', matchField: 'code' },
+        ]);
+      }),
+    );
+
+    renderWithProviders(<CustomsDictTypesView />);
+    await screen.findByRole('button', { name: 'country' });
+    const initialCalls = listParams.length;
+
+    await user.type(screen.getByPlaceholderText('搜索类型编码或名称'), 'coun');
+    await waitFor(() => {
+      expect(suggestionHits).toBeGreaterThan(0);
+    });
+    expect(listParams).toHaveLength(initialCalls);
+
+    await user.click(screen.getByRole('button', { name: 'country (国家)' }));
+    expect(listParams).toHaveLength(initialCalls);
+
+    await user.click(screen.getByRole('button', { name: '查询' }));
+    await waitFor(() => {
+      expect(listParams.some((params) => params.get('q') === 'country')).toBe(true);
+    });
   });
 
   it('opens detail drawer from code link and deletes from detail', async () => {

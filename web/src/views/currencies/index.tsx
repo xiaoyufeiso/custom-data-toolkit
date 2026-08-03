@@ -77,11 +77,11 @@ const CurrenciesView = () => {
       setItems(data.items ?? []);
       setTotal(data.total ?? 0);
     } catch (error) {
-      message.error(getApiErrorMessage(error, '加载货币列表失败'));
+      message.error(getApiErrorMessage(error, t('currencies.message.loadFailed')));
     } finally {
       setLoading(false);
     }
-  }, [keyword, page, pageSize]);
+  }, [keyword, page, pageSize, t]);
 
   useEffect(() => {
     void load();
@@ -161,12 +161,12 @@ const CurrenciesView = () => {
   const onSubmit = async (values: FormState) => {
     const name = values.name.trim();
     if (!name) {
-      message.warning('请填写货币名称');
+      message.warning(t('currencies.message.nameRequired'));
       return;
     }
     const code = values.code.trim();
     if (code && !/^[A-Za-z_]{1,10}$/.test(code)) {
-      message.warning('货币字母代码须为 1~10 位字母或下划线，如 CNY');
+      message.warning(t('currencies.message.codeInvalid'));
       return;
     }
     const payload = { name, code: code ? code.toUpperCase() : null };
@@ -174,16 +174,16 @@ const CurrenciesView = () => {
     try {
       if (editingId != null) {
         const updated = await updateCurrency(editingId, payload);
-        message.success('已更新');
+        message.success(t('currencies.message.updated'));
         setDetail(updated);
       } else {
         await createCurrency(payload);
-        message.success('已创建');
+        message.success(t('currencies.message.created'));
       }
       closeForm();
       await load();
     } catch (error) {
-      message.error(getApiErrorMessage(error, '保存失败'));
+      message.error(getApiErrorMessage(error, t('currencies.message.saveFailed')));
     } finally {
       setSubmitting(false);
     }
@@ -226,7 +226,7 @@ const CurrenciesView = () => {
 
   const columns: ColumnsType = [
     {
-      title: '名称',
+      title: t('currencies.column.name'),
       dataIndex: 'name',
       key: 'name',
       width: 200,
@@ -244,7 +244,7 @@ const CurrenciesView = () => {
       ),
     },
     {
-      title: '字母代码',
+      title: t('currencies.column.code'),
       dataIndex: 'code',
       key: 'code',
       width: 120,
@@ -262,7 +262,7 @@ const CurrenciesView = () => {
           <Space wrap className={listStyles.toolbarFields}>
             <AutoComplete
               allowClear
-              placeholder="搜索名称或字母代码"
+              placeholder={t('currencies.search.placeholder')}
               value={q}
               options={suggestions.map((suggestion) => ({
                 key: `${suggestion.id}-${suggestion.matchField}`,
@@ -288,7 +288,7 @@ const CurrenciesView = () => {
           </Space>
           <Space wrap className={listStyles.toolbarActions}>
             <Button type="primary" onClick={onSearch}>
-              {t('currencies.action.search')}
+              {t('common.action.query')}
             </Button>
             <Button onClick={onResetSearch}>
               {t('currencies.action.reset')}
@@ -335,24 +335,20 @@ const CurrenciesView = () => {
             onClick: () => openDetail(row),
           })}
           tdLoading={loading}
-          noData={{ text: '暂无数据' }}
+          noData={{ text: t('currencies.empty') }}
           page={{
             current: page,
             pageSize,
             total,
             showSizeChanger: true,
             pageSizeOptions: PAGE_SIZE_OPTIONS,
-            showTotal: (count) => `共 ${count} 条`,
+            showTotal: (count) => t('currencies.total', { total: count }),
           }}
           onChange={(pagination) => {
             setSelectedRowKeys([]);
             const nextPageSize = pagination.pageSize ?? pageSize;
-            if (nextPageSize && nextPageSize !== pageSize) {
-              setPageSize(nextPageSize);
-              setPage(1);
-              return;
-            }
-            setPage(pagination.current ?? 1);
+            setPageSize(nextPageSize);
+            setPage(nextPageSize === pageSize ? pagination.current ?? 1 : 1);
           }}
         />
       </QueryListCard>
@@ -377,21 +373,21 @@ const CurrenciesView = () => {
           onFinish={onSubmit}
         >
           <Form.Item
-            label="名称"
+            label={t('currencies.form.name')}
             name="name"
-            rules={[{ required: true, message: '请填写货币名称' }]}
+            rules={[{ required: true, message: t('currencies.message.nameRequired') }]}
           >
             <Input maxLength={100} />
           </Form.Item>
           <Form.Item
-            label="字母代码（可选）"
+            label={t('currencies.form.code')}
             name="code"
             rules={[{
               pattern: /^[A-Za-z_]{1,10}$/,
-              message: '须为 1~10 位字母或下划线，如 CNY',
+              message: t('currencies.message.codePattern'),
             }]}
           >
-            <Input maxLength={10} placeholder="如 CNY、MYR_IM" />
+            <Input maxLength={10} placeholder={t('currencies.form.codePlaceholder')} />
           </Form.Item>
         </Form>
       </Modal>
@@ -406,15 +402,15 @@ const CurrenciesView = () => {
         {detail ? (
           <div className={listStyles.detailGrid}>
             <div className={listStyles.detailRow}>
-              <span className={listStyles.detailLabel}>ID</span>
+              <span className={listStyles.detailLabel}>{t('currencies.column.id')}</span>
               <span className={listStyles.detailValue}>{detail.id}</span>
             </div>
             <div className={listStyles.detailRow}>
-              <span className={listStyles.detailLabel}>名称</span>
+              <span className={listStyles.detailLabel}>{t('currencies.column.name')}</span>
               <span className={listStyles.detailValue}>{detail.name}</span>
             </div>
             <div className={listStyles.detailRow}>
-              <span className={listStyles.detailLabel}>字母代码</span>
+              <span className={listStyles.detailLabel}>{t('currencies.column.code')}</span>
               <span className={listStyles.detailValue}>{detail.code || '—'}</span>
             </div>
             <div className={listStyles.detailActions}>

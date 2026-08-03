@@ -134,3 +134,24 @@ def test_missing_list_handle_export_and_zrem(
     rows = list(workbook.active.iter_rows(values_only=True))
     assert rows[0][:4] == ("字典类型编码", "字典类型名称", "原始值", "出现次数")
     assert any(row[2] == raw_lo for row in rows[1:])
+
+
+def test_missing_suggestions_prefix(
+    client: TestClient,
+    fake_redis: fakeredis.FakeRedis,
+) -> None:
+    headers = _login(client)
+    suffix = datetime.now(UTC).strftime("%H%M%S%f")
+    raw = f"SuggestMiss-{suffix}"
+    key = missing_dict_key("country")
+    fake_redis.zadd(key, {raw: 3, f"Other-{suffix}": 1})
+
+    suggestions = client.get(
+        "/api/v1/customs-dict/missing/suggestions",
+        params={"dictType": "country", "prefix": "SuggestMiss"},
+        headers=headers,
+    )
+    assert suggestions.status_code == 200
+    body = suggestions.json()
+    assert len(body) <= 10
+    assert any(item["rawValue"] == raw and item["occurrenceCount"] == 3 for item in body)

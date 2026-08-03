@@ -22,6 +22,39 @@ vi.mock('tendata-ui', async (importOriginal) => {
   const original = await importOriginal<typeof import('tendata-ui')>();
   return {
     ...original,
+    AutoComplete: ({
+      onChange,
+      onKeyDown,
+      onSelect,
+      options = [],
+      placeholder,
+      value,
+    }: {
+      onChange?: (nextValue: string) => void;
+      onKeyDown?: (event: React.KeyboardEvent<HTMLInputElement>) => void;
+      onSelect?: (nextValue: string) => void;
+      options?: Array<{ key: string; label: React.ReactNode; value: string }>;
+      placeholder?: string;
+      value?: string;
+    }) => (
+      <div>
+        <input
+          placeholder={placeholder}
+          value={value}
+          onChange={(event) => onChange?.(event.target.value)}
+          onKeyDown={onKeyDown}
+        />
+        {options.map((option) => (
+          <button
+            type="button"
+            key={option.key}
+            onClick={() => onSelect?.(option.value)}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+    ),
     Select: ({
       onChange,
       options = [],
@@ -147,6 +180,7 @@ describe('CustomsDictMissingView', () => {
   });
 
   it('renders missing list without actions column', async () => {
+    const user = userEvent.setup();
     let requestedType = '';
     server.use(
       http.get(MISSING_URL, ({ request }) => {
@@ -157,11 +191,19 @@ describe('CustomsDictMissingView', () => {
 
     renderWithProviders(<CustomsDictMissingView />);
 
+    expect(await screen.findByText('查询列表')).toBeInTheDocument();
+    expect(screen.getByText('筛选条件')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('搜索原始值')).toBeInTheDocument();
+    expect(screen.getByLabelText('字典类型')).toHaveValue('');
+    expect(screen.queryByRole('button', { name: 'KOR' })).not.toBeInTheDocument();
+    expect(requestedType).toBe('');
+
+    await user.selectOptions(screen.getByLabelText('字典类型'), 'country');
+    await user.click(screen.getByRole('button', { name: '查询' }));
+
     expect(await screen.findByRole('button', { name: 'KOR' })).toBeInTheDocument();
-    expect(screen.getByText('查询列表')).toBeInTheDocument();
     expect(screen.getByText('12')).toBeInTheDocument();
     expect(screen.getByText('共 1 条')).toBeInTheDocument();
-    expect(screen.getByText('筛选条件')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '导出' })).toBeInTheDocument();
     expect(requestedType).toBe('country');
     expect(screen.queryByRole('button', { name: '处理' })).not.toBeInTheDocument();
@@ -171,11 +213,15 @@ describe('CustomsDictMissingView', () => {
   });
 
   it('uses bordered reset and link-style refresh', async () => {
+    const user = userEvent.setup();
     server.use(
       http.get(MISSING_URL, () => HttpResponse.json(listResponse)),
     );
 
     renderWithProviders(<CustomsDictMissingView />);
+    await screen.findByLabelText('字典类型');
+    await user.selectOptions(screen.getByLabelText('字典类型'), 'country');
+    await user.click(screen.getByRole('button', { name: '查询' }));
     await screen.findByRole('button', { name: 'KOR' });
 
     const reset = screen.getByRole('button', { name: '重置' });
@@ -210,6 +256,8 @@ describe('CustomsDictMissingView', () => {
     );
 
     renderWithProviders(<CustomsDictMissingView />);
+    await user.selectOptions(await screen.findByLabelText('字典类型'), 'country');
+    await user.click(screen.getByRole('button', { name: '查询' }));
     await user.click(await screen.findByRole('button', { name: 'KOR' }));
     expect(await screen.findByTestId('detail-drawer')).toBeInTheDocument();
     expect(screen.getByText('缺失详情')).toBeInTheDocument();

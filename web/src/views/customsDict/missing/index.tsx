@@ -8,6 +8,7 @@ import {
 import BizTable from '@tendata-biz-components/biz-table';
 import { DownloadOutlined, ReloadOutlined } from '@tendata-ui/icon';
 import {
+  AutoComplete,
   Button,
   Drawer,
   Form,
@@ -21,8 +22,10 @@ import {
   exportCustomsDictMissing,
   handleCustomsDictMissing,
   listCustomsDictMissing,
+  listCustomsDictMissingSuggestions,
   listCustomsDictTypeOptions,
   type CustomsDictMissingItem,
+  type CustomsDictMissingSuggestion,
   type CustomsDictTypeOption,
 } from '@/services/customsDict';
 import QueryListCard from '@/shared/components/queryListCard';
@@ -33,9 +36,10 @@ import { getApiErrorMessage } from '@/shared/utils/apiError';
 type ColumnsType = NonNullable<ComponentProps<typeof BizTable>['columns']>;
 
 const DEFAULT_PAGE_SIZE = 20;
+const PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
 
 type FilterDraft = {
-  dictType: string;
+  dictType?: string;
   rawValue: string;
 };
 
@@ -62,6 +66,7 @@ const CustomsDictMissingView = () => {
     dictType: '',
     rawValue: '',
   });
+  const [suggestions, setSuggestions] = useState<CustomsDictMissingSuggestion[]>([]);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
@@ -82,12 +87,7 @@ const CustomsDictMissingView = () => {
 
   useEffect(() => {
     void listCustomsDictTypeOptions()
-      .then((options) => {
-        setTypeOptionsRaw(options);
-        const first = options[0]?.code ?? '';
-        setDraft((prev) => (prev.dictType ? prev : { ...prev, dictType: first }));
-        setApplied((prev) => (prev.dictType ? prev : { ...prev, dictType: first }));
-      })
+      .then(setTypeOptionsRaw)
       .catch(() => {
         message.error(t('customsDict.message.loadFailed'));
       })
@@ -97,7 +97,8 @@ const CustomsDictMissingView = () => {
   const load = useCallback(async () => {
     if (!typesReady) return;
     if (!applied.dictType) {
-      message.warning(t('customsDict.message.dictTypeRequired'));
+      setItems([]);
+      setTotal(0);
       return;
     }
     setLoading(true);
@@ -120,6 +121,31 @@ const CustomsDictMissingView = () => {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    const prefix = draft.rawValue.trim();
+    if (!prefix || !draft.dictType) {
+      setSuggestions([]);
+      return undefined;
+    }
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      try {
+        const data = await listCustomsDictMissingSuggestions(
+          draft.dictType,
+          prefix,
+          controller.signal,
+        );
+        setSuggestions(data);
+      } catch {
+        if (!controller.signal.aborted) setSuggestions([]);
+      }
+    }, 300);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [draft.rawValue, draft.dictType]);
 
   const closeDetail = () => {
     setDetailOpen(false);
@@ -228,21 +254,46 @@ const CustomsDictMissingView = () => {
         <div className={listStyles.toolbarRow}>
           <Space wrap className={listStyles.toolbarFields}>
             <Select
+              allowClear
               placeholder={t('customsDict.filter.dictType')}
               style={{ width: 120 }}
               options={typeOptions}
               value={draft.dictType}
-              onChange={(value) => setDraft((prev) => ({ ...prev, dictType: value }))}
+              onChange={(value) => {
+                setDraft((prev) => ({ ...prev, dictType: value }));
+                setSuggestions([]);
+              }}
             />
-            <Input
+            <AutoComplete
               allowClear
-              placeholder={t('customsDict.filter.rawValue')}
+              placeholder={t('customsDict.search.missingPlaceholder')}
               style={{ width: 160 }}
               value={draft.rawValue}
-              onChange={(event) => setDraft((prev) => ({
-                ...prev,
-                rawValue: event.target.value,
+              options={suggestions.map((suggestion) => ({
+                key: suggestion.rawValue,
+                value: suggestion.rawValue,
+                label: suggestion.rawValue,
               }))}
+              filterOption={false}
+              listHeight={240}
+              onChange={(value) => setDraft((prev) => ({
+                ...prev,
+                rawValue: String(value),
+              }))}
+              onSelect={(value) => {
+                setDraft((prev) => ({ ...prev, rawValue: String(value) }));
+                setSuggestions([]);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  if (!draft.dictType) {
+                    message.warning(t('customsDict.message.dictTypeRequired'));
+                    return;
+                  }
+                  setPage(1);
+                  setApplied({ ...draft, rawValue: draft.rawValue.trim() });
+                }
+              }}
             />
           </Space>
           <Space wrap className={listStyles.toolbarActions}>
@@ -254,16 +305,17 @@ const CustomsDictMissingView = () => {
                   return;
                 }
                 setPage(1);
-                setApplied({ ...draft });
+                setApplied({ ...draft, rawValue: draft.rawValue.trim() });
               }}
             >
-              {t('customsDict.action.search')}
+              {t('common.action.query')}
             </Button>
             <Button
               onClick={() => {
-                const reset = { dictType: 'country', rawValue: '' };
+                const reset: FilterDraft = { rawValue: '' };
                 setDraft(reset);
                 setApplied(reset);
+                setSuggestions([]);
                 setPage(1);
               }}
             >
@@ -289,7 +341,7 @@ const CustomsDictMissingView = () => {
           columns={columns}
           dataSource={items}
           tdLoading={loading}
-          locale={{ emptyText: t('customsDict.empty') }}
+          noData={{ text: t('customsDict.empty') }}
           rowClassName={() => listStyles.clickableRow}
           onRow={(row: CustomsDictMissingItem) => ({
             onClick: () => openDetail(row),
@@ -299,11 +351,13 @@ const CustomsDictMissingView = () => {
             pageSize,
             total,
             showSizeChanger: true,
+            pageSizeOptions: PAGE_SIZE_OPTIONS,
             showTotal: (count: number) => t('customsDict.total', { total: count }),
           }}
           onChange={(pagination) => {
-            setPage(pagination.current ?? 1);
-            setPageSize(pagination.pageSize ?? DEFAULT_PAGE_SIZE);
+            const nextPageSize = pagination.pageSize ?? pageSize;
+            setPageSize(nextPageSize);
+            setPage(nextPageSize === pageSize ? pagination.current ?? 1 : 1);
           }}
         />
       </QueryListCard>

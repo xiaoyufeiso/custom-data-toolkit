@@ -13,6 +13,7 @@ from custom_data_toolkit.routers.customs_dict_schemas import (
     CustomsDictMappingCreateRequest,
     CustomsDictMappingListResponse,
     CustomsDictMappingPublic,
+    CustomsDictMappingSuggestion,
     CustomsDictMappingUpdateRequest,
     CustomsDictReplaySyncResponse,
 )
@@ -58,6 +59,7 @@ def list_mappings(
     _auth: CurrentAuthDep,
     service: CustomsDictService = CustomsDictServiceDep,
     dict_type: str | None = Query(default=None, alias="dictType"),
+    q: str | None = None,
     raw_value: str | None = Query(default=None, alias="rawValue"),
     standard_value: str | None = Query(default=None, alias="standardValue"),
     enabled: bool | None = None,
@@ -66,6 +68,7 @@ def list_mappings(
 ) -> CustomsDictMappingListResponse:
     items, total = service.list_page(
         dict_type=dict_type,
+        q=q,
         raw_value=raw_value,
         standard_value=standard_value,
         enabled=enabled,
@@ -78,6 +81,30 @@ def list_mappings(
         page_size=page_size,
         total=total,
     )
+
+
+@router.get("/suggestions", response_model=list[CustomsDictMappingSuggestion])
+def list_mapping_suggestions(
+    _auth: CurrentAuthDep,
+    service: CustomsDictService = CustomsDictServiceDep,
+    prefix: str = Query(..., min_length=1, max_length=100),
+    dict_type: str | None = Query(default=None, alias="dictType"),
+    limit: int = Query(10, ge=1, le=10),
+) -> list[CustomsDictMappingSuggestion]:
+    suggestions = service.list_suggestions(
+        prefix=prefix,
+        dict_type=dict_type,
+        limit=limit,
+    )
+    return [
+        CustomsDictMappingSuggestion(
+            id=mapping.id,
+            raw_value=mapping.raw_value,
+            standard_value=mapping.standard_value,
+            match_field=match_field,
+        )
+        for mapping, match_field in suggestions
+    ]
 
 
 @router.post(
@@ -128,12 +155,14 @@ def export_mappings(
     _auth: CurrentAuthDep,
     service: CustomsDictService = CustomsDictServiceDep,
     dict_type: str | None = Query(default=None, alias="dictType"),
+    q: str | None = None,
     raw_value: str | None = Query(default=None, alias="rawValue"),
     standard_value: str | None = Query(default=None, alias="standardValue"),
     enabled: bool | None = True,
 ) -> Response:
     content = service.export_mappings_xlsx(
         dict_type=dict_type,
+        q=q,
         raw_value=raw_value,
         standard_value=standard_value,
         enabled=enabled,

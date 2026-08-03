@@ -1,4 +1,4 @@
-from sqlmodel import Session, col, func, or_, select
+from sqlmodel import Session, case, col, func, or_, select
 
 from custom_data_toolkit.models.customs_dict import CustomsDictMapping, CustomsDictType
 
@@ -41,6 +41,51 @@ class CustomsDictTypeRepository:
             select(CustomsDictType)
             .where(CustomsDictType.enabled == True)  # noqa: E712
             .order_by(col(CustomsDictType.code).asc())
+        )
+        return list(self.session.exec(statement).all())
+
+    def list_suggestions(
+        self,
+        *,
+        prefix: str,
+        limit: int,
+    ) -> list[CustomsDictType]:
+        normalized_code = func.lower(func.trim(CustomsDictType.code))
+        normalized_name = func.lower(func.trim(CustomsDictType.name))
+        escaped_prefix = (
+            prefix.lower()
+            .replace("\\", "\\\\")
+            .replace("%", "\\%")
+            .replace("_", "\\_")
+        )
+        pattern = f"{escaped_prefix}%"
+        code_prefix_match = normalized_code.like(pattern, escape="\\")
+        name_prefix_match = normalized_name.like(pattern, escape="\\")
+        rank = case(
+            (normalized_code == prefix.lower(), 0),
+            (normalized_name == prefix.lower(), 0),
+            (code_prefix_match, 1),
+            else_=2,
+        )
+        sort_value = case(
+            (normalized_code == prefix.lower(), normalized_code),
+            (normalized_name == prefix.lower(), normalized_name),
+            (code_prefix_match, normalized_code),
+            else_=normalized_name,
+        )
+        statement = (
+            select(CustomsDictType)
+            .where(
+                CustomsDictType.enabled == True,  # noqa: E712
+                or_(code_prefix_match, name_prefix_match),
+            )
+            .order_by(
+                rank,
+                sort_value.asc(),
+                normalized_name.asc(),
+                col(CustomsDictType.id).asc(),
+            )
+            .limit(limit)
         )
         return list(self.session.exec(statement).all())
 

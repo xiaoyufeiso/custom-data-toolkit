@@ -15,8 +15,10 @@ import {
   UploadOutlined,
 } from '@tendata-ui/icon';
 import {
+  AutoComplete,
   Button,
   Drawer,
+  Dropdown,
   Form,
   Input,
   Modal,
@@ -32,10 +34,12 @@ import {
   downloadCustomsDictImportTemplate,
   exportCustomsDictMappings,
   importCustomsDictMappings,
+  listCustomsDictMappingSuggestions,
   listCustomsDictMappings,
   listCustomsDictTypeOptions,
   updateCustomsDictMapping,
   type CustomsDictMapping,
+  type CustomsDictMappingSuggestion,
   type CustomsDictTypeOption,
 } from '@/services/customsDict';
 import QueryListCard from '@/shared/components/queryListCard';
@@ -45,7 +49,24 @@ import { getApiErrorCode, getApiErrorMessage } from '@/shared/utils/apiError';
 
 type ColumnsType = NonNullable<ComponentProps<typeof BizTable>['columns']>;
 
+/** tendata-ui Dropdown 类型未透出 antd menu/trigger，运行时可用 */
+type IoDropdownProps = {
+  trigger?: Array<'click' | 'hover' | 'contextMenu'>;
+  menu?: {
+    items: Array<{
+      key: string;
+      icon?: React.ReactNode;
+      label: React.ReactNode;
+      disabled?: boolean;
+      onClick?: () => void;
+    }>;
+  };
+  children?: React.ReactNode;
+};
+const IoDropdown = Dropdown as unknown as React.FC<IoDropdownProps>;
+
 const DEFAULT_PAGE_SIZE = 20;
+const PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
 
 const downloadBlob = (blob: Blob, filename: string) => {
   const url = URL.createObjectURL(blob);
@@ -58,8 +79,7 @@ const downloadBlob = (blob: Blob, filename: string) => {
 
 type FilterDraft = {
   dictType?: string;
-  rawValue: string;
-  standardValue: string;
+  q: string;
 };
 
 type FormState = {
@@ -81,13 +101,12 @@ const CustomsDictMappingsView = () => {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [draft, setDraft] = useState<FilterDraft>({
-    rawValue: '',
-    standardValue: '',
+    q: '',
   });
   const [applied, setApplied] = useState<FilterDraft>({
-    rawValue: '',
-    standardValue: '',
+    q: '',
   });
+  const [suggestions, setSuggestions] = useState<CustomsDictMappingSuggestion[]>([]);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [batchDeleteLoading, setBatchDeleteLoading] = useState(false);
@@ -122,13 +141,15 @@ const CustomsDictMappingsView = () => {
       });
   }, [t]);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (options?: { clearSelection?: boolean }) => {
+    if (options?.clearSelection !== false) {
+      setSelectedRowKeys([]);
+    }
     setLoading(true);
     try {
       const data = await listCustomsDictMappings({
         dictType: applied.dictType,
-        rawValue: applied.rawValue || undefined,
-        standardValue: applied.standardValue || undefined,
+        q: applied.q || undefined,
         // 软删（停用）记录不在前端展示，固定只拉启用数据
         enabled: true,
         page,
@@ -146,6 +167,31 @@ const CustomsDictMappingsView = () => {
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    const prefix = draft.q.trim();
+    if (!prefix) {
+      setSuggestions([]);
+      return undefined;
+    }
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      try {
+        const data = await listCustomsDictMappingSuggestions(
+          prefix,
+          draft.dictType,
+          controller.signal,
+        );
+        setSuggestions(data);
+      } catch {
+        if (!controller.signal.aborted) setSuggestions([]);
+      }
+    }, 300);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [draft.q, draft.dictType]);
 
   const syncLabel = (status: string) => {
     if (status === 'synced') return t('customsDict.sync.synced');
@@ -258,8 +304,8 @@ const CustomsDictMappingsView = () => {
         failed: result.failed,
       }));
       const failedSet = new Set(result.failedIds ?? []);
+      await load({ clearSelection: false });
       setSelectedRowKeys(ids.filter((id) => failedSet.has(id)));
-      await load();
     } catch (error) {
       message.error(getApiErrorMessage(error, t('customsDict.batchResync.failed')));
       if (getApiErrorCode(error) === 'BatchDelete.StaleSelection') {
@@ -338,8 +384,7 @@ const CustomsDictMappingsView = () => {
     try {
       const blob = await exportCustomsDictMappings({
         dictType: applied.dictType,
-        rawValue: applied.rawValue || undefined,
-        standardValue: applied.standardValue || undefined,
+        q: applied.q || undefined,
         enabled: true,
       });
       downloadBlob(blob, 'customs-dict-mappings.xlsx');
@@ -347,6 +392,21 @@ const CustomsDictMappingsView = () => {
     } catch (error) {
       message.error(getApiErrorMessage(error, t('customsDict.message.loadFailed')));
     }
+  };
+
+  const onSearch = () => {
+    setPage(1);
+    setSelectedRowKeys([]);
+    setApplied({ ...draft, q: draft.q.trim() });
+  };
+
+  const onResetSearch = () => {
+    const reset: FilterDraft = { q: '' };
+    setDraft(reset);
+    setApplied(reset);
+    setSuggestions([]);
+    setSelectedRowKeys([]);
+    setPage(1);
   };
 
   const onDownloadTemplate = async () => {
@@ -371,7 +431,10 @@ const CustomsDictMappingsView = () => {
       if (result.failed > 0) {
         const preview = (result.errors ?? [])
           .slice(0, 3)
-          .map((item) => `第${item.row}行：${item.message}`)
+          .map((item) => t('customsDict.message.importErrorRow', {
+            row: item.row,
+            message: item.message,
+          }))
           .join('；');
         message.warning(
           preview
@@ -404,49 +467,43 @@ const CustomsDictMappingsView = () => {
               style={{ width: 120 }}
               options={typeOptions}
               value={draft.dictType}
-              onChange={(value) => setDraft((prev) => ({ ...prev, dictType: value }))}
+              onChange={(value) => {
+                setDraft((prev) => ({ ...prev, dictType: value }));
+                setSuggestions([]);
+              }}
             />
-            <Input
+            <AutoComplete
               allowClear
-              placeholder={t('customsDict.filter.rawValue')}
+              placeholder={t('customsDict.search.mappingPlaceholder')}
               style={{ width: 160 }}
-              value={draft.rawValue}
-              onChange={(event) => setDraft((prev) => ({
-                ...prev,
-                rawValue: event.target.value,
+              value={draft.q}
+              options={suggestions.map((suggestion) => ({
+                key: `${suggestion.id}-${suggestion.matchField}`,
+                value: suggestion.matchField === 'rawValue'
+                  ? suggestion.rawValue
+                  : suggestion.standardValue,
+                label: `${suggestion.rawValue} (${suggestion.standardValue})`,
               }))}
-            />
-            <Input
-              allowClear
-              placeholder={t('customsDict.filter.standardValue')}
-              style={{ width: 160 }}
-              value={draft.standardValue}
-              onChange={(event) => setDraft((prev) => ({
+              filterOption={false}
+              listHeight={240}
+              onChange={(value) => setDraft((prev) => ({
                 ...prev,
-                standardValue: event.target.value,
+                q: String(value),
               }))}
+              onSelect={(value) => {
+                setDraft((prev) => ({ ...prev, q: String(value) }));
+                setSuggestions([]);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') onSearch();
+              }}
             />
           </Space>
           <Space wrap className={listStyles.toolbarActions}>
-            <Button
-              type="primary"
-              onClick={() => {
-                setPage(1);
-                setSelectedRowKeys([]);
-                setApplied({ ...draft });
-              }}
-            >
-              {t('customsDict.action.search')}
+            <Button type="primary" onClick={onSearch}>
+              {t('common.action.query')}
             </Button>
-            <Button
-              onClick={() => {
-                const reset = { rawValue: '', standardValue: '' };
-                setDraft(reset);
-                setApplied(reset);
-                setSelectedRowKeys([]);
-                setPage(1);
-              }}
-            >
+            <Button onClick={onResetSearch}>
               {t('customsDict.action.reset')}
             </Button>
             <Button
@@ -464,19 +521,40 @@ const CustomsDictMappingsView = () => {
         title={t('common.queryList')}
         actions={(
           <Space>
-            <Button icon={<DownloadOutlined />} onClick={onDownloadTemplate}>
-              {t('customsDict.action.importTemplate')}
-            </Button>
-            <Button icon={<DownloadOutlined />} onClick={onExport}>
-              {t('customsDict.action.export')}
-            </Button>
-            <Button
-              icon={<UploadOutlined />}
-              loading={importing}
-              onClick={() => fileInputRef.current?.click()}
+            <IoDropdown
+              trigger={['click']}
+              menu={{
+                items: [
+                  {
+                    key: 'import',
+                    icon: <UploadOutlined />,
+                    label: t('customsDict.action.import'),
+                    disabled: importing,
+                    onClick: () => fileInputRef.current?.click(),
+                  },
+                  {
+                    key: 'export',
+                    icon: <DownloadOutlined />,
+                    label: t('customsDict.action.export'),
+                    onClick: () => {
+                      void onExport();
+                    },
+                  },
+                  {
+                    key: 'template',
+                    icon: <DownloadOutlined />,
+                    label: t('customsDict.action.importTemplate'),
+                    onClick: () => {
+                      void onDownloadTemplate();
+                    },
+                  },
+                ],
+              }}
             >
-              {t('customsDict.action.import')}
-            </Button>
+              <Button loading={importing}>
+                {t('customsDict.action.importExport')}
+              </Button>
+            </IoDropdown>
             <input
               ref={fileInputRef}
               type="file"
@@ -487,6 +565,7 @@ const CustomsDictMappingsView = () => {
                 if (file) {
                   void onImportFile(file);
                 }
+                event.target.value = '';
               }}
             />
             <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
@@ -506,6 +585,7 @@ const CustomsDictMappingsView = () => {
               {t('customsDict.batchDelete.button')}
             </Button>
             <Button
+              type="secondary"
               loading={batchResyncLoading}
               disabled={batchBusy}
               onClick={openBatchResyncConfirm}
@@ -520,7 +600,7 @@ const CustomsDictMappingsView = () => {
           columns={columns}
           dataSource={items}
           tdLoading={loading}
-          locale={{ emptyText: t('customsDict.empty') }}
+          noData={{ text: t('customsDict.empty') }}
           rowClassName={() => listStyles.clickableRow}
           rowSelection={{
             columnWidth: 32,
@@ -538,12 +618,14 @@ const CustomsDictMappingsView = () => {
             pageSize,
             total,
             showSizeChanger: true,
+            pageSizeOptions: PAGE_SIZE_OPTIONS,
             showTotal: (count: number) => t('customsDict.total', { total: count }),
           }}
           onChange={(pagination) => {
             setSelectedRowKeys([]);
-            setPage(pagination.current ?? 1);
-            setPageSize(pagination.pageSize ?? DEFAULT_PAGE_SIZE);
+            const nextPageSize = pagination.pageSize ?? pageSize;
+            setPageSize(nextPageSize);
+            setPage(nextPageSize === pageSize ? pagination.current ?? 1 : 1);
           }}
         />
       </QueryListCard>

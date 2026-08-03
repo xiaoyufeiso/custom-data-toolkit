@@ -153,6 +153,19 @@ def test_types_seed_options_create_and_disable_rules(
     assert ok_rename.json()["name"] == "新口岸"
 
 
+def test_type_suggestions_prefix(client: TestClient) -> None:
+    headers = _login(client)
+    suggestions = client.get(
+        "/api/v1/customs-dict/types/suggestions",
+        params={"prefix": "coun"},
+        headers=headers,
+    )
+    assert suggestions.status_code == 200
+    body = suggestions.json()
+    assert len(body) <= 10
+    assert any(item["code"] == "country" and item["matchField"] == "code" for item in body)
+
+
 def test_disabled_type_rejected_on_create_mapping(client: TestClient) -> None:
     headers = _login(client)
     suffix = datetime.now(UTC).strftime("%H%M%S%f")

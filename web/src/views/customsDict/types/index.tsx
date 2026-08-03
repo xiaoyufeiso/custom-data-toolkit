@@ -1,5 +1,6 @@
 import type { ComponentProps, Key } from 'react';
 import {
+  Children,
   useCallback,
   useEffect,
   useState,
@@ -7,6 +8,7 @@ import {
 import BizTable from '@tendata-biz-components/biz-table';
 import { PlusOutlined, ReloadOutlined } from '@tendata-ui/icon';
 import {
+  AutoComplete,
   Button,
   Drawer,
   Form,
@@ -20,9 +22,11 @@ import {
   createCustomsDictType,
   disableCustomsDictType,
   enableCustomsDictType,
+  listCustomsDictTypeSuggestions,
   listCustomsDictTypes,
   updateCustomsDictType,
   type CustomsDictTypeItem,
+  type CustomsDictTypeSuggestion,
 } from '@/services/customsDict';
 import QueryListCard from '@/shared/components/queryListCard';
 import { useTranslate } from '@/shared/hooks';
@@ -32,6 +36,7 @@ import { getApiErrorCode, getApiErrorMessage } from '@/shared/utils/apiError';
 type ColumnsType = NonNullable<ComponentProps<typeof BizTable>['columns']>;
 
 const DEFAULT_PAGE_SIZE = 20;
+const PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
 
 type FormState = {
   code: string;
@@ -46,6 +51,7 @@ const CustomsDictTypesView = () => {
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [draftQ, setDraftQ] = useState('');
   const [appliedQ, setAppliedQ] = useState('');
+  const [suggestions, setSuggestions] = useState<CustomsDictTypeSuggestion[]>([]);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [batchDisableLoading, setBatchDisableLoading] = useState(false);
@@ -57,9 +63,11 @@ const CustomsDictTypesView = () => {
   const [form] = Form.useForm<FormState>();
 
   const load = useCallback(async () => {
+    setSelectedRowKeys([]);
     setLoading(true);
     try {
       const data = await listCustomsDictTypes({
+        enabled: true,
         q: appliedQ || undefined,
         page,
         pageSize,
@@ -76,6 +84,27 @@ const CustomsDictTypesView = () => {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    const prefix = draftQ.trim();
+    if (!prefix) {
+      setSuggestions([]);
+      return undefined;
+    }
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      try {
+        const data = await listCustomsDictTypeSuggestions(prefix, controller.signal);
+        setSuggestions(data);
+      } catch {
+        if (!controller.signal.aborted) setSuggestions([]);
+      }
+    }, 300);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [draftQ]);
 
   const openCreate = () => {
     setEditingId(null);
@@ -137,14 +166,32 @@ const CustomsDictTypesView = () => {
       const updated = row.enabled
         ? await disableCustomsDictType(row.id)
         : await enableCustomsDictType(row.id);
-      setDetail(updated);
       message.success(t('customsDict.message.saveSuccess'));
+      if (!updated.enabled) {
+        closeDetail();
+      } else {
+        setDetail(updated);
+      }
       await load();
     } catch (error) {
       message.error(getApiErrorMessage(error, t('customsDict.message.loadFailed')));
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const openToggleConfirm = (row: CustomsDictTypeItem) => {
+    if (!row.enabled) {
+      void onToggle(row);
+      return;
+    }
+    Modal.confirm({
+      children: Children,
+      centered: true,
+      title: t('customsDict.disable.confirmTitle'),
+      content: t('customsDict.disable.confirmContent'),
+      onOk: () => onToggle(row),
+    });
   };
 
   const onBatchDisable = async () => {
@@ -188,6 +235,32 @@ const CustomsDictTypesView = () => {
     }
   };
 
+  const openBatchDisableConfirm = () => {
+    Modal.confirm({
+      children: Children,
+      centered: true,
+      title: t('customsDict.batchDisable.confirmTitle', {
+        count: selectedRowKeys.length,
+      }),
+      content: t('customsDict.batchDisable.confirmContent'),
+      onOk: onBatchDisable,
+    });
+  };
+
+  const onSearch = () => {
+    setAppliedQ(draftQ.trim());
+    setSelectedRowKeys([]);
+    setPage(1);
+  };
+
+  const onResetSearch = () => {
+    setDraftQ('');
+    setAppliedQ('');
+    setSuggestions([]);
+    setSelectedRowKeys([]);
+    setPage(1);
+  };
+
   const columns: ColumnsType = [
     {
       title: t('customsDict.column.typeCode'),
@@ -226,33 +299,35 @@ const CustomsDictTypesView = () => {
         </strong>
         <div className={listStyles.toolbarRow}>
           <Space wrap className={listStyles.toolbarFields}>
-            <Input
+            <AutoComplete
               allowClear
-              placeholder={t('customsDict.filter.typeKeyword')}
+              placeholder={t('customsDict.search.typePlaceholder')}
               value={draftQ}
-              onChange={(event) => setDraftQ(event.target.value)}
+              options={suggestions.map((suggestion) => ({
+                key: `${suggestion.code}-${suggestion.matchField}`,
+                value: suggestion.matchField === 'code'
+                  ? suggestion.code
+                  : suggestion.name,
+                label: `${suggestion.code} (${suggestion.name})`,
+              }))}
+              filterOption={false}
+              listHeight={240}
+              onChange={(value) => setDraftQ(String(value))}
+              onSelect={(value) => {
+                setDraftQ(String(value));
+                setSuggestions([]);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') onSearch();
+              }}
               style={{ width: 160 }}
             />
           </Space>
           <Space wrap className={listStyles.toolbarActions}>
-            <Button
-              type="primary"
-              onClick={() => {
-                setAppliedQ(draftQ.trim());
-                setSelectedRowKeys([]);
-                setPage(1);
-              }}
-            >
-              {t('customsDict.action.search')}
+            <Button type="primary" onClick={onSearch}>
+              {t('common.action.query')}
             </Button>
-            <Button
-              onClick={() => {
-                setDraftQ('');
-                setAppliedQ('');
-                setSelectedRowKeys([]);
-                setPage(1);
-              }}
-            >
+            <Button onClick={onResetSearch}>
               {t('customsDict.action.reset')}
             </Button>
             <Button type="link" icon={<ReloadOutlined />} onClick={() => void load()}>
@@ -274,7 +349,7 @@ const CustomsDictTypesView = () => {
           <Button
             danger
             loading={batchDisableLoading}
-            onClick={() => void onBatchDisable()}
+            onClick={openBatchDisableConfirm}
           >
             {t('customsDict.batchDisable.button')}
           </Button>
@@ -282,9 +357,10 @@ const CustomsDictTypesView = () => {
       >
         <BizTable
           rowKey="id"
-          loading={loading}
           columns={columns}
           dataSource={items}
+          tdLoading={loading}
+          noData={{ text: t('customsDict.empty') }}
           rowClassName={() => listStyles.clickableRow}
           rowSelection={{
             columnWidth: 32,
@@ -301,12 +377,15 @@ const CustomsDictTypesView = () => {
             current: page,
             pageSize,
             total,
+            showSizeChanger: true,
+            pageSizeOptions: PAGE_SIZE_OPTIONS,
             showTotal: (count: number) => t('customsDict.total', { total: count }),
           }}
           onChange={(pagination) => {
             setSelectedRowKeys([]);
-            setPage(pagination.current ?? 1);
-            setPageSize(pagination.pageSize ?? DEFAULT_PAGE_SIZE);
+            const nextPageSize = pagination.pageSize ?? pageSize;
+            setPageSize(nextPageSize);
+            setPage(nextPageSize === pageSize ? pagination.current ?? 1 : 1);
           }}
         />
       </QueryListCard>
@@ -330,7 +409,10 @@ const CustomsDictTypesView = () => {
             label={t('customsDict.form.typeCode')}
             rules={[{ required: true, message: t('customsDict.message.typeCodeRequired') }]}
           >
-            <Input placeholder="country" disabled={editingId != null} />
+            <Input
+              placeholder={t('customsDict.form.typeCodePlaceholder')}
+              disabled={editingId != null}
+            />
           </Form.Item>
           <Form.Item
             name="name"
@@ -377,7 +459,7 @@ const CustomsDictTypesView = () => {
               <Button type="primary" onClick={openEdit}>
                 {t('customsDict.action.edit')}
               </Button>
-              <Button loading={submitting} onClick={() => void onToggle(detail)}>
+              <Button loading={submitting} onClick={() => openToggleConfirm(detail)}>
                 {detail.enabled
                   ? t('customsDict.action.disable')
                   : t('customsDict.action.enable')}

@@ -10,6 +10,7 @@ from custom_data_toolkit.routers.customs_dict_schemas import (
     CustomsDictTypeListResponse,
     CustomsDictTypeOption,
     CustomsDictTypePublic,
+    CustomsDictTypeSuggestion,
     CustomsDictTypeUpdateRequest,
 )
 from custom_data_toolkit.services.customs_dict_type_service import CustomsDictTypeService
@@ -70,6 +71,23 @@ def list_type_options(
     return [
         CustomsDictTypeOption(code=row.code, name=row.name)
         for row in service.list_options()
+    ]
+
+
+@router.get("/suggestions", response_model=list[CustomsDictTypeSuggestion])
+def list_type_suggestions(
+    _auth: CurrentAuthDep,
+    service: CustomsDictTypeService = CustomsDictTypeServiceDep,
+    prefix: str = Query(..., min_length=1, max_length=100),
+    limit: int = Query(10, ge=1, le=10),
+) -> list[CustomsDictTypeSuggestion]:
+    return [
+        CustomsDictTypeSuggestion(
+            code=row.code,
+            name=row.name,
+            match_field=match_field,
+        )
+        for row, match_field in service.list_suggestions(prefix=prefix, limit=limit)
     ]
 
 

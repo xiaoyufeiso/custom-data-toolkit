@@ -277,6 +277,7 @@ Session + CSRF（写操作）。仅增量同步 Redis，不做整表覆盖。字
 |---|---|---|
 | GET | `/customs-dict/types` | 列表；query：`enabled`、`q`、`page`、`pageSize`；项含 `mappingCount` |
 | GET | `/customs-dict/types/options` | 仅启用项：`[{ code, name }]`，供下拉 |
+| GET | `/customs-dict/types/suggestions` | 启用类型 code/name 前缀推荐；query：`prefix`、`limit`≤10；项含 `matchField` |
 | POST | `/customs-dict/types` | 新建（`code`+`name`；code 规范化为小写） |
 | PATCH | `/customs-dict/types/{id}` | 仅改 `name`；提交不同 `code` → 400 `CustomsDictType.CodeImmutable` |
 | POST | `/customs-dict/types/{id}/enable` | 启用 |
@@ -290,8 +291,9 @@ Session + CSRF（写操作）。仅增量同步 Redis，不做整表覆盖。字
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| GET | `/customs-dict/mappings` | 列表；query：`dictType`、`rawValue`、`standardValue`、`enabled`、`page`、`pageSize` |
-| GET | `/customs-dict/mappings/export` | 导出当前筛选全量 xlsx（默认 `enabled=true`）；表头与缺失导出同构 |
+| GET | `/customs-dict/mappings` | 列表；query：`dictType`、`q`（OR 模糊 raw/standard）、`rawValue`、`standardValue`、`enabled`、`page`、`pageSize` |
+| GET | `/customs-dict/mappings/suggestions` | 启用映射 raw/standard 前缀推荐；query：`prefix`、可选 `dictType`、`limit`≤10；项含 `matchField` |
+| GET | `/customs-dict/mappings/export` | 导出当前筛选全量 xlsx（默认 `enabled=true`；支持 `q`）；表头与缺失导出同构 |
 | GET | `/customs-dict/mappings/import-template` | 下载仅含表头的导入模板 xlsx |
 | POST | `/customs-dict/mappings/import` | multipart 上传 xlsx；upsert；单行失败不整批回滚；`source=import` |
 | GET | `/customs-dict/mappings/{id}` | 详情 |
@@ -334,6 +336,7 @@ Redis 失败时 MySQL 仍保存，`syncStatus` 为 `failed`/`pending`，`syncErr
 | 方法 | 路径 | 说明 |
 |---|---|---|
 | GET | `/customs-dict/missing` | 列表；**`dictType` 必填**；可选 `rawValue`、`page`、`pageSize`；按出现次数降序 |
+| GET | `/customs-dict/missing/suggestions` | 缺失原始值前缀推荐；query：**`dictType` 必填**、`prefix`、`limit`≤10 |
 | POST | `/customs-dict/missing/handle` | 处理：写 MySQL（source=`missing`）→ 正式 Hash 成功后 ZREM |
 | GET | `/customs-dict/missing/export` | 导出当前筛选全量 xlsx（不改 Redis） |
 

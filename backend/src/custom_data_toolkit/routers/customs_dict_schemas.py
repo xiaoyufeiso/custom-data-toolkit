@@ -109,6 +109,24 @@ class CustomsDictTypeOption(CamelModel):
     name: str
 
 
+class CustomsDictTypeSuggestion(CamelModel):
+    code: str
+    name: str
+    match_field: str = Field(alias="matchField")
+
+
+class CustomsDictMappingSuggestion(CamelModel):
+    id: int
+    raw_value: str = Field(alias="rawValue")
+    standard_value: str = Field(alias="standardValue")
+    match_field: str = Field(alias="matchField")
+
+
+class CustomsDictMissingSuggestion(CamelModel):
+    raw_value: str = Field(alias="rawValue")
+    occurrence_count: int = Field(alias="occurrenceCount")
+
+
 class CustomsDictTypeListResponse(CamelModel):
     items: list[CustomsDictTypePublic]
     page: int
