@@ -1,5 +1,6 @@
-import type { ComponentProps } from 'react';
+import type { ComponentProps, Key } from 'react';
 import {
+  Children,
   useCallback,
   useEffect,
   useMemo,
@@ -10,38 +11,46 @@ import { PlusOutlined, ReloadOutlined } from '@tendata-ui/icon';
 import {
   Button,
   Card,
+  Checkbox,
+  Drawer,
   Form,
   Input,
   Modal,
   Select,
   Space,
-  Tag,
   Typography,
   message,
 } from 'tendata-ui';
 import {
+  batchDisableCustomsDictMappings,
+  batchResyncCustomsDictMappings,
   createCustomsDictMapping,
-  disableCustomsDictMapping,
-  enableCustomsDictMapping,
   listCustomsDictMappings,
-  replayCustomsDictSync,
-  resyncCustomsDictMapping,
   updateCustomsDictMapping,
   type CustomsDictMapping,
 } from '@/services/customsDict';
 import { useTranslate } from '@/shared/hooks';
-import { getApiErrorMessage } from '@/shared/utils/apiError';
+import { getApiErrorCode, getApiErrorMessage } from '@/shared/utils/apiError';
 import styles from './index.module.less';
 
 type ColumnsType = NonNullable<ComponentProps<typeof BizTable>['columns']>;
 
 const DEFAULT_PAGE_SIZE = 20;
 
+type CheckboxProps = {
+  checked?: boolean;
+  children?: React.ReactNode;
+  onChange?: (event: { target: { checked: boolean } }) => void;
+};
+
+const TendataCheckbox = Checkbox as unknown as (
+  props: CheckboxProps,
+) => React.ReactElement;
+
 type FilterDraft = {
   dictType?: string;
   rawValue: string;
   standardValue: string;
-  enabled?: boolean;
 };
 
 type FormState = {
@@ -72,10 +81,13 @@ const CustomsDictMappingsView = () => {
   });
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [batchLoading, setBatchLoading] = useState(false);
+  const [selectedRowKeys, setSelectedRowKeys] = useState<Key[]>([]);
   const [formOpen, setFormOpen] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
-  const [editing, setEditing] = useState<CustomsDictMapping | null>(null);
+  const [detailEditing, setDetailEditing] = useState(false);
   const [detail, setDetail] = useState<CustomsDictMapping | null>(null);
+  const [editStandardValue, setEditStandardValue] = useState('');
   const [form] = Form.useForm<FormState>();
 
   const typeOptions = useMemo(
@@ -93,7 +105,8 @@ const CustomsDictMappingsView = () => {
         dictType: applied.dictType,
         rawValue: applied.rawValue || undefined,
         standardValue: applied.standardValue || undefined,
-        enabled: applied.enabled,
+        // 软删（停用）记录不在前端展示，固定只拉启用数据
+        enabled: true,
         page,
         pageSize,
       });
@@ -123,19 +136,58 @@ const CustomsDictMappingsView = () => {
     return dictType;
   };
 
-  const openCreate = () => {
-    setEditing(null);
-    form.setFieldsValue(emptyForm);
-    setFormOpen(true);
+  const closeDetail = () => {
+    setDetailOpen(false);
+    setDetailEditing(false);
+    setEditStandardValue('');
   };
 
-  const openEdit = (row: CustomsDictMapping) => {
-    setEditing(row);
-    form.setFieldsValue({
-      dictType: row.dictType,
-      rawValue: row.rawValue,
-      standardValue: row.standardValue,
-    });
+  const openDetail = (row: CustomsDictMapping) => {
+    setDetail(row);
+    setDetailEditing(false);
+    setEditStandardValue(row.standardValue);
+    setDetailOpen(true);
+  };
+
+  const startDetailEdit = () => {
+    if (!detail) return;
+    setEditStandardValue(detail.standardValue);
+    setDetailEditing(true);
+  };
+
+  const cancelDetailEdit = () => {
+    if (detail) {
+      setEditStandardValue(detail.standardValue);
+    }
+    setDetailEditing(false);
+  };
+
+  const saveDetailEdit = async () => {
+    if (!detail) return;
+    const nextValue = editStandardValue.trim();
+    if (!nextValue) {
+      message.warning(t('customsDict.message.standardRequired'));
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const updated = await updateCustomsDictMapping(detail.id, {
+        standardValue: nextValue,
+      });
+      setDetail(updated);
+      setEditStandardValue(updated.standardValue);
+      setDetailEditing(false);
+      message.success(t('customsDict.message.saveSuccess'));
+      await load();
+    } catch (error) {
+      message.error(getApiErrorMessage(error, t('customsDict.message.loadFailed')));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const openCreate = () => {
+    form.setFieldsValue(emptyForm);
     setFormOpen(true);
   };
 
@@ -143,17 +195,11 @@ const CustomsDictMappingsView = () => {
     const values = await form.validateFields();
     setSubmitting(true);
     try {
-      if (editing) {
-        await updateCustomsDictMapping(editing.id, {
-          standardValue: values.standardValue.trim(),
-        });
-      } else {
-        await createCustomsDictMapping({
-          dictType: values.dictType,
-          rawValue: values.rawValue.trim(),
-          standardValue: values.standardValue.trim(),
-        });
-      }
+      await createCustomsDictMapping({
+        dictType: values.dictType,
+        rawValue: values.rawValue.trim(),
+        standardValue: values.standardValue.trim(),
+      });
       message.success(t('customsDict.message.saveSuccess'));
       setFormOpen(false);
       await load();
@@ -162,6 +208,79 @@ const CustomsDictMappingsView = () => {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const onBatchDelete = async () => {
+    const ids = selectedRowKeys.map(Number);
+    if (ids.length === 0) return;
+    setBatchLoading(true);
+    try {
+      const result = await batchDisableCustomsDictMappings(ids);
+      message.success(t('customsDict.batchDelete.success', { count: result.disabled }));
+      if (result.syncFailed > 0) {
+        message.warning(t('customsDict.batchDelete.syncWarning', {
+          disabled: result.disabled,
+          syncFailed: result.syncFailed,
+        }));
+      }
+      setSelectedRowKeys([]);
+      await load();
+    } catch (error) {
+      message.error(getApiErrorMessage(error, t('customsDict.batchDelete.failed')));
+      if (getApiErrorCode(error) === 'BatchDelete.StaleSelection') {
+        await load();
+      }
+    } finally {
+      setBatchLoading(false);
+    }
+  };
+
+  const onBatchResync = async () => {
+    const ids = selectedRowKeys.map(Number);
+    if (ids.length === 0) return;
+    setBatchLoading(true);
+    try {
+      const result = await batchResyncCustomsDictMappings(ids);
+      message.success(t('customsDict.batchResync.success', {
+        synced: result.synced,
+        failed: result.failed,
+      }));
+      const failedSet = new Set(result.failedIds ?? []);
+      setSelectedRowKeys(ids.filter((id) => failedSet.has(id)));
+      await load();
+    } catch (error) {
+      message.error(getApiErrorMessage(error, t('customsDict.batchResync.failed')));
+      if (getApiErrorCode(error) === 'BatchDelete.StaleSelection') {
+        await load();
+      }
+    } finally {
+      setBatchLoading(false);
+    }
+  };
+
+  const openBatchDeleteConfirm = () => {
+    Modal.confirm({
+      // tendata-ui 的静态 Modal 类型误将 children 声明为必填；实际内容由 content 提供。
+      children: Children,
+      centered: true,
+      title: t('customsDict.batchDelete.confirmTitle', {
+        count: selectedRowKeys.length,
+      }),
+      content: t('customsDict.batchDelete.confirmContent'),
+      onOk: onBatchDelete,
+    });
+  };
+
+  const openBatchResyncConfirm = () => {
+    Modal.confirm({
+      children: Children,
+      centered: true,
+      title: t('customsDict.batchResync.confirmTitle', {
+        count: selectedRowKeys.length,
+      }),
+      content: t('customsDict.batchResync.confirmContent'),
+      onOk: onBatchResync,
+    });
   };
 
   const columns: ColumnsType = [
@@ -175,23 +294,23 @@ const CustomsDictMappingsView = () => {
       title: t('customsDict.column.rawValue'),
       dataIndex: 'rawValue',
       key: 'rawValue',
+      render: (value: string, row: CustomsDictMapping) => (
+        <button
+          type="button"
+          className={styles.rawValueLink}
+          onClick={(event) => {
+            event.stopPropagation();
+            openDetail(row);
+          }}
+        >
+          {value}
+        </button>
+      ),
     },
     {
       title: t('customsDict.column.standardValue'),
       dataIndex: 'standardValue',
       key: 'standardValue',
-    },
-    {
-      title: t('customsDict.column.enabled'),
-      dataIndex: 'enabled',
-      key: 'enabled',
-      render: (enabled: boolean) => (
-        <Tag color={enabled ? 'success' : 'default'}>
-          {enabled
-            ? t('customsDict.filter.enabled.true')
-            : t('customsDict.filter.enabled.false')}
-        </Tag>
-      ),
     },
     {
       title: t('customsDict.column.syncStatus'),
@@ -203,99 +322,14 @@ const CustomsDictMappingsView = () => {
         </span>
       ),
     },
-    {
-      title: t('customsDict.column.actions'),
-      key: 'actions',
-      render: (_: unknown, row: CustomsDictMapping) => (
-        <Space size="small" wrap>
-          <Button type="link" onClick={() => { setDetail(row); setDetailOpen(true); }}>
-            {t('customsDict.modal.detailTitle')}
-          </Button>
-          <Button type="link" onClick={() => openEdit(row)}>
-            {t('customsDict.action.edit')}
-          </Button>
-          {row.enabled ? (
-            <Button
-              type="link"
-              onClick={() => {
-                Modal.confirm({
-                  title: t('customsDict.confirm.disable'),
-                  onOk: async () => {
-                    await disableCustomsDictMapping(row.id);
-                    await load();
-                  },
-                });
-              }}
-            >
-              {t('customsDict.action.disable')}
-            </Button>
-          ) : (
-            <Button
-              type="link"
-              onClick={() => {
-                Modal.confirm({
-                  title: t('customsDict.confirm.enable'),
-                  onOk: async () => {
-                    await enableCustomsDictMapping(row.id);
-                    await load();
-                  },
-                });
-              }}
-            >
-              {t('customsDict.action.enable')}
-            </Button>
-          )}
-          <Button
-            type="link"
-            onClick={async () => {
-              try {
-                await resyncCustomsDictMapping(row.id);
-                message.success(t('customsDict.message.resyncSuccess'));
-                await load();
-              } catch (error) {
-                message.error(getApiErrorMessage(error, t('customsDict.message.loadFailed')));
-              }
-            }}
-          >
-            {t('customsDict.action.resync')}
-          </Button>
-        </Space>
-      ),
-    },
   ];
 
   return (
     <div className={styles.page}>
       <div className={styles.pageAction}>
-        <Space>
-          <Button
-            onClick={() => {
-              const dictType = applied.dictType ?? draft.dictType;
-              if (!dictType) {
-                message.warning(t('customsDict.message.dictTypeRequired'));
-                return;
-              }
-              Modal.confirm({
-                title: t('customsDict.confirm.replay'),
-                onOk: async () => {
-                  const result = await replayCustomsDictSync(dictType);
-                  message.success(
-                    t('customsDict.message.replaySuccess', {
-                      synced: result.synced,
-                      failed: result.failed,
-                    }),
-                  );
-                  await load();
-                },
-              });
-            }}
-          >
-            {t('customsDict.action.replaySync')}
-          </Button>
-          <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
-            {t('customsDict.action.create')}
-          </Button>
-        </Space>
+        <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
+          {t('customsDict.action.create')}
+        </Button>
       </div>
 
       <div className={styles.toolbar}>
@@ -331,41 +365,80 @@ const CustomsDictMappingsView = () => {
               standardValue: event.target.value,
             }))}
           />
-          <Select
-            allowClear
-            placeholder={t('customsDict.filter.enabled')}
-            style={{ width: 120 }}
-            options={[
-              { label: t('customsDict.filter.enabled.true'), value: true },
-              { label: t('customsDict.filter.enabled.false'), value: false },
-            ]}
-            value={draft.enabled}
-            onChange={(value) => setDraft((prev) => ({ ...prev, enabled: value }))}
-          />
           <Button
             type="primary"
             onClick={() => {
               setPage(1);
+              setSelectedRowKeys([]);
               setApplied({ ...draft });
             }}
           >
             {t('customsDict.action.search')}
           </Button>
           <Button
-            type="link"
             onClick={() => {
               const reset = { rawValue: '', standardValue: '' };
               setDraft(reset);
               setApplied(reset);
+              setSelectedRowKeys([]);
               setPage(1);
             }}
           >
             {t('customsDict.action.reset')}
           </Button>
-          <Button icon={<ReloadOutlined />} onClick={() => load()}>
+          <Button
+            type="link"
+            icon={<ReloadOutlined />}
+            onClick={() => load()}
+          >
             {t('customsDict.action.refresh')}
           </Button>
         </Space>
+        <div className={styles.batchToolbar}>
+          <strong>{t('customsDict.batchActions.title')}</strong>
+          <div className={styles.batchToolbarActions}>
+            <Space wrap>
+              <TendataCheckbox
+                checked={
+                  items.length > 0
+                  && items.every((item) => selectedRowKeys.includes(item.id))
+                }
+                onChange={({ target }) => {
+                  setSelectedRowKeys(target.checked ? items.map((item) => item.id) : []);
+                }}
+              >
+                {t('customsDict.batchActions.selectPage')}
+              </TendataCheckbox>
+              <span>
+                {t('customsDict.batchActions.selected', {
+                  count: selectedRowKeys.length,
+                })}
+              </span>
+              <fieldset
+                disabled={selectedRowKeys.length === 0 || batchLoading}
+                className={styles.batchDeleteFieldset}
+              >
+                <Space>
+                  <Button
+                    danger
+                    loading={batchLoading}
+                    disabled={selectedRowKeys.length === 0}
+                    onClick={openBatchDeleteConfirm}
+                  >
+                    {t('customsDict.batchDelete.button')}
+                  </Button>
+                  <Button
+                    loading={batchLoading}
+                    disabled={selectedRowKeys.length === 0}
+                    onClick={openBatchResyncConfirm}
+                  >
+                    {t('customsDict.batchResync.button')}
+                  </Button>
+                </Space>
+              </fieldset>
+            </Space>
+          </div>
+        </div>
       </div>
 
       <Card>
@@ -375,6 +448,18 @@ const CustomsDictMappingsView = () => {
           dataSource={items}
           tdLoading={loading}
           locale={{ emptyText: t('customsDict.empty') }}
+          rowClassName={() => styles.clickableRow}
+          rowSelection={{
+            columnWidth: 32,
+            selectedRowKeys,
+            onChange: setSelectedRowKeys,
+            getCheckboxProps: () => ({
+              onClick: (event: React.MouseEvent) => event.stopPropagation(),
+            }),
+          }}
+          onRow={(row: CustomsDictMapping) => ({
+            onClick: () => openDetail(row),
+          })}
           page={{
             current: page,
             pageSize,
@@ -383,6 +468,7 @@ const CustomsDictMappingsView = () => {
             showTotal: (count: number) => t('customsDict.total', { total: count }),
           }}
           onChange={(pagination) => {
+            setSelectedRowKeys([]);
             setPage(pagination.current ?? 1);
             setPageSize(pagination.pageSize ?? DEFAULT_PAGE_SIZE);
           }}
@@ -391,7 +477,7 @@ const CustomsDictMappingsView = () => {
 
       <Modal
         open={formOpen}
-        title={editing ? t('customsDict.modal.editTitle') : t('customsDict.modal.createTitle')}
+        title={t('customsDict.modal.createTitle')}
         onCancel={() => setFormOpen(false)}
         onOk={submitForm}
         confirmLoading={submitting}
@@ -406,15 +492,14 @@ const CustomsDictMappingsView = () => {
             label={t('customsDict.form.dictType')}
             rules={[{ required: true, message: t('customsDict.message.dictTypeRequired') }]}
           >
-            <Select options={typeOptions} disabled={Boolean(editing)} />
+            <Select options={typeOptions} />
           </Form.Item>
           <Form.Item
             name="rawValue"
             label={t('customsDict.form.rawValue')}
             rules={[{ required: true, message: t('customsDict.message.rawRequired') }]}
-            extra={editing ? t('customsDict.form.rawValueReadonly') : undefined}
           >
-            <Input disabled={Boolean(editing)} />
+            <Input />
           </Form.Item>
           <Form.Item
             name="standardValue"
@@ -426,30 +511,72 @@ const CustomsDictMappingsView = () => {
         </Form>
       </Modal>
 
-      <Modal
+      <Drawer
         open={detailOpen}
         title={t('customsDict.modal.detailTitle')}
-        footer={null}
-        onCancel={() => setDetailOpen(false)}
+        width={480}
         destroyOnClose
+        maskClosable={!detailEditing}
+        onClose={closeDetail}
+        footer={(
+          <div className={styles.detailFooter}>
+            {detailEditing ? (
+              <Space>
+                <Button onClick={cancelDetailEdit} disabled={submitting}>
+                  {t('customsDict.action.cancel')}
+                </Button>
+                <Button type="primary" loading={submitting} onClick={saveDetailEdit}>
+                  {t('customsDict.action.save')}
+                </Button>
+              </Space>
+            ) : (
+              <Button type="primary" onClick={startDetailEdit}>
+                {t('customsDict.action.edit')}
+              </Button>
+            )}
+          </div>
+        )}
       >
         {detail && (
-          <Space direction="vertical" size="small">
-            <div>{`${t('customsDict.column.dictType')}: ${typeLabel(detail.dictType)}`}</div>
-            <div>{`${t('customsDict.column.rawValue')}: ${detail.rawValue}`}</div>
-            <div>{`${t('customsDict.column.standardValue')}: ${detail.standardValue}`}</div>
-            <div>{`${t('customsDict.column.enabled')}: ${
-              detail.enabled
-                ? t('customsDict.filter.enabled.true')
-                : t('customsDict.filter.enabled.false')
-            }`}
+          <div className={styles.detailGrid}>
+            <div className={styles.detailRow}>
+              <span className={styles.detailLabel}>{t('customsDict.column.dictType')}</span>
+              <span className={styles.detailValue}>{typeLabel(detail.dictType)}</span>
             </div>
-            <div>{`${t('customsDict.column.syncStatus')}: ${syncLabel(detail.syncStatus)}`}</div>
-            <div>{`${t('customsDict.column.source')}: ${detail.source}`}</div>
-            {detail.syncError ? <div className={styles.syncFailed}>{detail.syncError}</div> : null}
-          </Space>
+            <div className={styles.detailRow}>
+              <span className={styles.detailLabel}>{t('customsDict.column.rawValue')}</span>
+              <span className={styles.detailValue}>{detail.rawValue}</span>
+            </div>
+            <div className={styles.detailRow}>
+              <span className={styles.detailLabel}>{t('customsDict.column.standardValue')}</span>
+              <span className={styles.detailValue}>
+                {detailEditing ? (
+                  <Input
+                    value={editStandardValue}
+                    onChange={(event) => setEditStandardValue(event.target.value)}
+                    aria-label={t('customsDict.form.standardValue')}
+                  />
+                ) : (
+                  detail.standardValue
+                )}
+              </span>
+            </div>
+            <div className={styles.detailRow}>
+              <span className={styles.detailLabel}>{t('customsDict.column.syncStatus')}</span>
+              <span className={styles.detailValue}>
+                {syncLabel(detail.syncStatus)}
+                {detail.syncError ? (
+                  <div className={styles.syncFailed}>{detail.syncError}</div>
+                ) : null}
+              </span>
+            </div>
+            <div className={styles.detailRow}>
+              <span className={styles.detailLabel}>{t('customsDict.column.source')}</span>
+              <span className={styles.detailValue}>{detail.source}</span>
+            </div>
+          </div>
         )}
-      </Modal>
+      </Drawer>
     </div>
   );
 };

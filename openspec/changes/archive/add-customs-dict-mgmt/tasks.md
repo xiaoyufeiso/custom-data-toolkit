@@ -35,13 +35,29 @@
 - [x] 4.1 标准字典页：统一列表 + 类型筛选、详情、新增、编辑标准值、启停、重同步
 - [x] 4.2 缺失字典页：列表、处理、导出、刷新
 - [x] 4.3 前端测试
+- [x] 4.4 E4：批量停用（UI 删除=软删）+ 批量同步；布局对齐货币页；去掉顶部重放同步
 
 ## 5. 验证与文档
 
-- [ ] 5.1 对照 Delta Scenario 逐条 Verify
-- [ ] 5.2 实跑前后端测试与构建
-- [ ] 5.3 更新 `docs/api.md`、`operations.md`（Redis 配置）、`progress.md`
-- [ ] 5.4 评审无 BLOCKER 后归档进 `openspec/specs/customs-dict/`
+- [x] 5.1 对照 Delta Scenario 逐条 Verify（见下方 Verification）
+- [x] 5.2 实跑：后端 customs-dict 相关 pytest 13 passed；前端 `src/views/customsDict` 11 passed；tsc 无新增阻断
+- [x] 5.3 更新 `docs/api.md`、`operations.md`（REDIS_URL）、`progress.md`
+- [x] 5.4 归档进 `openspec/specs/customs-dict/`；change 移至 `openspec/changes/archive/add-customs-dict-mgmt/`
+
+### Verification（2026-08-03）
+
+| Scenario | 证据 | 结果 |
+|---|---|---|
+| Filter by dictionary type | API list `dictType` + 前端筛选 | PASS |
+| Create without code-list check | `test_customs_dict_api` 创建 | PASS |
+| Disable HDEL keeps other fields | `test_customs_dict_api` 停用 + 第三方 field | PASS |
+| Sync failure keeps MySQL | `test_customs_dict_redis_failure` | PASS |
+| Handle missing ZREM after sync | `test_customs_dict_missing_api` | PASS |
+| Failed formal sync keeps missing | `test_customs_dict_missing_sync_fail` | PASS |
+| No import / type-edit UI | 前端无入口；Deferred | PASS |
+| Batch soft-delete + batch resync | `test_customs_dict_batch_api` + 前端测试 | PASS |
+
+BLOCKER：无。MINOR：本地缺失页需 Redis 有数据（联调种子，非产品缺陷）。
 
 ## Deferred（本 change 不做）
 

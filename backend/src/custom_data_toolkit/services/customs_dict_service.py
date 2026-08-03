@@ -158,6 +158,76 @@ class CustomsDictService:
         self._sync_mapping(mapping)
         return mapping
 
+    def batch_disable(
+        self,
+        mapping_ids: list[int],
+        *,
+        actor_id: int | None,
+    ) -> dict[str, object]:
+        mappings = self.repository.get_by_ids_for_update(mapping_ids)
+        found_ids = {mapping.id for mapping in mappings}
+        missing_ids = sorted(set(mapping_ids) - found_ids)
+        if missing_ids:
+            raise ConflictException(
+                "部分映射已不存在，本次未停用任何记录，请刷新列表后重试。",
+                error_code="BatchDelete.StaleSelection",
+                details={"missingIds": missing_ids},
+            )
+
+        now = datetime.now(UTC).replace(tzinfo=None)
+        for mapping in mappings:
+            mapping.enabled = False
+            mapping.updated_by = actor_id
+            mapping.updated_at = now
+            mapping.sync_status = CustomsDictSyncStatus.PENDING.value
+            mapping.sync_error = None
+        self.repository.commit()
+
+        failed_ids: list[int] = []
+        for mapping in mappings:
+            self.repository.refresh(mapping)
+            self._sync_mapping(mapping)
+            self.repository.refresh(mapping)
+            if mapping.sync_status != CustomsDictSyncStatus.SYNCED.value:
+                failed_ids.append(mapping.id)
+
+        return {
+            "disabled": len(mappings),
+            "sync_failed": len(failed_ids),
+            "failed_ids": failed_ids,
+        }
+
+    def batch_resync(self, mapping_ids: list[int]) -> dict[str, object]:
+        mappings = self.repository.get_by_ids_for_update(mapping_ids)
+        found_ids = {mapping.id for mapping in mappings}
+        missing_ids = sorted(set(mapping_ids) - found_ids)
+        if missing_ids:
+            raise ConflictException(
+                "部分映射已不存在，本次未同步任何记录，请刷新列表后重试。",
+                error_code="BatchDelete.StaleSelection",
+                details={"missingIds": missing_ids},
+            )
+
+        synced = 0
+        failed_ids: list[int] = []
+        # 按请求顺序稳定返回 failedIds
+        id_order = {mapping_id: index for index, mapping_id in enumerate(mapping_ids)}
+        mappings_sorted = sorted(mappings, key=lambda item: id_order[item.id])
+        for mapping in mappings_sorted:
+            self._sync_mapping(mapping)
+            self.repository.refresh(mapping)
+            if mapping.sync_status == CustomsDictSyncStatus.SYNCED.value:
+                synced += 1
+            else:
+                failed_ids.append(mapping.id)
+
+        return {
+            "synced": synced,
+            "failed": len(failed_ids),
+            "failed_ids": failed_ids,
+            "total": len(mappings),
+        }
+
     def list_missing(
         self,
         *,

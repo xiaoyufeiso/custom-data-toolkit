@@ -47,6 +47,19 @@ class CustomsDictReplaySyncResponse(CamelModel):
     total: int
 
 
+class CustomsDictBatchDisableResponse(CamelModel):
+    disabled: int
+    sync_failed: int = Field(alias="syncFailed")
+    failed_ids: list[int] = Field(default_factory=list, alias="failedIds")
+
+
+class CustomsDictBatchResyncResponse(CamelModel):
+    synced: int
+    failed: int
+    failed_ids: list[int] = Field(default_factory=list, alias="failedIds")
+    total: int
+
+
 class CustomsDictMissingPublic(CamelModel):
     dict_type: str = Field(alias="dictType")
     dict_type_label: str = Field(alias="dictTypeLabel")

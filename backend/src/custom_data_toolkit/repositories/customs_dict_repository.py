@@ -50,6 +50,14 @@ class CustomsDictRepository:
     def get_by_id(self, mapping_id: int) -> CustomsDictMapping | None:
         return self.session.get(CustomsDictMapping, mapping_id)
 
+    def get_by_ids_for_update(self, mapping_ids: list[int]) -> list[CustomsDictMapping]:
+        statement = (
+            select(CustomsDictMapping)
+            .where(col(CustomsDictMapping.id).in_(mapping_ids))
+            .with_for_update()
+        )
+        return list(self.session.exec(statement).all())
+
     def get_by_type_raw(self, dict_type: str, raw_value: str) -> CustomsDictMapping | None:
         statement = select(CustomsDictMapping).where(
             CustomsDictMapping.dict_type == dict_type,

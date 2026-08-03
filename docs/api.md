@@ -278,7 +278,15 @@
 | POST | `/customs-dict/mappings/{id}/enable` | 启用并 HSET |
 | POST | `/customs-dict/mappings/{id}/disable` | 停用并 HDEL（不删第三方其它 field） |
 | POST | `/customs-dict/mappings/{id}/resync` | 单条重试同步 |
-| POST | `/customs-dict/mappings/replay-sync?dictType=` | 按类型重放：启用 HSET、停用 HDEL；保留 Redis 中未知 field |
+| POST | `/customs-dict/mappings/batch-disable` | 批量停用（UI「批量删除」）；MySQL 原子；Redis 可部分失败 |
+| POST | `/customs-dict/mappings/batch-resync` | 批量同步选中行；汇总成功/失败 |
+| POST | `/customs-dict/mappings/replay-sync?dictType=` | 按类型重放：启用 HSET、停用 HDEL；保留 Redis 中未知 field（管理端 UI 已不用） |
+
+批量 body：`{ "ids": [1, 2] }`（1～100，正整数且唯一）。
+
+`batch-disable` 成功：`{ "disabled": 2, "syncFailed": 0, "failedIds": [] }`。缺 ID：409 `BatchDelete.StaleSelection`，`details.missingIds`，不改任何行。  
+`batch-resync` 成功：`{ "synced": 1, "failed": 1, "failedIds": [2], "total": 2 }`。缺 ID：同上 409。  
+说明：管理端「删除」语义为停用（软删），非物理删除。
 
 创建/更新 body（camelCase）：
 

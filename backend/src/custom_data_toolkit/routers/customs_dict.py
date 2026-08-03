@@ -3,7 +3,10 @@ from fastapi import APIRouter, Depends, Query, status
 from custom_data_toolkit.deps import CurrentAuthDep, SessionDep, require_session_csrf
 from custom_data_toolkit.models.customs_dict import CustomsDictMapping
 from custom_data_toolkit.repositories.customs_dict_repository import CustomsDictRepository
+from custom_data_toolkit.routers.common_schemas import BatchIdsRequest
 from custom_data_toolkit.routers.customs_dict_schemas import (
+    CustomsDictBatchDisableResponse,
+    CustomsDictBatchResyncResponse,
     CustomsDictMappingCreateRequest,
     CustomsDictMappingListResponse,
     CustomsDictMappingPublic,
@@ -86,6 +89,35 @@ def replay_sync(
 ) -> CustomsDictReplaySyncResponse:
     result = service.replay_sync(dict_type=dict_type)
     return CustomsDictReplaySyncResponse(**result)
+
+
+@router.post(
+    "/batch-disable",
+    response_model=CustomsDictBatchDisableResponse,
+)
+def batch_disable_mappings(
+    body: BatchIdsRequest,
+    auth: CurrentAuthDep,
+    _csrf: None = Depends(require_session_csrf),
+    service: CustomsDictService = CustomsDictServiceDep,
+) -> CustomsDictBatchDisableResponse:
+    result = service.batch_disable(body.ids, actor_id=auth.user.id)
+    return CustomsDictBatchDisableResponse(**result)
+
+
+@router.post(
+    "/batch-resync",
+    response_model=CustomsDictBatchResyncResponse,
+)
+def batch_resync_mappings(
+    body: BatchIdsRequest,
+    auth: CurrentAuthDep,
+    _csrf: None = Depends(require_session_csrf),
+    service: CustomsDictService = CustomsDictServiceDep,
+) -> CustomsDictBatchResyncResponse:
+    _ = auth
+    result = service.batch_resync(body.ids)
+    return CustomsDictBatchResyncResponse(**result)
 
 
 @router.get("/{mapping_id}", response_model=CustomsDictMappingPublic)

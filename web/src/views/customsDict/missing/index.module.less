@@ -21,3 +21,50 @@
   top: 14px;
   right: 24px;
 }
+
+.clickableRow {
+  cursor: pointer;
+}
+
+.rawValueLink {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-link, #1677ff);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.rawValueLink:hover {
+  text-decoration: underline;
+}
+
+.detailGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.detailRow {
+  display: grid;
+  grid-template-columns: 112px 1fr;
+  gap: 12px;
+  align-items: start;
+}
+
+.detailLabel {
+  color: var(--color-text-secondary, #8c8c8c);
+  line-height: 22px;
+}
+
+.detailValue {
+  color: var(--color-text, #141414);
+  line-height: 22px;
+  word-break: break-word;
+}
+
+.detailFooter {
+  display: flex;
+  justify-content: flex-end;
+}

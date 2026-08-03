@@ -19,8 +19,15 @@ import CustomsDictMappingsView from '@/views/customsDict/mappings';
 
 vi.mock('tendata-ui', async (importOriginal) => {
   const original = await importOriginal<typeof import('tendata-ui')>();
+  const ModalComponent = original.Modal as typeof original.Modal & {
+    confirm: (config: { onOk?: (...args: never[]) => void | Promise<void> }) => void;
+  };
+  ModalComponent.confirm = ({ onOk }) => {
+    void (onOk as undefined | (() => void | Promise<void>))?.();
+  };
   return {
     ...original,
+    Modal: ModalComponent,
     Select: ({
       onChange,
       options = [],
@@ -48,6 +55,31 @@ vi.mock('tendata-ui', async (importOriginal) => {
         ))}
       </select>
     ),
+    Drawer: ({
+      open,
+      title,
+      onClose,
+      children,
+      footer,
+      maskClosable = true,
+    }: {
+      open?: boolean;
+      title?: React.ReactNode;
+      onClose?: () => void;
+      children?: React.ReactNode;
+      footer?: React.ReactNode;
+      maskClosable?: boolean;
+    }) => (open ? (
+      <div data-testid="detail-drawer">
+        <div>{title}</div>
+        <button type="button" onClick={onClose}>关闭</button>
+        {maskClosable ? (
+          <button type="button" onClick={onClose}>遮罩</button>
+        ) : null}
+        {children}
+        <div data-testid="detail-footer">{footer}</div>
+      </div>
+    ) : null),
   };
 });
 
@@ -56,31 +88,65 @@ vi.mock('@tendata-biz-components/biz-table', () => ({
     columns = [],
     dataSource = [],
     onChange,
+    onRow,
     page,
+    rowSelection,
   }: {
     columns?: Array<{
       key?: string;
+      dataIndex?: string;
       render?: (value: unknown, row: Record<string, unknown>) => React.ReactNode;
     }>;
     dataSource?: Array<Record<string, unknown>>;
     onChange?: (pagination: { current?: number; pageSize?: number }) => void;
+    onRow?: (row: Record<string, unknown>) => { onClick?: () => void };
     page?: {
       current?: number;
       pageSize?: number;
       total?: number;
       showTotal?: (total: number) => React.ReactNode;
     };
+    rowSelection?: {
+      selectedRowKeys?: React.Key[];
+      onChange?: (keys: React.Key[]) => void;
+    };
   }) => {
-    const actionColumn = columns.find((column) => column.key === 'actions');
+    const selectedKeys = rowSelection?.selectedRowKeys ?? [];
     return (
       <div data-testid="biz-table">
-        {dataSource.map((row) => (
-          <div key={String(row.id)}>
-            <span>{String(row.rawValue)}</span>
-            <span>{String(row.standardValue)}</span>
-            {actionColumn?.render?.(undefined, row)}
-          </div>
-        ))}
+        {dataSource.map((row) => {
+          const rawColumn = columns.find((column) => column.key === 'rawValue');
+          const rowProps = onRow?.(row);
+          return (
+            <div
+              key={String(row.id)}
+              data-testid={`row-${String(row.id)}`}
+              onClick={rowProps?.onClick}
+              onKeyDown={undefined}
+              role="button"
+              tabIndex={0}
+            >
+              <input
+                type="checkbox"
+                aria-label={`选择${String(row.rawValue)}`}
+                checked={selectedKeys.includes(row.id as React.Key)}
+                onClick={(event) => event.stopPropagation()}
+                onChange={(event) => {
+                  const id = row.id as React.Key;
+                  rowSelection?.onChange?.(
+                    event.target.checked
+                      ? [...selectedKeys, id]
+                      : selectedKeys.filter((key) => key !== id),
+                  );
+                }}
+              />
+              {rawColumn?.render
+                ? rawColumn.render(row.rawValue, row)
+                : <span>{String(row.rawValue)}</span>}
+              <span>{String(row.standardValue)}</span>
+            </div>
+          );
+        })}
         {page?.showTotal?.(page.total ?? 0)}
         {(page?.total ?? 0) > (page?.pageSize ?? 20) ? (
           <button
@@ -124,17 +190,177 @@ const listResponse = {
 };
 
 describe('CustomsDictMappingsView', () => {
-  it('renders mappings list', async () => {
+  it('renders mappings list without row actions or enabled UI', async () => {
+    let requestedEnabled: string | null = null;
+    server.use(
+      http.get(MAPPINGS_URL, ({ request }) => {
+        requestedEnabled = new URL(request.url).searchParams.get('enabled');
+        return HttpResponse.json(listResponse);
+      }),
+    );
+
+    renderWithProviders(<CustomsDictMappingsView />);
+
+    expect(await screen.findByText('美国')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'USA' })).toBeInTheDocument();
+    expect(screen.getByText('共 1 条')).toBeInTheDocument();
+    expect(requestedEnabled).toBe('true');
+    expect(screen.queryByPlaceholderText('启停状态')).not.toBeInTheDocument();
+    expect(screen.queryByText('启用')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '编辑' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '停用' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '重新同步' })).not.toBeInTheDocument();
+  });
+
+  it('opens detail drawer from raw value link and closes via mask', async () => {
+    const user = userEvent.setup();
     server.use(
       http.get(MAPPINGS_URL, () => HttpResponse.json(listResponse)),
     );
 
     renderWithProviders(<CustomsDictMappingsView />);
+    await screen.findByRole('button', { name: 'USA' });
 
-    expect(await screen.findByText('USA')).toBeInTheDocument();
-    expect(screen.getByText('美国')).toBeInTheDocument();
-    expect(screen.getByText('共 1 条')).toBeInTheDocument();
-    expect(screen.getByText('标准字典')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'USA' }));
+    expect(await screen.findByTestId('detail-drawer')).toBeInTheDocument();
+    expect(screen.getByText('映射详情')).toBeInTheDocument();
+    expect(screen.getByText('manual')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: '遮罩' }));
+    await waitFor(() => {
+      expect(screen.queryByTestId('detail-drawer')).not.toBeInTheDocument();
+    });
+  });
+
+  it('opens detail drawer from row click', async () => {
+    const user = userEvent.setup();
+    server.use(
+      http.get(MAPPINGS_URL, () => HttpResponse.json(listResponse)),
+    );
+
+    renderWithProviders(<CustomsDictMappingsView />);
+    await screen.findByTestId('row-1');
+
+    await user.click(screen.getByTestId('row-1'));
+    expect(await screen.findByTestId('detail-drawer')).toBeInTheDocument();
+  });
+
+  it('edits standard value inside detail drawer', async () => {
+    const user = userEvent.setup();
+    const patchPayload = vi.fn();
+    server.use(
+      http.get(MAPPINGS_URL, () => HttpResponse.json(listResponse)),
+      http.patch(`${MAPPINGS_URL}/1`, async ({ request }) => {
+        patchPayload(await request.json());
+        return HttpResponse.json({
+          ...listResponse.items[0],
+          standardValue: '美利坚',
+        });
+      }),
+    );
+
+    renderWithProviders(<CustomsDictMappingsView />);
+    await user.click(await screen.findByRole('button', { name: 'USA' }));
+    expect(await screen.findByTestId('detail-drawer')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: '编辑' }));
+    const input = screen.getByLabelText('标准值');
+    await user.clear(input);
+    await user.type(input, '美利坚');
+    await user.click(screen.getByRole('button', { name: '保存' }));
+
+    await waitFor(() => {
+      expect(patchPayload).toHaveBeenCalledWith({ standardValue: '美利坚' });
+    });
+    expect(await screen.findByText('美利坚')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '编辑' })).toBeInTheDocument();
+  });
+
+  it('batch disables selected mappings', async () => {
+    const user = userEvent.setup();
+    const disablePayload = vi.fn();
+    server.use(
+      http.get(MAPPINGS_URL, () => HttpResponse.json(listResponse)),
+      http.post(`${MAPPINGS_URL}/batch-disable`, async ({ request }) => {
+        disablePayload(await request.json());
+        return HttpResponse.json({
+          disabled: 1,
+          syncFailed: 0,
+          failedIds: [],
+        });
+      }),
+    );
+
+    renderWithProviders(<CustomsDictMappingsView />);
+    await screen.findByText('美国');
+
+    expect(
+      screen.getByRole('button', { name: '批量删除' }).closest('fieldset'),
+    ).toBeDisabled();
+
+    await user.click(screen.getByRole('checkbox', { name: '选择USA' }));
+    await user.click(screen.getByRole('button', { name: '批量删除' }));
+
+    await waitFor(() => {
+      expect(disablePayload).toHaveBeenCalledWith({ ids: [1] });
+    });
+    expect(screen.queryByRole('button', { name: '重放同步' })).not.toBeInTheDocument();
+  });
+
+  it('batch resync keeps failed selection', async () => {
+    const user = userEvent.setup();
+    const resyncPayload = vi.fn();
+    server.use(
+      http.get(MAPPINGS_URL, () => HttpResponse.json({
+        ...listResponse,
+        items: [
+          listResponse.items[0],
+          {
+            ...listResponse.items[0],
+            id: 2,
+            rawValue: 'JPN',
+            standardValue: '日本',
+          },
+        ],
+        total: 2,
+      })),
+      http.post(`${MAPPINGS_URL}/batch-resync`, async ({ request }) => {
+        resyncPayload(await request.json());
+        return HttpResponse.json({
+          synced: 1,
+          failed: 1,
+          failedIds: [2],
+          total: 2,
+        });
+      }),
+    );
+
+    renderWithProviders(<CustomsDictMappingsView />);
+    await screen.findByText('日本');
+
+    await user.click(screen.getByRole('checkbox', { name: '全选本页' }));
+    await user.click(screen.getByRole('button', { name: '批量同步' }));
+
+    await waitFor(() => {
+      expect(resyncPayload).toHaveBeenCalledWith({ ids: [1, 2] });
+    });
+    expect(screen.getByRole('checkbox', { name: '选择JPN' })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: '选择USA' })).not.toBeChecked();
+  });
+
+  it('uses bordered reset and link-style refresh', async () => {
+    server.use(
+      http.get(MAPPINGS_URL, () => HttpResponse.json(listResponse)),
+    );
+
+    renderWithProviders(<CustomsDictMappingsView />);
+    await screen.findByText('美国');
+
+    const reset = screen.getByRole('button', { name: '重置' });
+    const refresh = screen.getByRole('button', { name: '刷新' });
+    // 重置为默认描边按钮；刷新为 link + 图标（styled-components 不在 class 中写 link）
+    expect(reset.querySelector('svg')).toBeNull();
+    expect(refresh.querySelector('svg')).not.toBeNull();
   });
 
   it('creates a mapping through the modal form', async () => {
@@ -157,7 +383,7 @@ describe('CustomsDictMappingsView', () => {
     );
 
     renderWithProviders(<CustomsDictMappingsView />);
-    await screen.findByText('USA');
+    await screen.findByText('美国');
 
     await user.click(screen.getByRole('button', { name: '新建映射' }));
     expect(await screen.findByLabelText('原始值')).toBeInTheDocument();

@@ -10,9 +10,8 @@ import { DownloadOutlined, ReloadOutlined } from '@tendata-ui/icon';
 import {
   Button,
   Card,
-  Form,
+  Drawer,
   Input,
-  Modal,
   Select,
   Space,
   Typography,
@@ -62,9 +61,10 @@ const CustomsDictMissingView = () => {
   });
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [handleOpen, setHandleOpen] = useState(false);
-  const [current, setCurrent] = useState<CustomsDictMissingItem | null>(null);
-  const [form] = Form.useForm<{ standardValue: string }>();
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [detailHandling, setDetailHandling] = useState(false);
+  const [detail, setDetail] = useState<CustomsDictMissingItem | null>(null);
+  const [standardValue, setStandardValue] = useState('');
 
   const typeOptions = useMemo(
     () => [
@@ -100,24 +100,46 @@ const CustomsDictMissingView = () => {
     load();
   }, [load]);
 
-  const openHandle = (row: CustomsDictMissingItem) => {
-    setCurrent(row);
-    form.setFieldsValue({ standardValue: '' });
-    setHandleOpen(true);
+  const closeDetail = () => {
+    setDetailOpen(false);
+    setDetailHandling(false);
+    setStandardValue('');
+    setDetail(null);
+  };
+
+  const openDetail = (row: CustomsDictMissingItem) => {
+    setDetail(row);
+    setDetailHandling(false);
+    setStandardValue('');
+    setDetailOpen(true);
+  };
+
+  const startHandle = () => {
+    setStandardValue('');
+    setDetailHandling(true);
+  };
+
+  const cancelHandle = () => {
+    setStandardValue('');
+    setDetailHandling(false);
   };
 
   const submitHandle = async () => {
-    if (!current) return;
-    const values = await form.validateFields();
+    if (!detail) return;
+    const nextValue = standardValue.trim();
+    if (!nextValue) {
+      message.warning(t('customsDict.message.standardRequired'));
+      return;
+    }
     setSubmitting(true);
     try {
       await handleCustomsDictMissing({
-        dictType: current.dictType,
-        rawValue: current.rawValue,
-        standardValue: values.standardValue.trim(),
+        dictType: detail.dictType,
+        rawValue: detail.rawValue,
+        standardValue: nextValue,
       });
       message.success(t('customsDict.message.handleSuccess'));
-      setHandleOpen(false);
+      closeDetail();
       await load();
     } catch (error) {
       message.error(getApiErrorMessage(error, t('customsDict.message.loadFailed')));
@@ -136,20 +158,23 @@ const CustomsDictMissingView = () => {
       title: t('customsDict.column.rawValue'),
       dataIndex: 'rawValue',
       key: 'rawValue',
+      render: (value: string, row: CustomsDictMissingItem) => (
+        <button
+          type="button"
+          className={styles.rawValueLink}
+          onClick={(event) => {
+            event.stopPropagation();
+            openDetail(row);
+          }}
+        >
+          {value}
+        </button>
+      ),
     },
     {
       title: t('customsDict.column.occurrenceCount'),
       dataIndex: 'occurrenceCount',
       key: 'occurrenceCount',
-    },
-    {
-      title: t('customsDict.column.actions'),
-      key: 'actions',
-      render: (_: unknown, row: CustomsDictMissingItem) => (
-        <Button type="link" onClick={() => openHandle(row)}>
-          {t('customsDict.action.handle')}
-        </Button>
-      ),
     },
   ];
 
@@ -215,7 +240,6 @@ const CustomsDictMissingView = () => {
             {t('customsDict.action.search')}
           </Button>
           <Button
-            type="link"
             onClick={() => {
               const reset = { dictType: 'country', rawValue: '' };
               setDraft(reset);
@@ -225,7 +249,7 @@ const CustomsDictMissingView = () => {
           >
             {t('customsDict.action.reset')}
           </Button>
-          <Button icon={<ReloadOutlined />} onClick={() => load()}>
+          <Button type="link" icon={<ReloadOutlined />} onClick={() => load()}>
             {t('customsDict.action.refresh')}
           </Button>
         </Space>
@@ -238,6 +262,10 @@ const CustomsDictMissingView = () => {
           dataSource={items}
           tdLoading={loading}
           locale={{ emptyText: t('customsDict.empty') }}
+          rowClassName={() => styles.clickableRow}
+          onRow={(row: CustomsDictMissingItem) => ({
+            onClick: () => openDetail(row),
+          })}
           page={{
             current: page,
             pageSize,
@@ -252,34 +280,66 @@ const CustomsDictMissingView = () => {
         />
       </Card>
 
-      <Modal
-        open={handleOpen}
-        title={t('customsDict.modal.handleTitle')}
-        onCancel={() => setHandleOpen(false)}
-        onOk={submitHandle}
-        confirmLoading={submitting}
+      <Drawer
+        open={detailOpen}
+        title={t('customsDict.modal.missingDetailTitle')}
+        width={480}
         destroyOnClose
-        maskClosable={false}
-        okText={t('customsDict.action.save')}
-        cancelText={t('customsDict.action.cancel')}
-      >
-        <Space direction="vertical" style={{ width: '100%' }} size="middle">
-          <div>{`${t('customsDict.column.dictType')}: ${current?.dictTypeLabel ?? ''}`}</div>
-          <div>{`${t('customsDict.column.rawValue')}: ${current?.rawValue ?? ''}`}</div>
-          <div>
-            {`${t('customsDict.column.occurrenceCount')}: ${current?.occurrenceCount ?? ''}`}
+        maskClosable={!detailHandling}
+        onClose={closeDetail}
+        footer={(
+          <div className={styles.detailFooter}>
+            {detailHandling ? (
+              <Space>
+                <Button onClick={cancelHandle} disabled={submitting}>
+                  {t('customsDict.action.cancel')}
+                </Button>
+                <Button type="primary" loading={submitting} onClick={submitHandle}>
+                  {t('customsDict.action.save')}
+                </Button>
+              </Space>
+            ) : (
+              <Button type="primary" onClick={startHandle}>
+                {t('customsDict.action.handle')}
+              </Button>
+            )}
           </div>
-          <Form form={form} layout="vertical">
-            <Form.Item
-              name="standardValue"
-              label={t('customsDict.form.standardValue')}
-              rules={[{ required: true, message: t('customsDict.message.standardRequired') }]}
-            >
-              <Input />
-            </Form.Item>
-          </Form>
-        </Space>
-      </Modal>
+        )}
+      >
+        {detail && (
+          <div className={styles.detailGrid}>
+            <div className={styles.detailRow}>
+              <span className={styles.detailLabel}>{t('customsDict.column.dictType')}</span>
+              <span className={styles.detailValue}>{detail.dictTypeLabel}</span>
+            </div>
+            <div className={styles.detailRow}>
+              <span className={styles.detailLabel}>{t('customsDict.column.rawValue')}</span>
+              <span className={styles.detailValue}>{detail.rawValue}</span>
+            </div>
+            <div className={styles.detailRow}>
+              <span className={styles.detailLabel}>
+                {t('customsDict.column.occurrenceCount')}
+              </span>
+              <span className={styles.detailValue}>{detail.occurrenceCount}</span>
+            </div>
+            {detailHandling ? (
+              <div className={styles.detailRow}>
+                <span className={styles.detailLabel}>
+                  {t('customsDict.column.standardValue')}
+                </span>
+                <span className={styles.detailValue}>
+                  <Input
+                    value={standardValue}
+                    onChange={(event) => setStandardValue(event.target.value)}
+                    aria-label={t('customsDict.form.standardValue')}
+                    placeholder={t('customsDict.form.standardValue')}
+                  />
+                </span>
+              </div>
+            ) : null}
+          </div>
+        )}
+      </Drawer>
     </div>
   );
 };

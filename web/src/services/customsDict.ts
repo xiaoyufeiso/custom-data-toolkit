@@ -98,18 +98,31 @@ export async function resyncCustomsDictMapping(id: number): Promise<CustomsDictM
   return data;
 }
 
-export async function replayCustomsDictSync(dictType: string): Promise<{
+export async function batchDisableCustomsDictMappings(ids: number[]): Promise<{
+  disabled: number;
+  syncFailed: number;
+  failedIds: number[];
+}> {
+  const { data } = await http.post<{
+    disabled: number;
+    syncFailed: number;
+    failedIds: number[];
+  }>('/customs-dict/mappings/batch-disable', { ids });
+  return data;
+}
+
+export async function batchResyncCustomsDictMappings(ids: number[]): Promise<{
   synced: number;
   failed: number;
+  failedIds: number[];
   total: number;
 }> {
   const { data } = await http.post<{
     synced: number;
     failed: number;
+    failedIds: number[];
     total: number;
-  }>('/customs-dict/mappings/replay-sync', null, {
-    params: { dictType },
-  });
+  }>('/customs-dict/mappings/batch-resync', { ids });
   return data;
 }
 

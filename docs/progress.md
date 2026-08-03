@@ -4,9 +4,9 @@
 
 ## 当前状态
 
-- 阶段：海关字典第一版 — 包 4（前端）已完成，待包 5 验收归档
-- 整体状态：进行中
-- 最后更新：2026-07-31
+- 阶段：海关字典第一版 — **包 5 验收归档完成**
+- 整体状态：功能开发完成，待合并 `feat/customs-dict-mapping-model` → main（按需）
+- 最后更新：2026-08-03
 
 ## 里程碑
 
@@ -14,20 +14,37 @@
 |---|---|
 | M0–M6 汇率 MVP 及发布整理 | 完成 |
 | 海关字典第一版文档 / Redis 默认假设 | 完成 |
-| 海关字典第一版开发 | 进行中（包 1–4 完成） |
+| 海关字典第一版开发（包 1–5） | 完成 |
 
 ## 阻塞
 
-无（导入搁置；整表覆盖全量不做；与第三方书面约定非阻塞，联调微调）。
+无。导入 / 类型管理 / 整表覆盖等仍为 Deferred。
 
 ## 下一步
 
-1. **包 5**：全量 Verify / 归档 OpenSpec
-2. 合并 `feat/customs-dict-mapping-model` 至 main（按需）
+1. 合并 `feat/customs-dict-mapping-model` 至 main（按需）
+2. 可选：E5 Redis 友好错误文案；另立 change 做导入
 
-切片：`openspec/changes/add-customs-dict-mgmt/tasks.md`
+切片：`openspec/changes/archive/add-customs-dict-mgmt/tasks.md`
 
 ## 日志（摘录）
+
+### 2026-08-03（包 5）
+
+- Verify Scenario 全 PASS；pytest 13 + vitest 11；归档 `openspec/specs/customs-dict`；change 入 archive
+
+### 2026-08-03（E4 + UX）
+
+- 批量停用（UI 删除=软删）+ 批量同步；隐藏停用行与启停筛选；缺失详情 Drawer + 处理
+
+### 2026-08-03（E2）
+
+- 详情 Drawer 右下角编辑；标准值可编辑并 PATCH 保存；编辑中禁点遮罩关闭
+
+### 2026-08-03（E1+E3）
+
+- 标准字典：去操作列；行/原始值进 Drawer 详情（可点遮罩关闭）；字段两列灰名黑值
+- 标准/缺失：重置有框、刷新 link 无框
 
 ### 2026-07-31（包 4）
 

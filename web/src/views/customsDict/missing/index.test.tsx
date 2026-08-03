@@ -45,6 +45,31 @@ vi.mock('tendata-ui', async (importOriginal) => {
         ))}
       </select>
     ),
+    Drawer: ({
+      open,
+      title,
+      onClose,
+      children,
+      footer,
+      maskClosable = true,
+    }: {
+      open?: boolean;
+      title?: React.ReactNode;
+      onClose?: () => void;
+      children?: React.ReactNode;
+      footer?: React.ReactNode;
+      maskClosable?: boolean;
+    }) => (open ? (
+      <div data-testid="detail-drawer">
+        <div>{title}</div>
+        <button type="button" onClick={onClose}>关闭</button>
+        {maskClosable ? (
+          <button type="button" onClick={onClose}>遮罩</button>
+        ) : null}
+        {children}
+        <div data-testid="detail-footer">{footer}</div>
+      </div>
+    ) : null),
   };
 });
 
@@ -52,32 +77,43 @@ vi.mock('@tendata-biz-components/biz-table', () => ({
   default: ({
     columns = [],
     dataSource = [],
+    onRow,
     page,
   }: {
     columns?: Array<{
       key?: string;
+      dataIndex?: string;
       render?: (value: unknown, row: Record<string, unknown>) => React.ReactNode;
     }>;
     dataSource?: Array<Record<string, unknown>>;
+    onRow?: (row: Record<string, unknown>) => { onClick?: () => void };
     page?: {
       total?: number;
       showTotal?: (total: number) => React.ReactNode;
     };
-  }) => {
-    const actionColumn = columns.find((column) => column.key === 'actions');
-    return (
-      <div data-testid="biz-table">
-        {dataSource.map((row) => (
-          <div key={`${String(row.dictType)}:${String(row.rawValue)}`}>
-            <span>{String(row.rawValue)}</span>
+  }) => (
+    <div data-testid="biz-table">
+      {dataSource.map((row) => {
+        const rawColumn = columns.find((column) => column.key === 'rawValue');
+        const rowProps = onRow?.(row);
+        return (
+          <div
+            key={`${String(row.dictType)}:${String(row.rawValue)}`}
+            data-testid={`row-${String(row.rawValue)}`}
+            onClick={rowProps?.onClick}
+            role="button"
+            tabIndex={0}
+          >
+            {rawColumn?.render
+              ? rawColumn.render(row.rawValue, row)
+              : <span>{String(row.rawValue)}</span>}
             <span>{String(row.occurrenceCount)}</span>
-            {actionColumn?.render?.(undefined, row)}
           </div>
-        ))}
-        {page?.showTotal?.(page.total ?? 0)}
-      </div>
-    );
-  },
+        );
+      })}
+      {page?.showTotal?.(page.total ?? 0)}
+    </div>
+  ),
 }));
 
 const MISSING_URL = 'http://localhost/api/v1/customs-dict/missing';
@@ -98,7 +134,7 @@ const listResponse = {
 };
 
 describe('CustomsDictMissingView', () => {
-  it('renders missing list with required dictType', async () => {
+  it('renders missing list without actions column', async () => {
     let requestedType = '';
     server.use(
       http.get(MISSING_URL, ({ request }) => {
@@ -109,14 +145,29 @@ describe('CustomsDictMissingView', () => {
 
     renderWithProviders(<CustomsDictMissingView />);
 
-    expect(await screen.findByText('KOR')).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'KOR' })).toBeInTheDocument();
     expect(screen.getByText('12')).toBeInTheDocument();
     expect(screen.getByText('共 1 条')).toBeInTheDocument();
     expect(screen.getByText('缺失字典')).toBeInTheDocument();
     expect(requestedType).toBe('country');
+    expect(screen.queryByRole('button', { name: '处理' })).not.toBeInTheDocument();
   });
 
-  it('handles a missing item', async () => {
+  it('uses bordered reset and link-style refresh', async () => {
+    server.use(
+      http.get(MISSING_URL, () => HttpResponse.json(listResponse)),
+    );
+
+    renderWithProviders(<CustomsDictMissingView />);
+    await screen.findByRole('button', { name: 'KOR' });
+
+    const reset = screen.getByRole('button', { name: '重置' });
+    const refresh = screen.getByRole('button', { name: '刷新' });
+    expect(reset.querySelector('svg')).toBeNull();
+    expect(refresh.querySelector('svg')).not.toBeNull();
+  });
+
+  it('handles a missing item from detail drawer', async () => {
     const user = userEvent.setup();
     const handlePayload = vi.fn();
     server.use(
@@ -142,11 +193,11 @@ describe('CustomsDictMissingView', () => {
     );
 
     renderWithProviders(<CustomsDictMissingView />);
-    await screen.findByText('KOR');
+    await user.click(await screen.findByRole('button', { name: 'KOR' }));
+    expect(await screen.findByTestId('detail-drawer')).toBeInTheDocument();
+    expect(screen.getByText('缺失详情')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: '处理' }));
-    expect(await screen.findByText('处理缺失')).toBeInTheDocument();
-
     await user.type(screen.getByLabelText('标准值'), '韩国');
     await user.click(screen.getByRole('button', { name: '保存' }));
 
@@ -156,6 +207,9 @@ describe('CustomsDictMissingView', () => {
         rawValue: 'KOR',
         standardValue: '韩国',
       });
+    });
+    await waitFor(() => {
+      expect(screen.queryByTestId('detail-drawer')).not.toBeInTheDocument();
     });
   });
 });
