@@ -180,7 +180,7 @@ describe('CustomsDictTypesView', () => {
     expect(screen.queryByText('状态')).not.toBeInTheDocument();
     expect(screen.queryByPlaceholderText('状态')).not.toBeInTheDocument();
     expect(screen.queryByText('批量操作')).not.toBeInTheDocument();
-    expect(screen.queryByText('已选择 0 项')).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: '批量操作' })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: '新建类型' }));
     await user.type(screen.getByPlaceholderText('country'), 'port');
@@ -256,7 +256,7 @@ describe('CustomsDictTypesView', () => {
 
     await user.click(screen.getByRole('checkbox', { name: '选择country' }));
     await user.click(screen.getByRole('checkbox', { name: '选择port' }));
-    expect(screen.getByText('已选择 2 项')).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: '批量操作' })).toHaveTextContent('已选择 2 项');
     await user.click(screen.getByRole('button', { name: '批量删除' }));
 
     await waitFor(() => {

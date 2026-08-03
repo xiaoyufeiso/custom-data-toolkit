@@ -65,6 +65,8 @@ const TendataCheckbox = Checkbox as unknown as (
 
 type DateMode = 'single' | 'range';
 
+type DateSortOrder = 'asc' | 'desc';
+
 type FilterDraft = {
   code: string;
   dateMode?: DateMode;
@@ -72,7 +74,8 @@ type FilterDraft = {
   dateFrom: string;
   dateTo: string;
   checked?: 'true' | 'false';
-  sortOrder: 'asc' | 'desc';
+  /** undefined = 未激活（箭头灰色）；后端未传时默认按日期倒序 */
+  sortOrder?: DateSortOrder;
 };
 
 type AppliedFilter = {
@@ -81,7 +84,14 @@ type AppliedFilter = {
   dateFrom?: string;
   dateTo?: string;
   checked?: boolean;
-  sortOrder?: 'asc' | 'desc';
+  sortOrder?: DateSortOrder;
+};
+
+/** 日期排序三态：未激活 → 正序 → 倒序 → 未激活 */
+const cycleDateSort = (current?: DateSortOrder): DateSortOrder | undefined => {
+  if (current === undefined) return 'asc';
+  if (current === 'asc') return 'desc';
+  return undefined;
 };
 
 type RateForm = {
@@ -98,7 +108,7 @@ const emptyFilter: FilterDraft = {
   dateFrom: '',
   dateTo: '',
   checked: undefined,
-  sortOrder: 'desc',
+  sortOrder: undefined,
 };
 
 const emptyForm: RateForm = {
@@ -237,7 +247,7 @@ const RatesView = () => {
 
     if (filterDraft.checked === 'true') next.checked = true;
     if (filterDraft.checked === 'false') next.checked = false;
-    next.sortOrder = filterDraft.sortOrder;
+    if (filterDraft.sortOrder) next.sortOrder = filterDraft.sortOrder;
 
     setSelectedRowKeys([]);
     setPage(1);
@@ -249,7 +259,7 @@ const RatesView = () => {
     setCodeSuggestions([]);
     setSelectedRowKeys([]);
     setPage(1);
-    setApplied({ sortOrder: 'desc' });
+    setApplied({});
   };
 
   const openCreate = () => {
@@ -386,11 +396,14 @@ const RatesView = () => {
     });
   };
 
-  const applyDateSort = (next: 'asc' | 'desc') => {
+  const applyDateSort = (next?: DateSortOrder) => {
     setSelectedRowKeys([]);
     setFilterDraft((prev) => ({ ...prev, sortOrder: next }));
     setPage(1);
-    setApplied((prev) => ({ ...prev, sortOrder: next }));
+    setApplied((prev) => {
+      const { sortOrder: _prevSort, ...rest } = prev;
+      return next ? { ...rest, sortOrder: next } : rest;
+    });
   };
 
   const columns: ColumnsType = [
@@ -425,7 +438,11 @@ const RatesView = () => {
       key: 'date',
       width: 110,
       sorter: true,
-      sortOrder: (applied.sortOrder ?? 'desc') === 'asc' ? 'ascend' : 'descend',
+      sortOrder: applied.sortOrder === 'asc'
+        ? 'ascend'
+        : applied.sortOrder === 'desc'
+          ? 'descend'
+          : undefined,
     },
     {
       title: t('rates.column.value'),
@@ -450,99 +467,103 @@ const RatesView = () => {
     <div className={listStyles.page}>
       <div className={listStyles.toolbar}>
         <strong className={listStyles.toolbarTitle}>{t('common.filters.title')}</strong>
-        <Space wrap>
-          <AutoComplete
-            allowClear
-            placeholder={t('rates.search.codePlaceholder')}
-            value={filterDraft.code}
-            options={codeSuggestions.map((suggestion) => ({
-              key: suggestion.id,
-              value: suggestion.code ?? '',
-              label: suggestion.code
-                ? `${suggestion.code} (${suggestion.name})`
-                : suggestion.name,
-            }))}
-            filterOption={false}
-            listHeight={240}
-            onChange={(value) => setFilterDraft((prev) => ({
-              ...prev,
-              code: String(value),
-            }))}
-            onSelect={(value) => {
-              setFilterDraft((prev) => ({ ...prev, code: String(value) }));
-              setCodeSuggestions([]);
-            }}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') onSearch();
-            }}
-            style={{ width: 160 }}
-            maxLength={10}
-          />
-          <Select
-            allowClear
-            placeholder={t('rates.dateMode.all')}
-            value={filterDraft.dateMode}
-            options={[
-              { value: 'single', label: t('rates.dateMode.single') },
-              { value: 'range', label: t('rates.dateMode.range') },
-            ]}
-            onChange={(dateMode?: DateMode) => {
-              setFilterDraft((prev) => ({
-                ...prev,
-                dateMode,
-                date: dateMode === 'single' ? prev.date : '',
-                dateFrom: dateMode === 'range' ? prev.dateFrom : '',
-                dateTo: dateMode === 'range' ? prev.dateTo : '',
-              }));
-            }}
-            style={{ width: 120 }}
-          />
-          {filterDraft.dateMode === 'single' ? (
-            <DatePicker
-              value={filterDraft.date ? dayjs(filterDraft.date) : null}
-              onChange={(_date, dateString) => setFilterDraft((prev) => ({
-                ...prev,
-                date: dateString as string,
+        <div className={listStyles.toolbarRow}>
+          <Space wrap className={listStyles.toolbarFields}>
+            <AutoComplete
+              allowClear
+              placeholder={t('rates.search.codePlaceholder')}
+              value={filterDraft.code}
+              options={codeSuggestions.map((suggestion) => ({
+                key: suggestion.id,
+                value: suggestion.code ?? '',
+                label: suggestion.code
+                  ? `${suggestion.code} (${suggestion.name})`
+                  : suggestion.name,
               }))}
+              filterOption={false}
+              listHeight={240}
+              onChange={(value) => setFilterDraft((prev) => ({
+                ...prev,
+                code: String(value),
+              }))}
+              onSelect={(value) => {
+                setFilterDraft((prev) => ({ ...prev, code: String(value) }));
+                setCodeSuggestions([]);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') onSearch();
+              }}
+              style={{ width: 160 }}
+              maxLength={10}
             />
-          ) : null}
-          {filterDraft.dateMode === 'range' ? (
-            <DatePicker.RangePicker
-              value={[
-                filterDraft.dateFrom ? dayjs(filterDraft.dateFrom) : null,
-                filterDraft.dateTo ? dayjs(filterDraft.dateTo) : null,
+            <Select
+              allowClear
+              placeholder={t('rates.dateMode.all')}
+              value={filterDraft.dateMode}
+              options={[
+                { value: 'single', label: t('rates.dateMode.single') },
+                { value: 'range', label: t('rates.dateMode.range') },
               ]}
-              onChange={(_dates, dateStrings) => setFilterDraft((prev) => ({
-                ...prev,
-                dateFrom: dateStrings[0],
-                dateTo: dateStrings[1],
-              }))}
+              onChange={(dateMode?: DateMode) => {
+                setFilterDraft((prev) => ({
+                  ...prev,
+                  dateMode,
+                  date: dateMode === 'single' ? prev.date : '',
+                  dateFrom: dateMode === 'range' ? prev.dateFrom : '',
+                  dateTo: dateMode === 'range' ? prev.dateTo : '',
+                }));
+              }}
+              style={{ width: 120 }}
             />
-          ) : null}
-          <Select
-            allowClear
-            placeholder={t('rates.checked.all')}
-            value={filterDraft.checked}
-            options={[
-              { value: 'true', label: t('rates.checked.true') },
-              { value: 'false', label: t('rates.checked.false') },
-            ]}
-            onChange={(checked?: FilterDraft['checked']) => setFilterDraft((prev) => ({
-              ...prev,
-              checked,
-            }))}
-            style={{ width: 120 }}
-          />
-          <Button type="primary" onClick={onSearch}>
-            {t('rates.action.filter')}
-          </Button>
-          <Button onClick={onResetFilters}>
-            {t('rates.action.reset')}
-          </Button>
-          <Button type="link" icon={<ReloadOutlined />} onClick={() => void load()}>
-            {t('rates.action.refresh')}
-          </Button>
-        </Space>
+            {filterDraft.dateMode === 'single' ? (
+              <DatePicker
+                value={filterDraft.date ? dayjs(filterDraft.date) : null}
+                onChange={(_date, dateString) => setFilterDraft((prev) => ({
+                  ...prev,
+                  date: dateString as string,
+                }))}
+              />
+            ) : null}
+            {filterDraft.dateMode === 'range' ? (
+              <DatePicker.RangePicker
+                value={[
+                  filterDraft.dateFrom ? dayjs(filterDraft.dateFrom) : null,
+                  filterDraft.dateTo ? dayjs(filterDraft.dateTo) : null,
+                ]}
+                onChange={(_dates, dateStrings) => setFilterDraft((prev) => ({
+                  ...prev,
+                  dateFrom: dateStrings[0],
+                  dateTo: dateStrings[1],
+                }))}
+              />
+            ) : null}
+            <Select
+              allowClear
+              placeholder={t('rates.checked.all')}
+              value={filterDraft.checked}
+              options={[
+                { value: 'true', label: t('rates.checked.true') },
+                { value: 'false', label: t('rates.checked.false') },
+              ]}
+              onChange={(checked?: FilterDraft['checked']) => setFilterDraft((prev) => ({
+                ...prev,
+                checked,
+              }))}
+              style={{ width: 120 }}
+            />
+          </Space>
+          <Space wrap className={listStyles.toolbarActions}>
+            <Button type="primary" onClick={onSearch}>
+              {t('rates.action.filter')}
+            </Button>
+            <Button onClick={onResetFilters}>
+              {t('rates.action.reset')}
+            </Button>
+            <Button type="link" icon={<ReloadOutlined />} onClick={() => void load()}>
+              {t('rates.action.refresh')}
+            </Button>
+          </Space>
+        </div>
       </div>
 
       <QueryListCard
@@ -553,9 +574,6 @@ const RatesView = () => {
           </Button>
         )}
         selectionCount={selectedRowKeys.length}
-        selectionLabel={t('common.batchActions.selected', {
-          count: selectedRowKeys.length,
-        })}
         selectionActions={(
           <>
             <Button
@@ -578,6 +596,8 @@ const RatesView = () => {
         )}
       >
         <BizTable
+          /* remount 以清空 BizTable 内部 currentSort，保证三态循环可靠 */
+          key={`rates-sort-${applied.sortOrder ?? 'none'}`}
           rowKey="id"
           columns={columns}
           dataSource={items}
@@ -603,9 +623,9 @@ const RatesView = () => {
             pageSizeOptions: PAGE_SIZE_OPTIONS,
             showTotal: (count) => t('rates.total', { total: count }),
           }}
-          onSortChange={(orderKey, orderType) => {
+          onSortChange={(orderKey) => {
             if (orderKey === 'date') {
-              applyDateSort(orderType === 'ascend' ? 'asc' : 'desc');
+              applyDateSort(cycleDateSort(applied.sortOrder));
             }
           }}
           onChange={(pagination) => {

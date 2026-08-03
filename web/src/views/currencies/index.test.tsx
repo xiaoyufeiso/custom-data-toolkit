@@ -199,7 +199,7 @@ describe('CurrenciesView', () => {
     expect(screen.getByText('筛选条件')).toBeInTheDocument();
     expect(screen.getByText('查询列表')).toBeInTheDocument();
     expect(screen.queryByText('批量操作')).not.toBeInTheDocument();
-    expect(screen.queryByText('已选择 0 项')).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: '批量操作' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '批量删除' })).not.toBeInTheDocument();
     expect(screen.getByTestId('biz-table')).toHaveAttribute(
       'data-selection-column-width',

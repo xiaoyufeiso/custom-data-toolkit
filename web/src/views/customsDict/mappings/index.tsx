@@ -22,6 +22,7 @@ import {
   Modal,
   Select,
   Space,
+  Tag,
   message,
 } from 'tendata-ui';
 import {
@@ -151,6 +152,13 @@ const CustomsDictMappingsView = () => {
     if (status === 'pending') return t('customsDict.sync.pending');
     if (status === 'failed') return t('customsDict.sync.failed');
     return status;
+  };
+
+  const syncTagColor = (status: string) => {
+    if (status === 'synced') return 'success';
+    if (status === 'pending') return 'warning';
+    if (status === 'failed') return 'error';
+    return 'default';
   };
 
   const typeLabel = (dictType: string) => typeLabelMap[dictType] ?? dictType;
@@ -321,9 +329,7 @@ const CustomsDictMappingsView = () => {
       dataIndex: 'syncStatus',
       key: 'syncStatus',
       render: (status: string) => (
-        <span className={status === 'failed' ? listStyles.syncFailed : undefined}>
-          {syncLabel(status)}
-        </span>
+        <Tag color={syncTagColor(status)}>{syncLabel(status)}</Tag>
       ),
     },
   ];
@@ -390,64 +396,68 @@ const CustomsDictMappingsView = () => {
         <strong className={listStyles.toolbarTitle}>
           {t('common.filters.title')}
         </strong>
-        <Space wrap>
-          <Select
-            allowClear
-            placeholder={t('customsDict.filter.dictType')}
-            style={{ width: 140 }}
-            options={typeOptions}
-            value={draft.dictType}
-            onChange={(value) => setDraft((prev) => ({ ...prev, dictType: value }))}
-          />
-          <Input
-            allowClear
-            placeholder={t('customsDict.filter.rawValue')}
-            style={{ width: 180 }}
-            value={draft.rawValue}
-            onChange={(event) => setDraft((prev) => ({
-              ...prev,
-              rawValue: event.target.value,
-            }))}
-          />
-          <Input
-            allowClear
-            placeholder={t('customsDict.filter.standardValue')}
-            style={{ width: 180 }}
-            value={draft.standardValue}
-            onChange={(event) => setDraft((prev) => ({
-              ...prev,
-              standardValue: event.target.value,
-            }))}
-          />
-          <Button
-            type="primary"
-            onClick={() => {
-              setPage(1);
-              setSelectedRowKeys([]);
-              setApplied({ ...draft });
-            }}
-          >
-            {t('customsDict.action.search')}
-          </Button>
-          <Button
-            onClick={() => {
-              const reset = { rawValue: '', standardValue: '' };
-              setDraft(reset);
-              setApplied(reset);
-              setSelectedRowKeys([]);
-              setPage(1);
-            }}
-          >
-            {t('customsDict.action.reset')}
-          </Button>
-          <Button
-            type="link"
-            icon={<ReloadOutlined />}
-            onClick={() => load()}
-          >
-            {t('customsDict.action.refresh')}
-          </Button>
-        </Space>
+        <div className={listStyles.toolbarRow}>
+          <Space wrap className={listStyles.toolbarFields}>
+            <Select
+              allowClear
+              placeholder={t('customsDict.filter.dictType')}
+              style={{ width: 120 }}
+              options={typeOptions}
+              value={draft.dictType}
+              onChange={(value) => setDraft((prev) => ({ ...prev, dictType: value }))}
+            />
+            <Input
+              allowClear
+              placeholder={t('customsDict.filter.rawValue')}
+              style={{ width: 160 }}
+              value={draft.rawValue}
+              onChange={(event) => setDraft((prev) => ({
+                ...prev,
+                rawValue: event.target.value,
+              }))}
+            />
+            <Input
+              allowClear
+              placeholder={t('customsDict.filter.standardValue')}
+              style={{ width: 160 }}
+              value={draft.standardValue}
+              onChange={(event) => setDraft((prev) => ({
+                ...prev,
+                standardValue: event.target.value,
+              }))}
+            />
+          </Space>
+          <Space wrap className={listStyles.toolbarActions}>
+            <Button
+              type="primary"
+              onClick={() => {
+                setPage(1);
+                setSelectedRowKeys([]);
+                setApplied({ ...draft });
+              }}
+            >
+              {t('customsDict.action.search')}
+            </Button>
+            <Button
+              onClick={() => {
+                const reset = { rawValue: '', standardValue: '' };
+                setDraft(reset);
+                setApplied(reset);
+                setSelectedRowKeys([]);
+                setPage(1);
+              }}
+            >
+              {t('customsDict.action.reset')}
+            </Button>
+            <Button
+              type="link"
+              icon={<ReloadOutlined />}
+              onClick={() => load()}
+            >
+              {t('customsDict.action.refresh')}
+            </Button>
+          </Space>
+        </div>
       </div>
 
       <QueryListCard
@@ -485,9 +495,6 @@ const CustomsDictMappingsView = () => {
           </Space>
         )}
         selectionCount={selectedRowKeys.length}
-        selectionLabel={t('common.batchActions.selected', {
-          count: selectedRowKeys.length,
-        })}
         selectionActions={(
           <>
             <Button
@@ -603,7 +610,7 @@ const CustomsDictMappingsView = () => {
             <div className={listStyles.detailRow}>
               <span className={listStyles.detailLabel}>{t('customsDict.column.syncStatus')}</span>
               <span className={listStyles.detailValue}>
-                {syncLabel(detail.syncStatus)}
+                <Tag color={syncTagColor(detail.syncStatus)}>{syncLabel(detail.syncStatus)}</Tag>
                 {detail.syncError ? (
                   <div className={listStyles.syncFailed}>{detail.syncError}</div>
                 ) : null}
@@ -611,7 +618,9 @@ const CustomsDictMappingsView = () => {
             </div>
             <div className={listStyles.detailRow}>
               <span className={listStyles.detailLabel}>{t('customsDict.column.source')}</span>
-              <span className={listStyles.detailValue}>{detail.source}</span>
+              <span className={listStyles.detailValue}>
+                <Tag>{detail.source}</Tag>
+              </span>
             </div>
             <div className={listStyles.detailActions}>
               <Button type="primary" onClick={openEdit}>

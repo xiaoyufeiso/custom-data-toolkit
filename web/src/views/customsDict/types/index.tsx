@@ -13,6 +13,7 @@ import {
   Input,
   Modal,
   Space,
+  Tag,
   message,
 } from 'tendata-ui';
 import {
@@ -223,38 +224,42 @@ const CustomsDictTypesView = () => {
         <strong className={listStyles.toolbarTitle}>
           {t('common.filters.title')}
         </strong>
-        <Space wrap>
-          <Input
-            allowClear
-            placeholder={t('customsDict.filter.typeKeyword')}
-            value={draftQ}
-            onChange={(event) => setDraftQ(event.target.value)}
-            style={{ width: 200 }}
-          />
-          <Button
-            type="primary"
-            onClick={() => {
-              setAppliedQ(draftQ.trim());
-              setSelectedRowKeys([]);
-              setPage(1);
-            }}
-          >
-            {t('customsDict.action.search')}
-          </Button>
-          <Button
-            onClick={() => {
-              setDraftQ('');
-              setAppliedQ('');
-              setSelectedRowKeys([]);
-              setPage(1);
-            }}
-          >
-            {t('customsDict.action.reset')}
-          </Button>
-          <Button type="link" icon={<ReloadOutlined />} onClick={() => void load()}>
-            {t('customsDict.action.refresh')}
-          </Button>
-        </Space>
+        <div className={listStyles.toolbarRow}>
+          <Space wrap className={listStyles.toolbarFields}>
+            <Input
+              allowClear
+              placeholder={t('customsDict.filter.typeKeyword')}
+              value={draftQ}
+              onChange={(event) => setDraftQ(event.target.value)}
+              style={{ width: 160 }}
+            />
+          </Space>
+          <Space wrap className={listStyles.toolbarActions}>
+            <Button
+              type="primary"
+              onClick={() => {
+                setAppliedQ(draftQ.trim());
+                setSelectedRowKeys([]);
+                setPage(1);
+              }}
+            >
+              {t('customsDict.action.search')}
+            </Button>
+            <Button
+              onClick={() => {
+                setDraftQ('');
+                setAppliedQ('');
+                setSelectedRowKeys([]);
+                setPage(1);
+              }}
+            >
+              {t('customsDict.action.reset')}
+            </Button>
+            <Button type="link" icon={<ReloadOutlined />} onClick={() => void load()}>
+              {t('customsDict.action.refresh')}
+            </Button>
+          </Space>
+        </div>
       </div>
 
       <QueryListCard
@@ -265,9 +270,6 @@ const CustomsDictTypesView = () => {
           </Button>
         )}
         selectionCount={selectedRowKeys.length}
-        selectionLabel={t('common.batchActions.selected', {
-          count: selectedRowKeys.length,
-        })}
         selectionActions={(
           <Button
             danger
@@ -360,9 +362,11 @@ const CustomsDictTypesView = () => {
             <div className={listStyles.detailRow}>
               <span className={listStyles.detailLabel}>{t('customsDict.column.enabled')}</span>
               <span className={listStyles.detailValue}>
-                {detail.enabled
-                  ? t('customsDict.filter.enabled.true')
-                  : t('customsDict.filter.enabled.false')}
+                <Tag color={detail.enabled ? 'success' : 'default'}>
+                  {detail.enabled
+                    ? t('customsDict.filter.enabled.true')
+                    : t('customsDict.filter.enabled.false')}
+                </Tag>
               </span>
             </div>
             <div className={listStyles.detailRow}>

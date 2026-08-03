@@ -1,5 +1,6 @@
 const common = {
   'common.appName': '海关数据处理工具',
+  'common.breadcrumb.home': '首页',
   'common.rateData': '数据管理',
   'common.currencies': '货币管理',
   'common.rates': '汇率管理',
@@ -10,6 +11,10 @@ const common = {
   'common.queryList': '查询列表',
   'common.filters.title': '筛选条件',
   'common.action.query': '查询',
+  'common.action.logout': '退出登录',
+  'common.logoutFailed': '退出登录失败',
+  'common.batchActions.selectedLeading': '已选择',
+  'common.batchActions.selectedTrailing': '项',
   'common.batchActions.selected': '已选择 {count} 项',
   'common.switchLang': '切换语言',
   'common.pageBoundary.title': '页面出错了',

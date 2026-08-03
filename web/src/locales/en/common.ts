@@ -1,5 +1,6 @@
 const common = {
   'common.appName': 'Customs Data Tool',
+  'common.breadcrumb.home': 'Home',
   'common.rateData': 'Data Management',
   'common.currencies': 'Currencies',
   'common.rates': 'Rates',
@@ -10,6 +11,10 @@ const common = {
   'common.queryList': 'Query List',
   'common.filters.title': 'Filters',
   'common.action.query': 'Query',
+  'common.action.logout': 'Log out',
+  'common.logoutFailed': 'Failed to log out',
+  'common.batchActions.selectedLeading': '',
+  'common.batchActions.selectedTrailing': 'selected',
   'common.batchActions.selected': '{count} selected',
   'common.switchLang': 'Switch Language',
   'common.pageBoundary.title': 'Something went wrong',

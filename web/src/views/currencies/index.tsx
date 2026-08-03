@@ -258,42 +258,46 @@ const CurrenciesView = () => {
         <strong className={listStyles.toolbarTitle}>
           {t('common.filters.title')}
         </strong>
-        <Space wrap>
-          <AutoComplete
-            allowClear
-            placeholder="搜索名称或字母代码"
-            value={q}
-            options={suggestions.map((suggestion) => ({
-              key: `${suggestion.id}-${suggestion.matchField}`,
-              value: suggestion.matchField === 'code'
-                ? suggestion.code ?? suggestion.name
-                : suggestion.name,
-              label: suggestion.code
-                ? `${suggestion.code} (${suggestion.name})`
-                : suggestion.name,
-            }))}
-            filterOption={false}
-            listHeight={240}
-            onChange={(value) => setQ(String(value))}
-            onSelect={(value) => {
-              setQ(String(value));
-              setSuggestions([]);
-            }}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') onSearch();
-            }}
-            style={{ width: 240 }}
-          />
-          <Button type="primary" onClick={onSearch}>
-            {t('currencies.action.search')}
-          </Button>
-          <Button onClick={onResetSearch}>
-            {t('currencies.action.reset')}
-          </Button>
-          <Button type="link" icon={<ReloadOutlined />} onClick={() => void load()}>
-            {t('currencies.action.refresh')}
-          </Button>
-        </Space>
+        <div className={listStyles.toolbarRow}>
+          <Space wrap className={listStyles.toolbarFields}>
+            <AutoComplete
+              allowClear
+              placeholder="搜索名称或字母代码"
+              value={q}
+              options={suggestions.map((suggestion) => ({
+                key: `${suggestion.id}-${suggestion.matchField}`,
+                value: suggestion.matchField === 'code'
+                  ? suggestion.code ?? suggestion.name
+                  : suggestion.name,
+                label: suggestion.code
+                  ? `${suggestion.code} (${suggestion.name})`
+                  : suggestion.name,
+              }))}
+              filterOption={false}
+              listHeight={240}
+              onChange={(value) => setQ(String(value))}
+              onSelect={(value) => {
+                setQ(String(value));
+                setSuggestions([]);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') onSearch();
+              }}
+              style={{ width: 160 }}
+            />
+          </Space>
+          <Space wrap className={listStyles.toolbarActions}>
+            <Button type="primary" onClick={onSearch}>
+              {t('currencies.action.search')}
+            </Button>
+            <Button onClick={onResetSearch}>
+              {t('currencies.action.reset')}
+            </Button>
+            <Button type="link" icon={<ReloadOutlined />} onClick={() => void load()}>
+              {t('currencies.action.refresh')}
+            </Button>
+          </Space>
+        </div>
       </div>
 
       <QueryListCard
@@ -304,9 +308,6 @@ const CurrenciesView = () => {
           </Button>
         )}
         selectionCount={selectedRowKeys.length}
-        selectionLabel={t('common.batchActions.selected', {
-          count: selectedRowKeys.length,
-        })}
         selectionActions={(
           <Button
             danger

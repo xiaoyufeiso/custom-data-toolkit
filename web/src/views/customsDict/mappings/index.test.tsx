@@ -222,7 +222,7 @@ describe('CustomsDictMappingsView', () => {
     expect(screen.queryByRole('button', { name: '删除' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '重新同步' })).not.toBeInTheDocument();
     expect(screen.queryByText('批量操作')).not.toBeInTheDocument();
-    expect(screen.queryByText('已选择 0 项')).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: '批量操作' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '批量删除' })).not.toBeInTheDocument();
   });
 
@@ -313,7 +313,7 @@ describe('CustomsDictMappingsView', () => {
     expect(screen.queryByRole('button', { name: '批量删除' })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('checkbox', { name: '选择USA' }));
-    expect(screen.getByText('已选择 1 项')).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: '批量操作' })).toHaveTextContent('已选择 1 项');
     await user.click(screen.getByRole('button', { name: '批量删除' }));
 
     await waitFor(() => {

@@ -166,7 +166,7 @@ describe('CustomsDictMissingView', () => {
     expect(requestedType).toBe('country');
     expect(screen.queryByRole('button', { name: '处理' })).not.toBeInTheDocument();
     expect(screen.queryByText('批量操作')).not.toBeInTheDocument();
-    expect(screen.queryByText('已选择 0 项')).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: '批量操作' })).not.toBeInTheDocument();
     expect(screen.getByTestId('biz-table')).toHaveAttribute('data-has-selection', 'no');
   });
 

@@ -157,7 +157,7 @@ vi.mock('@tendata-biz-components/biz-table', () => ({
     dataSource?: Array<Record<string, unknown>>;
     onChange?: (pagination: { current?: number; pageSize?: number }) => void;
     onRow?: (row: Record<string, unknown>) => { onClick?: () => void };
-    onSortChange?: (key: string, order: 'ascend' | 'descend') => void;
+    onSortChange?: (key: string, order?: 'ascend' | 'descend') => void;
     page?: {
       current?: number;
       pageSize?: number;
@@ -214,10 +214,8 @@ vi.mock('@tendata-biz-components/biz-table', () => ({
         {page?.showTotal?.(page.total ?? 0)}
         <button
           type="button"
-          onClick={() => onSortChange?.(
-            'date',
-            dateColumn?.sortOrder === 'ascend' ? 'descend' : 'ascend',
-          )}
+          data-sort-order={dateColumn?.sortOrder ?? 'none'}
+          onClick={() => onSortChange?.('date')}
         >
           日期切换排序
         </button>
@@ -302,7 +300,7 @@ describe('RatesView', () => {
       'data-selection-column-width',
       '32',
     );
-    expect(screen.queryByText('已选择 0 项')).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: '批量操作' })).not.toBeInTheDocument();
     expect(screen.queryByText('批量操作')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '批量删除' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '批量核对' })).not.toBeInTheDocument();
@@ -372,20 +370,34 @@ describe('RatesView', () => {
 
     await user.click(screen.getByRole('checkbox', { name: '选择人民币 2026-07-30' }));
     expect(screen.getByRole('button', { name: '批量删除' })).toBeInTheDocument();
-    expect(screen.getByText('已选择 1 项')).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: '批量操作' })).toHaveTextContent('已选择 1 项');
     await user.click(screen.getByRole('button', { name: '下一页' }));
     expect(await screen.findByText('美元')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '批量删除' })).not.toBeInTheDocument();
-    expect(screen.queryByText('已选择 1 项')).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: '批量操作' })).not.toBeInTheDocument();
 
     const sortButton = screen.getByRole('button', { name: '日期切换排序' });
+    expect(sortButton).toHaveAttribute('data-sort-order', 'none');
+
     await user.click(sortButton);
     await waitFor(() => {
       expect(requests.some((params) => params.get('sortOrder') === 'asc')).toBe(true);
+      expect(screen.getByRole('button', { name: '日期切换排序' }))
+        .toHaveAttribute('data-sort-order', 'ascend');
     });
-    await user.click(sortButton);
+
+    await user.click(screen.getByRole('button', { name: '日期切换排序' }));
     await waitFor(() => {
       expect(requests[requests.length - 1]?.get('sortOrder')).toBe('desc');
+      expect(screen.getByRole('button', { name: '日期切换排序' }))
+        .toHaveAttribute('data-sort-order', 'descend');
+    });
+
+    await user.click(screen.getByRole('button', { name: '日期切换排序' }));
+    await waitFor(() => {
+      expect(requests[requests.length - 1]?.has('sortOrder')).toBe(false);
+      expect(screen.getByRole('button', { name: '日期切换排序' }))
+        .toHaveAttribute('data-sort-order', 'none');
     });
   });
 
@@ -443,14 +455,14 @@ describe('RatesView', () => {
     await user.selectOptions(screen.getByRole('combobox', { name: '全部状态' }), 'false');
     await user.click(screen.getByRole('button', { name: '查询' }));
     await user.click(screen.getByRole('checkbox', { name: '选择人民币 2026-07-30' }));
-    expect(screen.getByText('已选择 1 项')).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: '批量操作' })).toHaveTextContent('已选择 1 项');
 
     await user.click(screen.getByRole('button', { name: '重置' }));
 
     await waitFor(() => {
       const latest = requests[requests.length - 1];
       expect(latest?.get('page')).toBe('1');
-      expect(latest?.get('sortOrder')).toBe('desc');
+      expect(latest?.has('sortOrder')).toBe(false);
       expect(latest?.has('code')).toBe(false);
       expect(latest?.has('date')).toBe(false);
       expect(latest?.has('checked')).toBe(false);
@@ -458,8 +470,7 @@ describe('RatesView', () => {
     expect(codeInput).toHaveValue('');
     expect(screen.getByRole('combobox', { name: '全部日期' })).toHaveValue('');
     expect(screen.getByRole('combobox', { name: '全部状态' })).toHaveValue('');
-    expect(screen.queryByText('已选择 0 项')).not.toBeInTheDocument();
-    expect(screen.queryByText('已选择 1 项')).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: '批量操作' })).not.toBeInTheDocument();
   });
 
   it('suggests code prefixes without filtering until explicitly requested', async () => {
@@ -631,11 +642,11 @@ describe('RatesView', () => {
     await screen.findByText('人民币');
 
     expect(screen.queryByText('批量操作')).not.toBeInTheDocument();
-    expect(screen.queryByText('已选择 0 项')).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: '批量操作' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '批量核对' })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('checkbox', { name: '全选当前页' }));
-    expect(screen.getByText('已选择 1 项')).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: '批量操作' })).toHaveTextContent('已选择 1 项');
     const batchCheckButton = screen.getByRole('button', { name: '批量核对' });
     expect(batchCheckButton).toBeEnabled();
     await user.click(batchCheckButton);
@@ -683,7 +694,7 @@ describe('RatesView', () => {
     await user.click(screen.getByRole('checkbox', { name: '全选当前页' }));
 
     expect(screen.getByRole('button', { name: '批量删除' })).toBeInTheDocument();
-    expect(screen.getByText('已选择 2 项')).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: '批量操作' })).toHaveTextContent('已选择 2 项');
   });
 
   it('returns to the previous page after deleting the last current-page rate', async () => {
@@ -801,7 +812,7 @@ describe('RatesView', () => {
     await waitFor(() => {
       expect(listRequests).toBeGreaterThan(1);
     });
-    expect(screen.queryByText('已选择 0 项')).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: '批量操作' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '批量核对' })).not.toBeInTheDocument();
   });
 });

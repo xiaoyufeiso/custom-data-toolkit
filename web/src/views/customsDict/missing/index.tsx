@@ -225,51 +225,55 @@ const CustomsDictMissingView = () => {
         <strong className={listStyles.toolbarTitle}>
           {t('common.filters.title')}
         </strong>
-        <Space wrap>
-          <Select
-            placeholder={t('customsDict.filter.dictType')}
-            style={{ width: 140 }}
-            options={typeOptions}
-            value={draft.dictType}
-            onChange={(value) => setDraft((prev) => ({ ...prev, dictType: value }))}
-          />
-          <Input
-            allowClear
-            placeholder={t('customsDict.filter.rawValue')}
-            style={{ width: 200 }}
-            value={draft.rawValue}
-            onChange={(event) => setDraft((prev) => ({
-              ...prev,
-              rawValue: event.target.value,
-            }))}
-          />
-          <Button
-            type="primary"
-            onClick={() => {
-              if (!draft.dictType) {
-                message.warning(t('customsDict.message.dictTypeRequired'));
-                return;
-              }
-              setPage(1);
-              setApplied({ ...draft });
-            }}
-          >
-            {t('customsDict.action.search')}
-          </Button>
-          <Button
-            onClick={() => {
-              const reset = { dictType: 'country', rawValue: '' };
-              setDraft(reset);
-              setApplied(reset);
-              setPage(1);
-            }}
-          >
-            {t('customsDict.action.reset')}
-          </Button>
-          <Button type="link" icon={<ReloadOutlined />} onClick={() => load()}>
-            {t('customsDict.action.refresh')}
-          </Button>
-        </Space>
+        <div className={listStyles.toolbarRow}>
+          <Space wrap className={listStyles.toolbarFields}>
+            <Select
+              placeholder={t('customsDict.filter.dictType')}
+              style={{ width: 120 }}
+              options={typeOptions}
+              value={draft.dictType}
+              onChange={(value) => setDraft((prev) => ({ ...prev, dictType: value }))}
+            />
+            <Input
+              allowClear
+              placeholder={t('customsDict.filter.rawValue')}
+              style={{ width: 160 }}
+              value={draft.rawValue}
+              onChange={(event) => setDraft((prev) => ({
+                ...prev,
+                rawValue: event.target.value,
+              }))}
+            />
+          </Space>
+          <Space wrap className={listStyles.toolbarActions}>
+            <Button
+              type="primary"
+              onClick={() => {
+                if (!draft.dictType) {
+                  message.warning(t('customsDict.message.dictTypeRequired'));
+                  return;
+                }
+                setPage(1);
+                setApplied({ ...draft });
+              }}
+            >
+              {t('customsDict.action.search')}
+            </Button>
+            <Button
+              onClick={() => {
+                const reset = { dictType: 'country', rawValue: '' };
+                setDraft(reset);
+                setApplied(reset);
+                setPage(1);
+              }}
+            >
+              {t('customsDict.action.reset')}
+            </Button>
+            <Button type="link" icon={<ReloadOutlined />} onClick={() => load()}>
+              {t('customsDict.action.refresh')}
+            </Button>
+          </Space>
+        </div>
       </div>
 
       <QueryListCard

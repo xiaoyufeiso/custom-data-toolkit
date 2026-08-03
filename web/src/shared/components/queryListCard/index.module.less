@@ -13,7 +13,9 @@
 }
 
 .title {
-  font-size: 14px;
+  color: var(--color-text);
+  font-size: 15px;
+  font-weight: 650;
   line-height: 22px;
 }
 
@@ -32,26 +34,6 @@
   :global(.tendata-ui-table-tbody > tr > td) {
     padding-top: 12px;
     padding-bottom: 12px;
-  }
-
-  /* 排序列不要高亮成蓝色 */
-  :global(.ant-table-column-sort),
-  :global(td.ant-table-column-sort),
-  :global(th.ant-table-column-sort),
-  :global(.tendata-ui-table-column-sort),
-  :global(td.tendata-ui-table-column-sort),
-  :global(th.tendata-ui-table-column-sort),
-  :global(.ant-table-column-has-sorters),
-  :global(.tendata-ui-table-column-has-sorters) {
-    background: transparent !important;
-    color: inherit !important;
-  }
-
-  :global(.ant-table-column-sorter),
-  :global(.tendata-ui-table-column-sorter),
-  :global(.ant-table-column-sorter .anticon),
-  :global(.tendata-ui-table-column-sorter .anticon) {
-    color: inherit !important;
   }
 }
 
@@ -73,9 +55,19 @@
 }
 
 .selectionLabel {
-  color: var(--color-text-secondary, #8c8c8c);
+  color: var(--color-text-muted, #617089);
+  font-size: 14px;
   line-height: 22px;
   white-space: nowrap;
+}
+
+.selectionCount {
+  margin: 0 2px;
+  color: var(--color-text, #172033);
+  font-size: 18px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 22px;
 }
 
 .selectionActions {
