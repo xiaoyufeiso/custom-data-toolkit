@@ -60,20 +60,12 @@ MVP 仅预置管理员账号，**不开放自助注册**。
 - 对外 `GET /public/rates`（单日或日期区间）
 - 工程文档与 OpenSpec 基线
 
-### In Scope（海关字典第一版 — change `add-customs-dict-mgmt`）
+### In Scope（海关字典 — 已归档至 `openspec/specs/customs-dict/spec.md`）
 
+- 字典类型管理（创建/改名/启停；`/options` 供下拉）
 - 标准字典映射管理 + 增量 Redis 同步
-- 缺失字典（读 ZSET、处理、导出）
-
-### In Scope（标准字典导入/导出 — change `add-customs-dict-import`）
-
-- 标准字典 xlsx 导出 / 导入（表头与缺失导出同构；upsert；`source=import`）
-- 导入模板下载
-
-### In Scope（字典类型管理 — change `add-customs-dict-types`）
-
-- 类型表 CRUD（新建/改名/启停）；`/options` 供标准/缺失下拉
-- 写映射与导入校验：类型存在且启用
+- 标准字典 xlsx 导出 / 导入 / 模板（upsert；`source=import`）
+- 缺失字典（读 ZSET、未选类型聚合全部启用类型、处理、导出）
 
 ### Out of Scope（除非新 change / 明确解冻）
 
@@ -89,7 +81,7 @@ MVP 仅预置管理员账号，**不开放自助注册**。
 
 - 管理员可完成货币与汇率日常维护闭环。
 - 外部系统可用有效 API Key 查询指定货币汇率。
-- 管理员可维护映射并处理缺失；启用项增量同步至约定 Redis key。
+- 管理员可维护类型与映射并处理缺失；启用项增量同步至约定 Redis key。
 - 文档分层足以驱动 AI Coding 切片，无需口头补充核心边界。
 
 ## 8. 相关权威文档
@@ -101,4 +93,5 @@ MVP 仅预置管理员账号，**不开放自助注册**。
 | 外部表语义 | `docs/data-contract.md` |
 | API 契约（过渡） | `docs/api.md`（目标迁 OpenAPI） |
 | 决策 | `docs/decisions.md` |
-| 海关字典 | `openspec/specs/customs-dict/spec.md`；导入：`add-customs-dict-import`；类型：`add-customs-dict-types` |
+| 海关字典 | `openspec/specs/customs-dict/spec.md` |
+| UI 交互 | `openspec/specs/ui.md` |

@@ -4,9 +4,9 @@
 
 ## 当前状态
 
-- 阶段：管理端列表 UI 统一 — change `unify-admin-list-ui`
-- 整体状态：实现完成，待合并 `feat/admin-list-ui-unify`
-- 最后更新：2026-08-03
+- 阶段：功能分支已合并；已完成 OpenSpec 归档
+- 整体状态：`main` 含字典全链路 + 管理端列表 UI；剩余可选 `standardize-admin-ui-components` 登录页/i18n 收口
+- 最后更新：2026-08-04
 
 ## 里程碑
 
@@ -15,9 +15,9 @@
 | M0–M6 汇率 MVP 及发布整理 | 完成 |
 | 海关字典第一版文档 / Redis 默认假设 | 完成 |
 | 海关字典第一版开发（包 1–5） | 完成 |
-| 标准字典导入/导出 | 完成 |
-| 字典类型管理 | 完成 |
-| 管理端列表 UI 统一 | 完成 |
+| 标准字典导入/导出 | 完成（已归档） |
+| 字典类型管理 | 完成（已归档） |
+| 管理端列表 UI 统一 | 完成（已归档） |
 
 ## 阻塞
 
@@ -25,12 +25,16 @@
 
 ## 下一步
 
-1. 合并 `feat/admin-list-ui-unify`（及上游分支）至 main（按需）
-2. 可选：归档 import / types / unify-admin-list-ui；E5 Redis 友好错误文案
-
-切片：`openspec/changes/unify-admin-list-ui/tasks.md`
+1. （可选）`standardize-admin-ui-components`：登录页 / i18n / 视觉收口后归档
+2. （可选）E5 Redis 友好错误文案；API 契约迁 OpenAPI
 
 ## 日志（摘录）
+
+### 2026-08-04（合并与归档）
+
+- 合并 `feat/admin-list-ui-unify`（含 import / types / 列表 UI）至 `main`
+- 归档：`add-customs-dict-import`、`add-customs-dict-types`、`unify-admin-list-ui`、`improve-rate-create-currency-picker`
+- 领域 spec 合并：`customs-dict` 0.3、`rate` 1.2（货币选择器）
 
 ### 2026-08-03（标准字典新建弹窗）
 

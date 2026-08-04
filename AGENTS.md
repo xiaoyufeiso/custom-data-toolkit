@@ -20,7 +20,7 @@
 7. `docs/api.md` — API 契约摘要（过渡；目标 OpenAPI）
 8. 当前 OpenSpec change 或归档后的 `openspec/specs/<domain>/`
 9. `docs/development.md`、`docs/operations.md` — 本地开发与运维
-10. `openspec/specs/customs-dict/spec.md` + 活跃 change `openspec/changes/add-customs-dict-mgmt/`（字典第一版）
+10. `openspec/specs/customs-dict/spec.md`（字典领域权威；已归档 import/types）
 11. 领域权威：`openspec/specs/{auth,currency,rate}/`；活跃 change 见 `openspec/specs/README.md`
 
 冲突时：可执行代码与迁移优先于过时 Markdown；项目内权威文档优先于外部通用习惯。  
@@ -84,8 +84,7 @@ MUST NOT：Casdoor/Casbin、自助注册、爬虫逻辑、无鉴权对外写接�
 
 ## Known follow-ups（交接）
 
-- 合并/归档：`add-customs-dict-import`、`add-customs-dict-types`（分支 `feat/customs-dict-types`）
 - 字典搁置：整表覆盖全量、操作日志、处理历史
-- （可选）`standardize-admin-ui-components` 登录页切片
+- （可选）`standardize-admin-ui-components` 登录页 / i18n / 视觉收口后归档
 - （可选）API 契约迁 OpenAPI 后降级 `docs/api.md`
 - **前端 API Key 管理 UI 已搁置并移除**（2026-07-31）；恢复时需重建路由/页面/服务，并继续筛选/批量删除与 BizTable 对齐（见 archive `add-page-bulk-delete` §4）
