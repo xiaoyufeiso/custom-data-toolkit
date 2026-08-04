@@ -1,0 +1,92 @@
+/* 列表页共用：筛选区、可点行、详情字段 */
+
+.page {
+  padding: var(--padding-page);
+}
+
+.toolbar {
+  padding: 16px 20px;
+  margin-bottom: 12px;
+  border: 1px solid var(--color-border-soft);
+  border-radius: 8px;
+  background: var(--color-surface);
+}
+
+.toolbarTitle {
+  display: block;
+  margin-bottom: 12px;
+  color: var(--color-text);
+  font-size: 15px;
+  font-weight: 650;
+  line-height: 22px;
+}
+
+.toolbarRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 16px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.toolbarFields {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.toolbarActions {
+  flex: 0 0 auto;
+}
+
+.clickableRow {
+  cursor: pointer;
+}
+
+.rawValueLink {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-link, #1677ff);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.rawValueLink:hover {
+  text-decoration: underline;
+}
+
+.detailGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.detailRow {
+  display: grid;
+  grid-template-columns: 112px 1fr;
+  gap: 12px;
+  align-items: start;
+}
+
+.detailLabel {
+  color: var(--color-text-secondary, #8c8c8c);
+  line-height: 22px;
+}
+
+.detailValue {
+  color: var(--color-text, #141414);
+  line-height: 22px;
+  word-break: break-word;
+}
+
+.detailActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.syncFailed {
+  color: var(--color-error, #cf1322);
+}

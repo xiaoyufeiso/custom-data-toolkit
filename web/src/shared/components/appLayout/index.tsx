@@ -1,13 +1,60 @@
-import { useMemo } from 'react';
 import {
-  Link, useLocation, useRoutes,
+  useEffect, useMemo, useState,
+} from 'react';
+import {
+  Link, useLocation, useNavigate, useRoutes,
 } from 'react-router-dom';
-import { Layout, Menu } from 'tendata-ui';
+import {
+  Breadcrumb,
+  Dropdown,
+  Layout,
+  Menu,
+  message,
+} from 'tendata-ui';
 import routes, { AppRouteObject } from '@/router';
+import {
+  fetchMe, logout, type AdminUser,
+} from '@/services/auth';
+import LanguageSwitcher from '@/shared/components/languageSwitcher';
 import { useTranslate } from '@/shared/hooks';
+import { getApiErrorMessage } from '@/shared/utils/apiError';
 import styles from './index.module.less';
 
-const { Sider, Content } = Layout;
+const { Sider, Header, Content } = Layout;
+
+/** 下拉触发器用的实心小三角（非 DownOutlined 长箭头） */
+const IconDown = ({ className }: { className?: string }) => (
+  <svg
+    className={className}
+    width="10"
+    height="10"
+    viewBox="0 0 1024 1024"
+    aria-hidden
+    focusable="false"
+  >
+    <path
+      fill="currentColor"
+      d="M840.4 300H183.6c-19.7 0-30.7 20.8-18.5 35l328.4 380.8c9.4 10.9 27.5 10.9 37 0L858.9 335c12.2-14.2 1.2-35-18.5-35z"
+    />
+  </svg>
+);
+
+/** tendata-ui Dropdown 类型未暴露 antd 透传 props，运行时可用 */
+type HeaderUserDropdownProps = {
+  trigger?: Array<'click' | 'hover' | 'contextMenu'>;
+  disabled?: boolean;
+  menu?: {
+    items: Array<{
+      key: string;
+      label: React.ReactNode;
+      disabled?: boolean;
+      onClick?: () => void;
+    }>;
+  };
+  children?: React.ReactNode;
+};
+
+const HeaderUserDropdown = Dropdown as React.FC<HeaderUserDropdownProps>;
 
 /**
  * 从自描述路由表中派生出菜单可见项。
@@ -25,12 +72,30 @@ type MenuItem = {
 const AppLayout = () => {
   const element = useRoutes(routes);
   const t = useTranslate();
+  const navigate = useNavigate();
   const { pathname } = useLocation();
+  const [user, setUser] = useState<AdminUser | null>(null);
+  const [loggingOut, setLoggingOut] = useState(false);
 
   const isPublicPage = useMemo(() => {
     const hit = routes.find((r) => typeof r.path === 'string' && r.path === pathname);
     return Boolean(hit?.meta?.public);
   }, [pathname]);
+
+  useEffect(() => {
+    if (isPublicPage) return undefined;
+    let cancelled = false;
+    fetchMe()
+      .then((me) => {
+        if (!cancelled) setUser(me);
+      })
+      .catch(() => {
+        if (!cancelled) setUser(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isPublicPage, pathname]);
 
   const menuRoutes = useMemo(() => getMenuRoutes(routes), []);
 
@@ -89,41 +154,106 @@ const AppLayout = () => {
     [pathname, menuRoutes],
   );
 
+  const breadcrumbItems = useMemo(() => {
+    const items: Array<{ title: React.ReactNode }> = [
+      {
+        title: <Link to="/currencies">{t('common.breadcrumb.home')}</Link>,
+      },
+    ];
+    if (activeRoute?.meta?.groupTitleKey) {
+      items.push({ title: t(activeRoute.meta.groupTitleKey) });
+    }
+    if (activeRoute?.meta?.titleKey) {
+      items.push({ title: t(activeRoute.meta.titleKey) });
+    }
+    return items;
+  }, [activeRoute, t]);
+
+  const onLogout = async () => {
+    setLoggingOut(true);
+    try {
+      await logout();
+      navigate('/login', { replace: true });
+    } catch (error) {
+      message.error(getApiErrorMessage(error, t('common.logoutFailed')));
+    } finally {
+      setLoggingOut(false);
+    }
+  };
+
   if (isPublicPage) {
     return element;
   }
 
   return (
     <Layout className={styles.appLayout}>
-      <Sider
-        width={240}
-        theme="light"
-        className={styles.sider}
-        breakpoint="lg"
-        collapsedWidth={64}
-      >
-        <div className={styles.brand}>
+      <Header className={styles.header}>
+        <div className={styles.headerBrand}>
+          <span className={styles.brandMark} aria-hidden>CD</span>
           <span className={styles.brandText}>{t('common.appName')}</span>
         </div>
-        <Menu
-          mode="inline"
-          selectedKeys={selectedKeys}
-          defaultOpenKeys={menuRoutes
-            .filter((r) => r.meta?.group)
-            .map((r) => r.meta!.group as string)
-            .filter((v, i, a) => a.indexOf(v) === i)}
-          items={menuItems}
-          className={styles.sideMenu}
-        />
-      </Sider>
-      <Layout className={styles.body}>
-        <Content className={styles.content}>
-          {activeRoute?.meta?.titleKey ? (
-            <h1 className={styles.pageTitle}>
-              {t(activeRoute.meta.titleKey)}
-            </h1>
-          ) : null}
-          {element}
+        <div className={styles.headerActions}>
+          <LanguageSwitcher />
+          <HeaderUserDropdown
+            trigger={['click']}
+            disabled={loggingOut}
+            menu={{
+              items: [
+                {
+                  key: 'logout',
+                  label: t('common.action.logout'),
+                  disabled: loggingOut,
+                  onClick: () => {
+                    void onLogout();
+                  },
+                },
+              ],
+            }}
+          >
+            <button
+              type="button"
+              className={styles.userMenuTrigger}
+              aria-label={user?.username ?? t('common.action.logout')}
+            >
+              <span className={styles.userName} title={user?.username}>
+                {user?.username ?? '—'}
+              </span>
+              <IconDown className={styles.userCaret} />
+            </button>
+          </HeaderUserDropdown>
+        </div>
+      </Header>
+      <Layout className={styles.main}>
+        <Sider
+          width={240}
+          theme="light"
+          className={styles.sider}
+          breakpoint="lg"
+          collapsedWidth={64}
+        >
+          <Menu
+            mode="inline"
+            selectedKeys={selectedKeys}
+            defaultOpenKeys={menuRoutes
+              .filter((r) => r.meta?.group)
+              .map((r) => r.meta!.group as string)
+              .filter((v, i, a) => a.indexOf(v) === i)}
+            items={menuItems}
+            className={styles.sideMenu}
+          />
+        </Sider>
+        <Content className={styles.content} data-admin-content>
+          <div className={styles.contentBody}>
+            <div className={styles.pageHeading}>
+              <Breadcrumb className={styles.breadcrumb} items={breadcrumbItems} />
+              {activeRoute?.meta?.titleKey ? (
+                <h1 className={styles.pageTitle}>
+                  {t(activeRoute.meta.titleKey)}
+                </h1>
+              ) : null}
+            </div>
+            {element}
+          </div>
         </Content>
       </Layout>
     </Layout>

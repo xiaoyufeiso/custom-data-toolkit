@@ -16,9 +16,9 @@ import dayjs, { type Dayjs } from 'dayjs';
 import {
   AutoComplete,
   Button,
-  Card,
   Checkbox,
   DatePicker,
+  Drawer,
   Form,
   Input,
   Modal,
@@ -41,11 +41,12 @@ import {
   updateRate,
   type Rate,
 } from '@/services/rate';
+import QueryListCard from '@/shared/components/queryListCard';
 import { useTranslate } from '@/shared/hooks';
+import listStyles from '@/shared/styles/listPage.module.less';
 import { getApiErrorCode, getApiErrorMessage } from '@/shared/utils/apiError';
 import CurrencyPicker from './CurrencyPicker';
 import { fetchAllCurrencies } from './currencyPickerUtils';
-import styles from './index.module.less';
 
 const DEFAULT_PAGE_SIZE = 20;
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
@@ -64,6 +65,8 @@ const TendataCheckbox = Checkbox as unknown as (
 
 type DateMode = 'single' | 'range';
 
+type DateSortOrder = 'asc' | 'desc';
+
 type FilterDraft = {
   code: string;
   dateMode?: DateMode;
@@ -71,7 +74,8 @@ type FilterDraft = {
   dateFrom: string;
   dateTo: string;
   checked?: 'true' | 'false';
-  sortOrder: 'asc' | 'desc';
+  /** undefined = 未激活（箭头灰色）；后端未传时默认按日期倒序 */
+  sortOrder?: DateSortOrder;
 };
 
 type AppliedFilter = {
@@ -80,7 +84,14 @@ type AppliedFilter = {
   dateFrom?: string;
   dateTo?: string;
   checked?: boolean;
-  sortOrder?: 'asc' | 'desc';
+  sortOrder?: DateSortOrder;
+};
+
+/** 日期排序三态：未激活 → 正序 → 倒序 → 未激活 */
+const cycleDateSort = (current?: DateSortOrder): DateSortOrder | undefined => {
+  if (current === undefined) return 'asc';
+  if (current === 'asc') return 'desc';
+  return undefined;
 };
 
 type RateForm = {
@@ -97,7 +108,7 @@ const emptyFilter: FilterDraft = {
   dateFrom: '',
   dateTo: '',
   checked: undefined,
-  sortOrder: 'desc',
+  sortOrder: undefined,
 };
 
 const emptyForm: RateForm = {
@@ -123,7 +134,9 @@ const RatesView = () => {
   const [deleting, setDeleting] = useState(false);
   const [checking, setChecking] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
-  const [editing, setEditing] = useState<Rate | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [detail, setDetail] = useState<Rate | null>(null);
   const [selectedRowKeys, setSelectedRowKeys] = useState<Key[]>([]);
   const [form] = Form.useForm<RateForm>();
 
@@ -202,43 +215,63 @@ const RatesView = () => {
     load();
   }, [load]);
 
-  const onSearch = () => {
-    const code = filterDraft.code.trim();
+  const buildApplied = (
+    draft: FilterDraft,
+    mode: 'soft' | 'strict',
+  ): AppliedFilter | null => {
+    const code = draft.code.trim();
     if (code && !/^[A-Za-z_]{1,10}$/.test(code)) {
-      message.warning(t('rates.message.codeInvalid'));
-      return;
+      if (mode === 'strict') {
+        message.warning(t('rates.message.codeInvalid'));
+      }
+      return null;
     }
 
     const next: AppliedFilter = {};
     if (code) next.code = code.toUpperCase();
 
-    if (filterDraft.dateMode === 'single') {
-      if (!filterDraft.date) {
+    if (draft.dateMode === 'single') {
+      if (draft.date) {
+        next.date = draft.date;
+      } else if (mode === 'strict') {
         message.warning(t('rates.message.dateRequired'));
-        return;
+        return null;
       }
-      next.date = filterDraft.date;
-    } else if (filterDraft.dateMode === 'range') {
-      const { dateFrom, dateTo } = filterDraft;
-      if (!dateFrom || !dateTo) {
+    } else if (draft.dateMode === 'range') {
+      const { dateFrom, dateTo } = draft;
+      if (dateFrom && dateTo) {
+        if (dateFrom > dateTo) {
+          if (mode === 'strict') {
+            message.warning(t('rates.message.rangeInvalid'));
+          }
+          return null;
+        }
+        next.dateFrom = dateFrom;
+        next.dateTo = dateTo;
+      } else if (mode === 'strict') {
         message.warning(t('rates.message.rangeRequired'));
-        return;
+        return null;
       }
-      if (dateFrom > dateTo) {
-        message.warning(t('rates.message.rangeInvalid'));
-        return;
-      }
-      next.dateFrom = dateFrom;
-      next.dateTo = dateTo;
     }
 
-    if (filterDraft.checked === 'true') next.checked = true;
-    if (filterDraft.checked === 'false') next.checked = false;
-    next.sortOrder = filterDraft.sortOrder;
+    if (draft.checked === 'true') next.checked = true;
+    if (draft.checked === 'false') next.checked = false;
+    if (draft.sortOrder) next.sortOrder = draft.sortOrder;
+    return next;
+  };
 
+  const commitFilters = (nextDraft: FilterDraft, mode: 'soft' | 'strict' = 'soft') => {
+    setFilterDraft(nextDraft);
+    const next = buildApplied(nextDraft, mode);
+    if (next === null) return;
+    setCodeSuggestions([]);
     setSelectedRowKeys([]);
     setPage(1);
     setApplied(next);
+  };
+
+  const onSearch = () => {
+    commitFilters(filterDraft, 'strict');
   };
 
   const onResetFilters = () => {
@@ -246,46 +279,63 @@ const RatesView = () => {
     setCodeSuggestions([]);
     setSelectedRowKeys([]);
     setPage(1);
-    setApplied({ sortOrder: 'desc' });
+    setApplied({});
   };
 
   const openCreate = () => {
-    setEditing(null);
+    setEditingId(null);
     form.setFieldsValue(emptyForm);
     setFormOpen(true);
   };
 
-  const openEdit = (row: Rate) => {
-    setEditing(row);
+  const openEdit = () => {
+    if (!detail) return;
+    setEditingId(detail.id);
     form.setFieldsValue({
-      currencyId: String(row.currencyId),
-      date: dayjs(row.date),
-      data: row.data,
-      checked: row.checked,
+      currencyId: String(detail.currencyId),
+      date: dayjs(detail.date),
+      data: detail.data,
+      checked: detail.checked,
     });
     setFormOpen(true);
   };
 
+  const openDetail = (row: Rate) => {
+    setDetail(row);
+    setDetailOpen(true);
+  };
+
+  const closeDetail = () => {
+    setDetailOpen(false);
+    setDetail(null);
+  };
+
   const closeForm = () => {
     setFormOpen(false);
-    setEditing(null);
+    setEditingId(null);
     form.resetFields();
   };
 
   const onSubmit = async (values: RateForm) => {
+    const data = values.data.trim();
+    if (!data) {
+      message.warning(t('rates.message.valueRequired'));
+      return;
+    }
     setSubmitting(true);
     try {
-      if (editing) {
-        await updateRate(editing.id, {
-          data: values.data.trim(),
+      if (editingId != null) {
+        const updated = await updateRate(editingId, {
+          data,
           checked: values.checked,
         });
         message.success(t('rates.message.updated'));
+        setDetail(updated);
       } else {
         await createRate({
           currencyId: Number(values.currencyId),
           date: values.date!.format('YYYY-MM-DD'),
-          data: values.data.trim(),
+          data,
           checked: values.checked,
         });
         message.success(t('rates.message.created'));
@@ -366,25 +416,34 @@ const RatesView = () => {
     });
   };
 
-  const applyDateSort = (next: 'asc' | 'desc') => {
+  const applyDateSort = (next?: DateSortOrder) => {
     setSelectedRowKeys([]);
     setFilterDraft((prev) => ({ ...prev, sortOrder: next }));
     setPage(1);
-    setApplied((prev) => ({ ...prev, sortOrder: next }));
+    setApplied((prev) => {
+      const { sortOrder: _prevSort, ...rest } = prev;
+      return next ? { ...rest, sortOrder: next } : rest;
+    });
   };
 
   const columns: ColumnsType = [
-    {
-      title: t('rates.column.id'),
-      dataIndex: 'id',
-      key: 'id',
-      width: 60,
-    },
     {
       title: t('rates.column.currency'),
       dataIndex: 'currencyName',
       key: 'currencyName',
       width: 120,
+      render: (value: string, row: Rate) => (
+        <button
+          type="button"
+          className={listStyles.rawValueLink}
+          onClick={(event) => {
+            event.stopPropagation();
+            openDetail(row);
+          }}
+        >
+          {value}
+        </button>
+      ),
     },
     {
       title: t('rates.column.code'),
@@ -399,7 +458,11 @@ const RatesView = () => {
       key: 'date',
       width: 110,
       sorter: true,
-      sortOrder: (applied.sortOrder ?? 'desc') === 'asc' ? 'ascend' : 'descend',
+      sortOrder: applied.sortOrder === 'asc'
+        ? 'ascend'
+        : applied.sortOrder === 'desc'
+          ? 'descend'
+          : undefined,
     },
     {
       title: t('rates.column.value'),
@@ -418,178 +481,193 @@ const RatesView = () => {
         </Tag>
       ),
     },
-    {
-      title: t('rates.column.actions'),
-      key: 'actions',
-      width: 80,
-      render: (_value: unknown, row: Rate) => (
-        <Button type="link" onClick={() => openEdit(row)}>
-          {t('rates.action.edit')}
-        </Button>
-      ),
-    },
   ];
 
   return (
-    <div className={styles.page}>
-      <div className={styles.pageAction}>
-        <Button
-          type="primary"
-          icon={<PlusOutlined width={16} height={16} />}
-          iconPosition="start"
-          onClick={openCreate}
-        >
-          {t('rates.action.create')}
-        </Button>
-      </div>
-      <div className={styles.toolbar}>
-        <strong className={styles.toolbarTitle}>{t('rates.filters.title')}</strong>
-        <Space wrap>
-          <AutoComplete
-            allowClear
-            placeholder={t('rates.search.codePlaceholder')}
-            value={filterDraft.code}
-            options={codeSuggestions.map((suggestion) => ({
-              key: suggestion.id,
-              value: suggestion.code ?? '',
-              label: suggestion.code
-                ? `${suggestion.code} (${suggestion.name})`
-                : suggestion.name,
-            }))}
-            filterOption={false}
-            listHeight={240}
-            onChange={(value) => setFilterDraft((prev) => ({
-              ...prev,
-              code: String(value),
-            }))}
-            onSelect={(value) => {
-              setFilterDraft((prev) => ({ ...prev, code: String(value) }));
-              setCodeSuggestions([]);
-            }}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') onSearch();
-            }}
-            style={{ width: 160 }}
-            maxLength={10}
-          />
-          <Select
-            allowClear
-            placeholder={t('rates.dateMode.all')}
-            value={filterDraft.dateMode}
-            options={[
-              { value: 'single', label: t('rates.dateMode.single') },
-              { value: 'range', label: t('rates.dateMode.range') },
-            ]}
-            onChange={(dateMode?: DateMode) => {
-              setFilterDraft((prev) => ({
-                ...prev,
-                dateMode,
-                date: dateMode === 'single' ? prev.date : '',
-                dateFrom: dateMode === 'range' ? prev.dateFrom : '',
-                dateTo: dateMode === 'range' ? prev.dateTo : '',
-              }));
-            }}
-            style={{ width: 120 }}
-          />
-          {filterDraft.dateMode === 'single' ? (
-            <DatePicker
-              value={filterDraft.date ? dayjs(filterDraft.date) : null}
-              onChange={(_date, dateString) => setFilterDraft((prev) => ({
-                ...prev,
-                date: dateString as string,
+    <div className={listStyles.page}>
+      <div className={listStyles.toolbar}>
+        <strong className={listStyles.toolbarTitle}>{t('common.filters.title')}</strong>
+        <div className={listStyles.toolbarRow}>
+          <Space wrap className={listStyles.toolbarFields}>
+            <AutoComplete
+              allowClear
+              placeholder={t('rates.search.codePlaceholder')}
+              value={filterDraft.code}
+              options={codeSuggestions.map((suggestion) => ({
+                key: suggestion.id,
+                value: suggestion.code ?? '',
+                label: suggestion.code
+                  ? `${suggestion.code} (${suggestion.name})`
+                  : suggestion.name,
               }))}
-            />
-          ) : null}
-          {filterDraft.dateMode === 'range' ? (
-            <DatePicker.RangePicker
-              value={[
-                filterDraft.dateFrom ? dayjs(filterDraft.dateFrom) : null,
-                filterDraft.dateTo ? dayjs(filterDraft.dateTo) : null,
-              ]}
-              onChange={(_dates, dateStrings) => setFilterDraft((prev) => ({
-                ...prev,
-                dateFrom: dateStrings[0],
-                dateTo: dateStrings[1],
-              }))}
-            />
-          ) : null}
-          <Select
-            allowClear
-            placeholder={t('rates.checked.all')}
-            value={filterDraft.checked}
-            options={[
-              { value: 'true', label: t('rates.checked.true') },
-              { value: 'false', label: t('rates.checked.false') },
-            ]}
-            onChange={(checked?: FilterDraft['checked']) => setFilterDraft((prev) => ({
-              ...prev,
-              checked,
-            }))}
-            style={{ width: 120 }}
-          />
-          <Button
-            type="link"
-            icon={<ReloadOutlined width={16} height={16} />}
-            iconPosition="start"
-            onClick={onResetFilters}
-          >
-            {t('rates.action.reset')}
-          </Button>
-          <Button type="primary" onClick={onSearch}>
-            {t('rates.action.filter')}
-          </Button>
-        </Space>
-        <div className={styles.batchToolbar}>
-          <strong>{t('rates.batchActions.title')}</strong>
-          <div className={styles.batchToolbarActions}>
-            <Space>
-              <TendataCheckbox
-                checked={
-                  items.length > 0
-                  && items.every((item) => selectedRowKeys.includes(item.id))
+              filterOption={false}
+              listHeight={240}
+              onChange={(value) => {
+                const nextCode = String(value);
+                setFilterDraft((prev) => ({ ...prev, code: nextCode }));
+                if (!nextCode.trim()) {
+                  commitFilters({ ...filterDraft, code: '' });
                 }
-                onChange={({ target }) => {
-                  setSelectedRowKeys(target.checked ? items.map((item) => item.id) : []);
+              }}
+              onSelect={(value) => {
+                commitFilters({ ...filterDraft, code: String(value) });
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') commitFilters(filterDraft, 'strict');
+              }}
+              style={{ width: 160 }}
+              maxLength={10}
+            />
+            <Select
+              allowClear
+              placeholder={t('rates.dateMode.all')}
+              value={filterDraft.dateMode}
+              options={[
+                { value: 'single', label: t('rates.dateMode.single') },
+                { value: 'range', label: t('rates.dateMode.range') },
+              ]}
+              onChange={(dateMode?: DateMode) => {
+                commitFilters({
+                  ...filterDraft,
+                  dateMode,
+                  date: dateMode === 'single' ? filterDraft.date : '',
+                  dateFrom: dateMode === 'range' ? filterDraft.dateFrom : '',
+                  dateTo: dateMode === 'range' ? filterDraft.dateTo : '',
+                });
+              }}
+              style={{ width: 120 }}
+            />
+            {filterDraft.dateMode === 'single' ? (
+              <DatePicker
+                value={filterDraft.date ? dayjs(filterDraft.date) : null}
+                onChange={(_date, dateString) => {
+                  commitFilters({
+                    ...filterDraft,
+                    date: (dateString as string) || '',
+                  });
                 }}
-              >
-                {t('rates.batchActions.selectPage')}
-              </TendataCheckbox>
-              <span>
-                {t('rates.batchActions.selected', { count: selectedRowKeys.length })}
-              </span>
-              <fieldset
-                disabled={selectedRowKeys.length === 0 || checking}
-                className={styles.batchDeleteFieldset}
-              >
-                <Button
-                  type="secondary"
-                  loading={checking}
-                  disabled={selectedRowKeys.length === 0}
-                  onClick={openBatchCheckConfirm}
-                >
-                  {t('rates.batchCheck.button')}
-                </Button>
-              </fieldset>
-              <fieldset
-                disabled={selectedRowKeys.length === 0 || deleting}
-                className={styles.batchDeleteFieldset}
-              >
-                <Button
-                  danger
-                  loading={deleting}
-                  disabled={selectedRowKeys.length === 0}
-                  onClick={openBatchDeleteConfirm}
-                >
-                  {t('rates.batchDelete.button')}
-                </Button>
-              </fieldset>
-            </Space>
-          </div>
+              />
+            ) : null}
+            {filterDraft.dateMode === 'range' ? (
+              <DatePicker.RangePicker
+                value={[
+                  filterDraft.dateFrom ? dayjs(filterDraft.dateFrom) : null,
+                  filterDraft.dateTo ? dayjs(filterDraft.dateTo) : null,
+                ]}
+                onChange={(_dates, dateStrings) => {
+                  const dateFrom = dateStrings[0] || '';
+                  const dateTo = dateStrings[1] || '';
+                  const nextDraft = { ...filterDraft, dateFrom, dateTo };
+                  setFilterDraft(nextDraft);
+                  if ((dateFrom && dateTo) || (!dateFrom && !dateTo)) {
+                    commitFilters(nextDraft);
+                  }
+                }}
+              />
+            ) : null}
+            <Select
+              allowClear
+              placeholder={t('rates.checked.all')}
+              value={filterDraft.checked}
+              options={[
+                { value: 'true', label: t('rates.checked.true') },
+                { value: 'false', label: t('rates.checked.false') },
+              ]}
+              onChange={(checked?: FilterDraft['checked']) => {
+                commitFilters({ ...filterDraft, checked });
+              }}
+              style={{ width: 120 }}
+            />
+          </Space>
+          <Space wrap className={listStyles.toolbarActions}>
+            <Button type="primary" onClick={onSearch}>
+              {t('common.action.query')}
+            </Button>
+            <Button onClick={onResetFilters}>
+              {t('rates.action.reset')}
+            </Button>
+            <Button type="link" icon={<ReloadOutlined />} onClick={() => void load()}>
+              {t('rates.action.refresh')}
+            </Button>
+          </Space>
         </div>
       </div>
 
+      <QueryListCard
+        title={t('common.queryList')}
+        actions={(
+          <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
+            {t('rates.action.create')}
+          </Button>
+        )}
+        selectionCount={selectedRowKeys.length}
+        selectionActions={(
+          <>
+            <Button
+              type="secondary"
+              loading={checking}
+              disabled={deleting}
+              onClick={openBatchCheckConfirm}
+            >
+              {t('rates.batchCheck.button')}
+            </Button>
+            <Button
+              danger
+              loading={deleting}
+              disabled={checking}
+              onClick={openBatchDeleteConfirm}
+            >
+              {t('rates.batchDelete.button')}
+            </Button>
+          </>
+        )}
+      >
+        <BizTable
+          /* remount 以清空 BizTable 内部 currentSort，保证三态循环可靠 */
+          key={`rates-sort-${applied.sortOrder ?? 'none'}`}
+          rowKey="id"
+          columns={columns}
+          dataSource={items}
+          rowClassName={() => listStyles.clickableRow}
+          rowSelection={{
+            columnWidth: 32,
+            selectedRowKeys,
+            onChange: setSelectedRowKeys,
+            getCheckboxProps: () => ({
+              onClick: (event: React.MouseEvent) => event.stopPropagation(),
+            }),
+          }}
+          onRow={(row: Rate) => ({
+            onClick: () => openDetail(row),
+          })}
+          tdLoading={loading}
+          noData={{ text: t('rates.empty') }}
+          page={{
+            current: page,
+            pageSize,
+            total,
+            showSizeChanger: true,
+            pageSizeOptions: PAGE_SIZE_OPTIONS,
+            showTotal: (count) => t('rates.total', { total: count }),
+          }}
+          onSortChange={(orderKey) => {
+            if (orderKey === 'date') {
+              applyDateSort(cycleDateSort(applied.sortOrder));
+            }
+          }}
+          onChange={(pagination) => {
+            setSelectedRowKeys([]);
+            const nextPageSize = pagination.pageSize ?? pageSize;
+            setPageSize(nextPageSize);
+            setPage(nextPageSize === pageSize ? pagination.current ?? 1 : 1);
+          }}
+        />
+      </QueryListCard>
+
       <Modal
-        title={editing ? t('rates.modal.editTitle') : t('rates.modal.createTitle')}
+        title={editingId != null
+          ? t('rates.modal.editTitle')
+          : t('rates.modal.createTitle')}
         open={formOpen}
         okText={t('rates.action.save')}
         cancelText={t('rates.action.cancel')}
@@ -605,45 +683,30 @@ const RatesView = () => {
           initialValues={emptyForm}
           onFinish={onSubmit}
         >
-          {editing ? (
-            <>
-              <Form.Item label={t('rates.form.currency')}>
-                <span>
-                  {editing.currencyName}
-                  {editing.currencyCode ? ` (${editing.currencyCode})` : ''}
-                </span>
-              </Form.Item>
-              <Form.Item label={t('rates.form.date')}>
-                <span>{editing.date}</span>
-              </Form.Item>
-            </>
-          ) : (
-            <>
-              <Form.Item
-                label={t('rates.form.currency')}
-                name="currencyId"
-                rules={[{
-                  required: true,
-                  message: t('rates.message.currencyRequired'),
-                }]}
-              >
-                <CurrencyPicker
-                  currencies={currencies}
-                  loading={currenciesLoading}
-                />
-              </Form.Item>
-              <Form.Item
-                label={t('rates.form.date')}
-                name="date"
-                rules={[{
-                  required: true,
-                  message: t('rates.message.dateRequired'),
-                }]}
-              >
-                <DatePicker />
-              </Form.Item>
-            </>
-          )}
+          <Form.Item
+            label={t('rates.form.currency')}
+            name="currencyId"
+            rules={[{
+              required: true,
+              message: t('rates.message.currencyRequired'),
+            }]}
+          >
+            <CurrencyPicker
+              currencies={currencies}
+              loading={currenciesLoading}
+              disabled={editingId != null}
+            />
+          </Form.Item>
+          <Form.Item
+            label={t('rates.form.date')}
+            name="date"
+            rules={[{
+              required: true,
+              message: t('rates.message.dateRequired'),
+            }]}
+          >
+            <DatePicker disabled={editingId != null} />
+          </Form.Item>
           <Form.Item
             label={t('rates.form.value')}
             name="data"
@@ -655,7 +718,7 @@ const RatesView = () => {
           >
             <Input
               maxLength={50}
-              placeholder={editing ? undefined : t('rates.form.valuePlaceholder')}
+              placeholder={t('rates.form.valuePlaceholder')}
             />
           </Form.Item>
           <Form.Item name="checked" valuePropName="checked">
@@ -664,40 +727,50 @@ const RatesView = () => {
         </Form>
       </Modal>
 
-      <Card>
-        <BizTable
-          rowKey="id"
-          size="small"
-          columns={columns}
-          dataSource={items}
-          rowSelection={{
-            columnWidth: 32,
-            selectedRowKeys,
-            onChange: setSelectedRowKeys,
-          }}
-          tdLoading={loading}
-          noData={{ text: t('rates.empty') }}
-          page={{
-            current: page,
-            pageSize,
-            total,
-            showSizeChanger: true,
-            pageSizeOptions: PAGE_SIZE_OPTIONS,
-            showTotal: (count) => t('rates.total', { total: count }),
-          }}
-          onSortChange={(orderKey, orderType) => {
-            if (orderKey === 'date') {
-              applyDateSort(orderType === 'ascend' ? 'asc' : 'desc');
-            }
-          }}
-          onChange={(pagination) => {
-            setSelectedRowKeys([]);
-            const nextPageSize = pagination.pageSize ?? pageSize;
-            setPageSize(nextPageSize);
-            setPage(nextPageSize === pageSize ? pagination.current ?? 1 : 1);
-          }}
-        />
-      </Card>
+      <Drawer
+        open={detailOpen}
+        title={t('rates.modal.detailTitle')}
+        width={480}
+        destroyOnClose
+        onClose={closeDetail}
+      >
+        {detail ? (
+          <div className={listStyles.detailGrid}>
+            <div className={listStyles.detailRow}>
+              <span className={listStyles.detailLabel}>{t('rates.column.id')}</span>
+              <span className={listStyles.detailValue}>{detail.id}</span>
+            </div>
+            <div className={listStyles.detailRow}>
+              <span className={listStyles.detailLabel}>{t('rates.form.currency')}</span>
+              <span className={listStyles.detailValue}>
+                {detail.currencyName}
+                {detail.currencyCode ? ` (${detail.currencyCode})` : ''}
+              </span>
+            </div>
+            <div className={listStyles.detailRow}>
+              <span className={listStyles.detailLabel}>{t('rates.form.date')}</span>
+              <span className={listStyles.detailValue}>{detail.date}</span>
+            </div>
+            <div className={listStyles.detailRow}>
+              <span className={listStyles.detailLabel}>{t('rates.form.value')}</span>
+              <span className={listStyles.detailValue}>{detail.data}</span>
+            </div>
+            <div className={listStyles.detailRow}>
+              <span className={listStyles.detailLabel}>{t('rates.form.checked')}</span>
+              <span className={listStyles.detailValue}>
+                <Tag color={detail.checked ? 'success' : 'default'}>
+                  {detail.checked ? t('rates.value.yes') : t('rates.value.no')}
+                </Tag>
+              </span>
+            </div>
+            <div className={listStyles.detailActions}>
+              <Button type="primary" onClick={openEdit}>
+                {t('rates.action.edit')}
+              </Button>
+            </div>
+          </div>
+        ) : null}
+      </Drawer>
     </div>
   );
 };

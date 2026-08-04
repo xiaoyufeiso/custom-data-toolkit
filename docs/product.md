@@ -32,11 +32,11 @@ MVP 仅预置管理员账号，**不开放自助注册**。
 | API Key | 对外 `/public/*` 鉴权凭证；服务端只存哈希 |
 | 原始值 | 海关数据中实际出现的字符串（字典侧） |
 | 标准值 | 映射后的统一值（单字段；内容审核不在范围，由管理员填写） |
-| 字典类型 | 预置 `country` / `continent`（筛选与 Redis 分区用；不可编辑；单表存储） |
+| 字典类型 | 表 `customs_dict_type` 管理；种子 `country`/`continent`；可新建/改名/启停；编码不可改；映射表仍单表按 `dict_type` 存 |
 
 ## 4. 系统职责
 
-- 管理端：Session + CSRF 鉴权下的货币/汇率/API Key、海关字典（国家/洲）维护。
+- 管理端：Session + CSRF 鉴权下的货币/汇率/API Key、海关字典（类型/标准/缺失）维护。
 - 对外 HTTP：只读汇率查询（`X-API-Key`）。
 - 字典：MySQL 为本系统映射权威；启用映射**增量**同步至共用 Redis Hash；缺失读第三方 ZSET（ADR-011）。
 - 兼容既有爬虫写入的 `currency` / `rate` 表语义（见 `data-contract.md`）。
@@ -60,15 +60,17 @@ MVP 仅预置管理员账号，**不开放自助注册**。
 - 对外 `GET /public/rates`（单日或日期区间）
 - 工程文档与 OpenSpec 基线
 
-### In Scope（海关字典第一版 — change `add-customs-dict-mgmt`）
+### In Scope（海关字典 — 已归档至 `openspec/specs/customs-dict/spec.md`）
 
+- 字典类型管理（创建/改名/启停；`/options` 供下拉）
 - 标准字典映射管理 + 增量 Redis 同步
-- 缺失字典（读 ZSET、处理、导出）
+- 标准字典 xlsx 导出 / 导入 / 模板（upsert；`source=import`）
+- 缺失字典（读 ZSET、未选类型聚合全部启用类型、处理、导出）
 
 ### Out of Scope（除非新 change / 明确解冻）
 
-- 标准字典**导入**、操作日志、处理历史、整表覆盖式全量同步
-- 货币名称字典、字典类型编辑、物理删除映射、标准值强制列表
+- 操作日志、处理历史、整表覆盖式全量同步
+- 货币名称字典、物理删除映射、标准值强制列表、改类型编码
 - 爬虫采集逻辑
 - Casdoor / Casbin / SSO / 自助注册
 - 多租户、复杂 RBAC、审计导出
@@ -79,7 +81,7 @@ MVP 仅预置管理员账号，**不开放自助注册**。
 
 - 管理员可完成货币与汇率日常维护闭环。
 - 外部系统可用有效 API Key 查询指定货币汇率。
-- 管理员可维护映射并处理缺失；启用项增量同步至约定 Redis key。
+- 管理员可维护类型与映射并处理缺失；启用项增量同步至约定 Redis key。
 - 文档分层足以驱动 AI Coding 切片，无需口头补充核心边界。
 
 ## 8. 相关权威文档
@@ -91,4 +93,5 @@ MVP 仅预置管理员账号，**不开放自助注册**。
 | 外部表语义 | `docs/data-contract.md` |
 | API 契约（过渡） | `docs/api.md`（目标迁 OpenAPI） |
 | 决策 | `docs/decisions.md` |
-| 海关字典 | `openspec/specs/customs-dict/spec.md`；交付中：`openspec/changes/add-customs-dict-mgmt/` |
+| 海关字典 | `openspec/specs/customs-dict/spec.md` |
+| UI 交互 | `openspec/specs/ui.md` |

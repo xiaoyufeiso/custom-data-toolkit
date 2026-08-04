@@ -11,6 +11,8 @@
          backend (FastAPI/Uvicorn, 默认 8000)
            ↓
          MySQL（外部 currency/rate + 应用管理表）
+           ↓
+         Redis（海关字典正式 Hash + 缺失 ZSET，可与第三方共用）
 ```
 
 ## 2. 环境变量（名称，非密钥）
@@ -25,6 +27,7 @@
 | `CORS_ORIGINS` | 前端源，须支持 credentials |
 | `ADMIN_BOOTSTRAP_USERNAME` | 首启管理员用户名 |
 | `ADMIN_BOOTSTRAP_PASSWORD` | 首启管理员密码（仅本地/受控环境） |
+| `REDIS_URL` | 海关字典共用 Redis（正式 Hash / 缺失 ZSET）；默认 `redis://127.0.0.1:6379/0` |
 | `APP_ENV` | `development` / `production` |
 
 生产环境：`Secure` Cookie、禁止把 bootstrap 密码写入仓库或日志。

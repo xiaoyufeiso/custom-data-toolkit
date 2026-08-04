@@ -57,7 +57,7 @@ custom-data-toolkit/
 - 汇率唯一性与外键约束的最终保证。
 - API Key 管理 UI（2026-07-31 起搁置；后端 `/api-keys` 与对外 `X-API-Key` 鉴权仍保留）。
 - 存储 API Key 明文。
-- 字典导入 / 处理历史 / 操作日志 UI（第一版搁置）；不做整表覆盖全量同步。
+- 处理历史 / 操作日志 UI（搁置）；不做整表覆盖全量同步。
 
 建议域划分：
 
@@ -68,7 +68,7 @@ web/src/
 │  ├─ auth/
 │  ├─ currencies/
 │  ├─ rates/
-│  └─ customsDict/    # 标准字典（国家/洲）
+│  └─ customsDict/    # types / mappings / missing
 ├─ shared/
 ├─ store/
 └─ router/
@@ -93,7 +93,7 @@ routers → services → repositories → models
 - `currency`：货币
 - `rate`：汇率
 - `api_key`：API Key 管理与对外鉴权依赖
-- `customs_dict`：海关字典映射与 Redis 同步（见 `add-customs-dict-mgmt`）
+- `customs_dict`：字典类型、映射与 Redis 同步（见 `customs-dict` change / ADR-011）
 
 ## 5. 鉴权架构
 

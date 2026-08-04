@@ -26,6 +26,9 @@ export type AppRouteObject =
 const Login = lazy(() => import('@/pages/login'));
 const Currencies = lazy(() => import('@/pages/currencies'));
 const Rates = lazy(() => import('@/pages/rates'));
+const CustomsDictMappings = lazy(() => import('@/pages/customsDict/mappings'));
+const CustomsDictMissing = lazy(() => import('@/pages/customsDict/missing'));
+const CustomsDictTypes = lazy(() => import('@/pages/customsDict/types'));
 
 const lazyLoad = (Component: React.LazyExoticComponent<React.ComponentType>) => (
   <Suspense fallback={<Loading />}>
@@ -56,6 +59,36 @@ const routes: AppRouteObject[] = [
     element: <RequireAuth>{lazyLoad(Rates)}</RequireAuth>,
     meta: {
       titleKey: 'common.rates', menu: true, group: 'rateData', groupTitleKey: 'common.rateData',
+    },
+  },
+  {
+    path: '/customs-dict/types',
+    element: <RequireAuth>{lazyLoad(CustomsDictTypes)}</RequireAuth>,
+    meta: {
+      titleKey: 'common.customsDictTypes',
+      menu: true,
+      group: 'customsDict',
+      groupTitleKey: 'common.customsDict',
+    },
+  },
+  {
+    path: '/customs-dict/mappings',
+    element: <RequireAuth>{lazyLoad(CustomsDictMappings)}</RequireAuth>,
+    meta: {
+      titleKey: 'common.customsDictMappings',
+      menu: true,
+      group: 'customsDict',
+      groupTitleKey: 'common.customsDict',
+    },
+  },
+  {
+    path: '/customs-dict/missing',
+    element: <RequireAuth>{lazyLoad(CustomsDictMissing)}</RequireAuth>,
+    meta: {
+      titleKey: 'common.customsDictMissing',
+      menu: true,
+      group: 'customsDict',
+      groupTitleKey: 'common.customsDict',
     },
   },
   { path: '*', element: <Navigate to="/currencies" replace /> },

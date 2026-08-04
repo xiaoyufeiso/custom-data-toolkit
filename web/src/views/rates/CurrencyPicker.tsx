@@ -18,7 +18,7 @@ import {
   indexLettersFromGroups,
   type InitialKey,
 } from './currencyPickerUtils';
-import styles from './index.module.less';
+import styles from './CurrencyPicker.module.less';
 
 type CurrencyPickerProps = {
   currencies: Currency[];

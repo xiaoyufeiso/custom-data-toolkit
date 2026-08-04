@@ -1,0 +1,680 @@
+import {
+  screen,
+  waitFor,
+} from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import {
+  http,
+  HttpResponse,
+} from 'msw';
+import {
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest';
+import { server } from '@/test/msw/server';
+import { renderWithProviders } from '@/test/utils/render';
+import CustomsDictMappingsView from '@/views/customsDict/mappings';
+
+vi.mock('@/views/customsDict/mappings/parseImportPreview', () => ({
+  parseCustomsDictImportPreview: vi.fn(async () => ([
+    {
+      excelRow: 2,
+      dictType: 'country',
+      dictTypeName: '国家',
+      rawValue: 'JPN',
+      hitCount: '',
+      standardValue: '日本',
+      remark: '',
+    },
+  ])),
+  ImportPreviewParseError: class ImportPreviewParseError extends Error {},
+}));
+
+vi.mock('tendata-ui', async (importOriginal) => {
+  const original = await importOriginal<typeof import('tendata-ui')>();
+  const ModalComponent = original.Modal as typeof original.Modal & {
+    confirm: (config: { onOk?: (...args: never[]) => void | Promise<void> }) => void;
+  };
+  ModalComponent.confirm = ({ onOk }) => {
+    void (onOk as undefined | (() => void | Promise<void>))?.();
+  };
+  return {
+    ...original,
+    Modal: ModalComponent,
+    AutoComplete: ({
+      onChange,
+      onKeyDown,
+      onSelect,
+      options = [],
+      placeholder,
+      value,
+    }: {
+      onChange?: (nextValue: string) => void;
+      onKeyDown?: (event: React.KeyboardEvent<HTMLInputElement>) => void;
+      onSelect?: (nextValue: string) => void;
+      options?: Array<{ key: string; label: React.ReactNode; value: string }>;
+      placeholder?: string;
+      value?: string;
+    }) => (
+      <div>
+        <input
+          placeholder={placeholder}
+          value={value}
+          onChange={(event) => onChange?.(event.target.value)}
+          onKeyDown={onKeyDown}
+        />
+        {options.map((option) => (
+          <button
+            type="button"
+            key={option.key}
+            onClick={() => onSelect?.(option.value)}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+    ),
+    Select: ({
+      onChange,
+      options = [],
+      placeholder,
+      value,
+      disabled,
+    }: {
+      onChange?: (nextValue: string) => void;
+      options?: Array<{ label: React.ReactNode; value: string }>;
+      placeholder?: string;
+      value?: string;
+      disabled?: boolean;
+    }) => (
+      <select
+        aria-label={placeholder}
+        disabled={disabled}
+        value={value ?? ''}
+        onChange={(event) => onChange?.(event.target.value)}
+      >
+        <option value="">{placeholder}</option>
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    ),
+    Drawer: ({
+      open,
+      title,
+      onClose,
+      children,
+      maskClosable = true,
+    }: {
+      open?: boolean;
+      title?: React.ReactNode;
+      onClose?: () => void;
+      children?: React.ReactNode;
+      maskClosable?: boolean;
+    }) => (open ? (
+      <div data-testid="detail-drawer">
+        <div>{title}</div>
+        <button type="button" onClick={onClose}>关闭</button>
+        {maskClosable ? (
+          <button type="button" onClick={onClose}>遮罩</button>
+        ) : null}
+        {children}
+      </div>
+    ) : null),
+    Tabs: ({
+      activeKey,
+      onChange,
+      items = [],
+    }: {
+      activeKey?: string;
+      onChange?: (key: string) => void;
+      items?: Array<{
+        key: string;
+        label: React.ReactNode;
+        children?: React.ReactNode;
+      }>;
+    }) => (
+      <div>
+        {items.map((item) => (
+          <button
+            key={item.key}
+            type="button"
+            role="tab"
+            aria-selected={activeKey === item.key}
+            onClick={() => onChange?.(item.key)}
+          >
+            {item.label}
+          </button>
+        ))}
+        {items.find((item) => item.key === activeKey)?.children}
+      </div>
+    ),
+  };
+});
+
+vi.mock('@tendata-biz-components/biz-table', () => ({
+  default: ({
+    columns = [],
+    dataSource = [],
+    onChange,
+    onRow,
+    page,
+    rowSelection,
+  }: {
+    columns?: Array<{
+      key?: string;
+      dataIndex?: string;
+      render?: (value: unknown, row: Record<string, unknown>) => React.ReactNode;
+    }>;
+    dataSource?: Array<Record<string, unknown>>;
+    onChange?: (pagination: { current?: number; pageSize?: number }) => void;
+    onRow?: (row: Record<string, unknown>) => { onClick?: () => void };
+    page?: {
+      current?: number;
+      pageSize?: number;
+      total?: number;
+      showTotal?: (total: number) => React.ReactNode;
+    };
+    rowSelection?: {
+      selectedRowKeys?: React.Key[];
+      onChange?: (keys: React.Key[]) => void;
+    };
+  }) => {
+    const selectedKeys = rowSelection?.selectedRowKeys ?? [];
+    return (
+      <div data-testid="biz-table">
+        {dataSource.map((row) => {
+          const rawColumn = columns.find((column) => column.key === 'rawValue');
+          const rowProps = onRow?.(row);
+          return (
+            <div
+              key={String(row.id)}
+              data-testid={`row-${String(row.id)}`}
+              onClick={rowProps?.onClick}
+              onKeyDown={undefined}
+              role="button"
+              tabIndex={0}
+            >
+              <input
+                type="checkbox"
+                aria-label={`选择${String(row.rawValue)}`}
+                checked={selectedKeys.includes(row.id as React.Key)}
+                onClick={(event) => event.stopPropagation()}
+                onChange={(event) => {
+                  const id = row.id as React.Key;
+                  rowSelection?.onChange?.(
+                    event.target.checked
+                      ? [...selectedKeys, id]
+                      : selectedKeys.filter((key) => key !== id),
+                  );
+                }}
+              />
+              {rawColumn?.render
+                ? rawColumn.render(row.rawValue, row)
+                : <span>{String(row.rawValue)}</span>}
+              <span>{String(row.standardValue)}</span>
+            </div>
+          );
+        })}
+        {page?.showTotal?.(page.total ?? 0)}
+        {(page?.total ?? 0) > (page?.pageSize ?? 20) ? (
+          <button
+            type="button"
+            onClick={() => onChange?.({
+              current: (page?.current ?? 1) + 1,
+              pageSize: page?.pageSize,
+            })}
+          >
+            下一页
+          </button>
+        ) : null}
+      </div>
+    );
+  },
+}));
+
+const MAPPINGS_URL = 'http://localhost/api/v1/customs-dict/mappings';
+const TYPES_OPTIONS_URL = 'http://localhost/api/v1/customs-dict/types/options';
+
+const typeOptions = [
+  { code: 'country', name: '国家' },
+  { code: 'continent', name: '洲' },
+];
+
+const listResponse = {
+  items: [
+    {
+      id: 1,
+      dictType: 'country',
+      rawValue: 'USA',
+      standardValue: '美国',
+      enabled: true,
+      source: 'manual',
+      syncStatus: 'synced',
+      syncError: null,
+      lastSyncedAt: null,
+      createdBy: 1,
+      updatedBy: 1,
+      createdAt: '2026-07-31T00:00:00Z',
+      updatedAt: '2026-07-31T00:00:00Z',
+    },
+  ],
+  page: 1,
+  pageSize: 20,
+  total: 1,
+};
+
+describe('CustomsDictMappingsView', () => {
+  beforeEach(() => {
+    server.use(
+      http.get(TYPES_OPTIONS_URL, () => HttpResponse.json(typeOptions)),
+    );
+  });
+
+  it('renders mappings list without row actions or enabled UI', async () => {
+    let requestedEnabled: string | null = null;
+    server.use(
+      http.get(MAPPINGS_URL, ({ request }) => {
+        requestedEnabled = new URL(request.url).searchParams.get('enabled');
+        return HttpResponse.json(listResponse);
+      }),
+    );
+
+    renderWithProviders(<CustomsDictMappingsView />);
+
+    expect(await screen.findByText('美国')).toBeInTheDocument();
+    expect(screen.getByText('查询列表')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'USA' })).toBeInTheDocument();
+    expect(screen.getByText('共 1 条')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('搜索原始值或标准值')).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText('原始值')).not.toBeInTheDocument();
+    expect(screen.queryByPlaceholderText('标准值')).not.toBeInTheDocument();
+    expect(requestedEnabled).toBe('true');
+    expect(screen.queryByPlaceholderText('启停状态')).not.toBeInTheDocument();
+    expect(screen.queryByText('启用')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '编辑' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '删除' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '重新同步' })).not.toBeInTheDocument();
+    expect(screen.queryByText('批量操作')).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: '批量操作' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '批量删除' })).not.toBeInTheDocument();
+  });
+
+  it('queries with merged q keyword and keeps suggestions from auto-filling list', async () => {
+    const user = userEvent.setup();
+    const listParams: URLSearchParams[] = [];
+    let suggestionHits = 0;
+    server.use(
+      http.get(MAPPINGS_URL, ({ request }) => {
+        listParams.push(new URL(request.url).searchParams);
+        return HttpResponse.json(listResponse);
+      }),
+      http.get(`${MAPPINGS_URL}/suggestions`, () => {
+        suggestionHits += 1;
+        return HttpResponse.json([
+          {
+            id: 1,
+            rawValue: 'USA',
+            standardValue: '美国',
+            matchField: 'rawValue',
+          },
+        ]);
+      }),
+    );
+
+    renderWithProviders(<CustomsDictMappingsView />);
+    await screen.findByText('美国');
+    const initialListCalls = listParams.length;
+
+    await user.type(screen.getByPlaceholderText('搜索原始值或标准值'), 'US');
+    await waitFor(() => {
+      expect(suggestionHits).toBeGreaterThan(0);
+    });
+    expect(listParams).toHaveLength(initialListCalls);
+
+    await user.click(screen.getByRole('button', { name: 'USA（美国）' }));
+    await waitFor(() => {
+      expect(listParams.some((params) => params.get('q') === 'USA')).toBe(true);
+      expect(listParams[listParams.length - 1]?.has('rawValue')).toBe(false);
+      expect(listParams[listParams.length - 1]?.has('standardValue')).toBe(false);
+    });
+  });
+
+  it('shows standard-value suggestions and fills standard value on select', async () => {
+    const user = userEvent.setup();
+    let suggestionPrefix = '';
+    server.use(
+      http.get(MAPPINGS_URL, () => HttpResponse.json(listResponse)),
+      http.get(`${MAPPINGS_URL}/suggestions`, ({ request }) => {
+        suggestionPrefix = new URL(request.url).searchParams.get('prefix') ?? '';
+        return HttpResponse.json([
+          {
+            id: 1,
+            rawValue: 'USA',
+            standardValue: '美国',
+            matchField: 'standardValue',
+          },
+        ]);
+      }),
+    );
+
+    renderWithProviders(<CustomsDictMappingsView />);
+    await screen.findByText('美国');
+
+    await user.type(screen.getByPlaceholderText('搜索原始值或标准值'), '美');
+    await waitFor(() => {
+      expect(suggestionPrefix).toBe('美');
+    });
+    expect(await screen.findByRole('button', { name: '美国（USA）' })).toBeTruthy();
+
+    await user.click(screen.getByRole('button', { name: '美国（USA）' }));
+    expect(screen.getByPlaceholderText('搜索原始值或标准值')).toHaveValue('美国');
+  });
+
+  it('opens detail drawer from raw value link and closes via mask', async () => {
+    const user = userEvent.setup();
+    server.use(
+      http.get(MAPPINGS_URL, () => HttpResponse.json(listResponse)),
+    );
+
+    renderWithProviders(<CustomsDictMappingsView />);
+    await screen.findByRole('button', { name: 'USA' });
+
+    await user.click(screen.getByRole('button', { name: 'USA' }));
+    expect(await screen.findByTestId('detail-drawer')).toBeInTheDocument();
+    expect(screen.getByText('映射详情')).toBeInTheDocument();
+    expect(screen.getByText('manual')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: '遮罩' }));
+    await waitFor(() => {
+      expect(screen.queryByTestId('detail-drawer')).not.toBeInTheDocument();
+    });
+  });
+
+  it('opens detail drawer from row click', async () => {
+    const user = userEvent.setup();
+    server.use(
+      http.get(MAPPINGS_URL, () => HttpResponse.json(listResponse)),
+    );
+
+    renderWithProviders(<CustomsDictMappingsView />);
+    await screen.findByTestId('row-1');
+
+    await user.click(screen.getByTestId('row-1'));
+    expect(await screen.findByTestId('detail-drawer')).toBeInTheDocument();
+  });
+
+  it('edits standard value through edit modal from detail', async () => {
+    const user = userEvent.setup();
+    const patchPayload = vi.fn();
+    server.use(
+      http.get(MAPPINGS_URL, () => HttpResponse.json(listResponse)),
+      http.patch(`${MAPPINGS_URL}/1`, async ({ request }) => {
+        patchPayload(await request.json());
+        return HttpResponse.json({
+          ...listResponse.items[0],
+          standardValue: '美利坚',
+        });
+      }),
+    );
+
+    renderWithProviders(<CustomsDictMappingsView />);
+    await user.click(await screen.findByRole('button', { name: 'USA' }));
+    expect(await screen.findByTestId('detail-drawer')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: '编辑' }));
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(screen.getByText('编辑映射')).toBeInTheDocument();
+    const input = screen.getByLabelText('标准值');
+    await user.clear(input);
+    await user.type(input, '美利坚');
+    await user.click(screen.getByRole('button', { name: '保存' }));
+
+    await waitFor(() => {
+      expect(patchPayload).toHaveBeenCalledWith({ standardValue: '美利坚' });
+    });
+    expect(await screen.findByText('美利坚')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '编辑' })).toBeInTheDocument();
+  });
+
+  it('batch disables selected mappings', async () => {
+    const user = userEvent.setup();
+    const disablePayload = vi.fn();
+    server.use(
+      http.get(MAPPINGS_URL, () => HttpResponse.json(listResponse)),
+      http.post(`${MAPPINGS_URL}/batch-disable`, async ({ request }) => {
+        disablePayload(await request.json());
+        return HttpResponse.json({
+          disabled: 1,
+          syncFailed: 0,
+          failedIds: [],
+        });
+      }),
+    );
+
+    renderWithProviders(<CustomsDictMappingsView />);
+    await screen.findByText('美国');
+
+    expect(screen.queryByRole('button', { name: '批量删除' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('checkbox', { name: '选择USA' }));
+    expect(screen.getByRole('region', { name: '批量操作' })).toHaveTextContent('已选择 1 项');
+    await user.click(screen.getByRole('button', { name: '批量删除' }));
+
+    await waitFor(() => {
+      expect(disablePayload).toHaveBeenCalledWith({ ids: [1] });
+    });
+    expect(screen.queryByRole('button', { name: '重放同步' })).not.toBeInTheDocument();
+  });
+
+  it('batch resync keeps failed selection', async () => {
+    const user = userEvent.setup();
+    const resyncPayload = vi.fn();
+    server.use(
+      http.get(MAPPINGS_URL, () => HttpResponse.json({
+        ...listResponse,
+        items: [
+          listResponse.items[0],
+          {
+            ...listResponse.items[0],
+            id: 2,
+            rawValue: 'JPN',
+            standardValue: '日本',
+          },
+        ],
+        total: 2,
+      })),
+      http.post(`${MAPPINGS_URL}/batch-resync`, async ({ request }) => {
+        resyncPayload(await request.json());
+        return HttpResponse.json({
+          synced: 1,
+          failed: 1,
+          failedIds: [2],
+          total: 2,
+        });
+      }),
+    );
+
+    renderWithProviders(<CustomsDictMappingsView />);
+    await screen.findByText('日本');
+
+    await user.click(screen.getByRole('checkbox', { name: '选择USA' }));
+    await user.click(screen.getByRole('checkbox', { name: '选择JPN' }));
+    await user.click(screen.getByRole('button', { name: '批量同步' }));
+
+    await waitFor(() => {
+      expect(resyncPayload).toHaveBeenCalledWith({ ids: [1, 2] });
+    });
+    expect(screen.getByRole('checkbox', { name: '选择JPN' })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: '选择USA' })).not.toBeChecked();
+  });
+
+  it('uses bordered reset and link-style refresh', async () => {
+    server.use(
+      http.get(MAPPINGS_URL, () => HttpResponse.json(listResponse)),
+    );
+
+    renderWithProviders(<CustomsDictMappingsView />);
+    await screen.findByText('美国');
+
+    const reset = screen.getByRole('button', { name: '重置' });
+    const refresh = screen.getByRole('button', { name: '刷新' });
+    // 重置为默认描边按钮；刷新为 link + 图标（styled-components 不在 class 中写 link）
+    expect(reset.querySelector('svg')).toBeNull();
+    expect(refresh.querySelector('svg')).not.toBeNull();
+  });
+
+  it('creates a mapping through the modal form', async () => {
+    const user = userEvent.setup();
+    const createPayload = vi.fn();
+    server.use(
+      http.get(MAPPINGS_URL, () => HttpResponse.json(listResponse)),
+      http.post(MAPPINGS_URL, async ({ request }) => {
+        createPayload(await request.json());
+        return HttpResponse.json(
+          {
+            ...listResponse.items[0],
+            id: 2,
+            rawValue: 'JPN',
+            standardValue: '日本',
+          },
+          { status: 201 },
+        );
+      }),
+    );
+
+    renderWithProviders(<CustomsDictMappingsView />);
+    await screen.findByText('美国');
+
+    await user.click(screen.getByRole('button', { name: '新建映射' }));
+    expect(await screen.findByLabelText('原始值')).toBeInTheDocument();
+
+    const dictTypeSelects = screen.getAllByLabelText('字典类型');
+    await user.selectOptions(dictTypeSelects[dictTypeSelects.length - 1], 'country');
+    await user.type(screen.getByLabelText('原始值'), 'JPN');
+    await user.type(screen.getByLabelText('标准值'), '日本');
+    await user.click(screen.getByRole('button', { name: '保存' }));
+
+    await waitFor(() => {
+      expect(createPayload).toHaveBeenCalled();
+    });
+    expect(createPayload.mock.calls[0][0]).toMatchObject({
+      dictType: 'country',
+      rawValue: 'JPN',
+      standardValue: '日本',
+    });
+  });
+
+  it('does not show list-level import/export actions', async () => {
+    server.use(
+      http.get(MAPPINGS_URL, () => HttpResponse.json(listResponse)),
+    );
+
+    renderWithProviders(<CustomsDictMappingsView />);
+    await screen.findByText('美国');
+    expect(screen.getByRole('button', { name: '新建映射' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /导入\/导出/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: '导出' })).toBeNull();
+  });
+
+  it('previews selected file then imports only after confirm', async () => {
+    const user = userEvent.setup();
+    const importBody = vi.fn();
+    server.use(
+      http.get(MAPPINGS_URL, () => HttpResponse.json(listResponse)),
+      http.post(`${MAPPINGS_URL}/import`, async ({ request }) => {
+        const form = await request.formData();
+        importBody(form.get('file'));
+        return HttpResponse.json({
+          created: 1,
+          updated: 0,
+          failed: 1,
+          errors: [{ row: 3, message: '标准值不能为空' }],
+        });
+      }),
+    );
+
+    renderWithProviders(<CustomsDictMappingsView />);
+    await screen.findByText('美国');
+    await user.click(screen.getByRole('button', { name: '新建映射' }));
+    await user.click(screen.getByRole('tab', { name: '批量导入' }));
+
+    const confirmBefore = screen.getByRole('button', { name: '确认导入' });
+    expect(confirmBefore.className).toMatch(/disabled/);
+    await user.click(confirmBefore);
+    expect(importBody).not.toHaveBeenCalled();
+
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    expect(fileInput).toBeTruthy();
+    const file = new File(['dummy'], 'mappings.xlsx', {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+    await user.upload(fileInput, file);
+
+    expect(await screen.findByText('待导入预览')).toBeTruthy();
+    expect(screen.getAllByText('共 1 条').length).toBeGreaterThan(0);
+    expect(screen.getByText('JPN')).toBeTruthy();
+    expect(importBody).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole('button', { name: '确认导入' }));
+
+    await waitFor(() => {
+      expect(importBody).toHaveBeenCalled();
+    });
+    expect(await screen.findByText('导入结果')).toBeTruthy();
+    expect(screen.getByText('部分导入成功')).toBeTruthy();
+    expect(screen.getByText('部分行未能导入，请查看下方失败明细')).toBeTruthy();
+    expect(screen.getByText('新建 1，更新 0，失败 1')).toBeTruthy();
+    expect(screen.getByText('第3行：标准值不能为空')).toBeTruthy();
+    expect(screen.queryByText('待导入预览')).toBeNull();
+    expect(screen.queryByRole('tab', { name: '批量导入' })).toBeNull();
+    expect(screen.queryByRole('button', { name: '确认导入' })).toBeNull();
+    expect(screen.getByRole('button', { name: '完成' })).toBeTruthy();
+
+    await user.click(screen.getByRole('button', { name: '完成' }));
+    await waitFor(() => {
+      expect(screen.queryByText('部分导入成功')).toBeNull();
+    });
+  });
+
+  it('downloads import template via hint link on batch tab', async () => {
+    const user = userEvent.setup();
+    const templateHit = vi.fn();
+    Object.defineProperty(URL, 'createObjectURL', {
+      value: vi.fn(() => 'blob:tpl'),
+      configurable: true,
+    });
+    Object.defineProperty(URL, 'revokeObjectURL', {
+      value: vi.fn(),
+      configurable: true,
+    });
+
+    server.use(
+      http.get(MAPPINGS_URL, () => HttpResponse.json(listResponse)),
+      http.get(`${MAPPINGS_URL}/import-template`, () => {
+        templateHit();
+        return new HttpResponse(new Blob(['tpl']), {
+          headers: {
+            'Content-Type':
+              'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          },
+        });
+      }),
+    );
+
+    renderWithProviders(<CustomsDictMappingsView />);
+    await screen.findByText('美国');
+    await user.click(screen.getByRole('button', { name: '新建映射' }));
+    await user.click(screen.getByRole('tab', { name: '批量导入' }));
+    await user.click(screen.getByRole('button', { name: '下载模板' }));
+
+    await waitFor(() => {
+      expect(templateHit).toHaveBeenCalled();
+    });
+  });
+});

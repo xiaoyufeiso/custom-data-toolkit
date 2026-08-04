@@ -33,7 +33,7 @@ const LoginView = () => {
 
   return (
     <div className={styles.wrap}>
-      <Card title="Custom Data Toolkit" className={styles.card}>
+      <Card title="海关数据处理工具" className={styles.card}>
         <form onSubmit={onSubmit} className={styles.form}>
           <div className={styles.label}>
             <span id="login-username-label">用户名</span>

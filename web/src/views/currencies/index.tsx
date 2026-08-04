@@ -1,8 +1,6 @@
 import type {
   ComponentProps,
   Key,
-  ReactElement,
-  ReactNode,
 } from 'react';
 import {
   Children,
@@ -15,8 +13,7 @@ import { PlusOutlined, ReloadOutlined } from '@tendata-ui/icon';
 import {
   AutoComplete,
   Button,
-  Card,
-  Checkbox,
+  Drawer,
   Form,
   Input,
   Modal,
@@ -32,21 +29,12 @@ import {
   type Currency,
   type CurrencySuggestion,
 } from '@/services/currency';
+import QueryListCard from '@/shared/components/queryListCard';
 import { useTranslate } from '@/shared/hooks';
+import listStyles from '@/shared/styles/listPage.module.less';
 import { getApiErrorCode, getApiErrorMessage } from '@/shared/utils/apiError';
-import styles from './index.module.less';
 
 type ColumnsType = NonNullable<ComponentProps<typeof BizTable>['columns']>;
-type CheckboxProps = {
-  children?: ReactNode;
-  checked?: boolean;
-  onChange?: (event: { target: { checked: boolean } }) => void;
-};
-
-// tendata-ui 3.0.0 的声明文件遗漏了 Checkbox 本身的函数签名。
-const TendataCheckbox = Checkbox as unknown as (
-  props: CheckboxProps,
-) => ReactElement;
 
 const DEFAULT_PAGE_SIZE = 20;
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
@@ -71,7 +59,9 @@ const CurrenciesView = () => {
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
-  const [editing, setEditing] = useState<Currency | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [detail, setDetail] = useState<Currency | null>(null);
   const [selectedRowKeys, setSelectedRowKeys] = useState<Key[]>([]);
   const [form] = Form.useForm<FormState>();
 
@@ -87,14 +77,14 @@ const CurrenciesView = () => {
       setItems(data.items ?? []);
       setTotal(data.total ?? 0);
     } catch (error) {
-      message.error(getApiErrorMessage(error, '加载货币列表失败'));
+      message.error(getApiErrorMessage(error, t('currencies.message.loadFailed')));
     } finally {
       setLoading(false);
     }
-  }, [keyword, page, pageSize]);
+  }, [keyword, page, pageSize, t]);
 
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
 
   useEffect(() => {
@@ -123,27 +113,48 @@ const CurrenciesView = () => {
   }, [q]);
 
   const openCreate = () => {
-    setEditing(null);
+    setEditingId(null);
     form.setFieldsValue(emptyForm);
     setFormOpen(true);
   };
 
-  const openEdit = (row: Currency) => {
-    setEditing(row);
-    form.setFieldsValue({ name: row.name, code: row.code ?? '' });
+  const openEdit = () => {
+    if (!detail) return;
+    setEditingId(detail.id);
+    form.setFieldsValue({
+      name: detail.name,
+      code: detail.code ?? '',
+    });
     setFormOpen(true);
+  };
+
+  const openDetail = (row: Currency) => {
+    setDetail(row);
+    setDetailOpen(true);
+  };
+
+  const closeDetail = () => {
+    setDetailOpen(false);
+    setDetail(null);
   };
 
   const closeForm = () => {
     setFormOpen(false);
-    setEditing(null);
+    setEditingId(null);
     form.resetFields();
   };
 
-  const onSearch = () => {
+  const commitKeyword = (nextQ: string) => {
+    const trimmed = nextQ.trim();
+    setQ(nextQ);
+    setSuggestions([]);
     setSelectedRowKeys([]);
     setPage(1);
-    setKeyword(q.trim());
+    setKeyword(trimmed);
+  };
+
+  const onSearch = () => {
+    commitKeyword(q);
   };
 
   const onResetSearch = () => {
@@ -157,27 +168,29 @@ const CurrenciesView = () => {
   const onSubmit = async (values: FormState) => {
     const name = values.name.trim();
     if (!name) {
-      message.warning('请填写货币名称');
+      message.warning(t('currencies.message.nameRequired'));
       return;
     }
     const code = values.code.trim();
     if (code && !/^[A-Za-z_]{1,10}$/.test(code)) {
-      message.warning('货币字母代码须为 1~10 位字母或下划线，如 CNY');
+      message.warning(t('currencies.message.codeInvalid'));
       return;
     }
+    const payload = { name, code: code ? code.toUpperCase() : null };
     setSubmitting(true);
     try {
-      if (editing) {
-        await updateCurrency(editing.id, { name, code: code ? code.toUpperCase() : null });
-        message.success('已更新');
+      if (editingId != null) {
+        const updated = await updateCurrency(editingId, payload);
+        message.success(t('currencies.message.updated'));
+        setDetail(updated);
       } else {
-        await createCurrency({ name, code: code ? code.toUpperCase() : null });
-        message.success('已创建');
+        await createCurrency(payload);
+        message.success(t('currencies.message.created'));
       }
       closeForm();
       await load();
     } catch (error) {
-      message.error(getApiErrorMessage(error, '保存失败'));
+      message.error(getApiErrorMessage(error, t('currencies.message.saveFailed')));
     } finally {
       setSubmitting(false);
     }
@@ -208,7 +221,6 @@ const CurrenciesView = () => {
 
   const openBatchDeleteConfirm = () => {
     Modal.confirm({
-      // tendata-ui 的静态 Modal 类型误将 children 声明为必填；实际内容由 content 提供。
       children: Children,
       centered: true,
       title: t('currencies.batchDelete.confirmTitle', {
@@ -221,133 +233,145 @@ const CurrenciesView = () => {
 
   const columns: ColumnsType = [
     {
-      title: 'ID',
-      dataIndex: 'id',
-      key: 'id',
-      width: 70,
-    },
-    {
-      title: '名称',
+      title: t('currencies.column.name'),
       dataIndex: 'name',
       key: 'name',
       width: 200,
+      render: (value: string, row: Currency) => (
+        <button
+          type="button"
+          className={listStyles.rawValueLink}
+          onClick={(event) => {
+            event.stopPropagation();
+            openDetail(row);
+          }}
+        >
+          {value}
+        </button>
+      ),
     },
     {
-      title: '字母代码',
+      title: t('currencies.column.code'),
       dataIndex: 'code',
       key: 'code',
       width: 120,
       render: (code: string | null) => code || '—',
     },
-    {
-      title: '操作',
-      key: 'actions',
-      width: 100,
-      render: (_value: unknown, row: Currency) => (
-        <Button type="link" onClick={() => openEdit(row)}>
-          编辑
-        </Button>
-      ),
-    },
   ];
 
   return (
-    <div className={styles.page}>
-      <div className={styles.pageAction}>
-        <Button
-          type="primary"
-          icon={<PlusOutlined width={16} height={16} />}
-          iconPosition="start"
-          onClick={openCreate}
-        >
-          新建货币
-        </Button>
-      </div>
-      <div className={styles.toolbar}>
-        <strong className={styles.toolbarTitle}>
-          {t('currencies.filters.title')}
+    <div className={listStyles.page}>
+      <div className={listStyles.toolbar}>
+        <strong className={listStyles.toolbarTitle}>
+          {t('common.filters.title')}
         </strong>
-        <Space wrap>
-          <AutoComplete
-            allowClear
-            placeholder="搜索名称或字母代码"
-            value={q}
-            options={suggestions.map((suggestion) => ({
-              key: `${suggestion.id}-${suggestion.matchField}`,
-              value: suggestion.matchField === 'code'
-                ? suggestion.code ?? suggestion.name
-                : suggestion.name,
-              label: suggestion.code
-                ? `${suggestion.code} (${suggestion.name})`
-                : suggestion.name,
-            }))}
-            filterOption={false}
-            listHeight={240}
-            onChange={(value) => setQ(String(value))}
-            onSelect={(value) => {
-              setQ(String(value));
-              setSuggestions([]);
-            }}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') onSearch();
-            }}
-            style={{ width: 240 }}
-          />
-          <Button
-            type="link"
-            icon={<ReloadOutlined width={16} height={16} />}
-            iconPosition="start"
-            onClick={onResetSearch}
-          >
-            {t('currencies.action.reset')}
-          </Button>
-          <Button type="primary" onClick={onSearch}>
-            {t('currencies.action.search')}
-          </Button>
-        </Space>
-        <div className={styles.batchToolbar}>
-          <strong>{t('currencies.batchActions.title')}</strong>
-          <div className={styles.batchToolbarActions}>
-            <Space>
-              <TendataCheckbox
-                checked={
-                  items.length > 0
-                  && items.every((item) => selectedRowKeys.includes(item.id))
+        <div className={listStyles.toolbarRow}>
+          <Space wrap className={listStyles.toolbarFields}>
+            <AutoComplete
+              allowClear
+              placeholder={t('currencies.search.placeholder')}
+              value={q}
+              options={suggestions.map((suggestion) => ({
+                key: `${suggestion.id}-${suggestion.matchField}`,
+                value: suggestion.matchField === 'code'
+                  ? suggestion.code ?? suggestion.name
+                  : suggestion.name,
+                label: suggestion.code
+                  ? `${suggestion.code} (${suggestion.name})`
+                  : suggestion.name,
+              }))}
+              filterOption={false}
+              listHeight={240}
+              onChange={(value) => {
+                const next = String(value);
+                setQ(next);
+                if (!next.trim()) {
+                  commitKeyword('');
                 }
-                onChange={({ target }) => {
-                  setSelectedRowKeys(target.checked ? items.map((item) => item.id) : []);
-                }}
-              >
-                {t('currencies.batchActions.selectPage')}
-              </TendataCheckbox>
-              <span>
-                {t('currencies.batchActions.selected', {
-                  count: selectedRowKeys.length,
-                })}
-              </span>
-              <fieldset
-                disabled={selectedRowKeys.length === 0 || deleting}
-                className={styles.batchDeleteFieldset}
-              >
-                <Button
-                  danger
-                  loading={deleting}
-                  disabled={selectedRowKeys.length === 0}
-                  onClick={openBatchDeleteConfirm}
-                >
-                  {t('currencies.batchDelete.button')}
-                </Button>
-              </fieldset>
-            </Space>
-          </div>
+              }}
+              onSelect={(value) => {
+                commitKeyword(String(value));
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') commitKeyword(q);
+              }}
+              style={{ width: 160 }}
+            />
+          </Space>
+          <Space wrap className={listStyles.toolbarActions}>
+            <Button type="primary" onClick={onSearch}>
+              {t('common.action.query')}
+            </Button>
+            <Button onClick={onResetSearch}>
+              {t('currencies.action.reset')}
+            </Button>
+            <Button type="link" icon={<ReloadOutlined />} onClick={() => void load()}>
+              {t('currencies.action.refresh')}
+            </Button>
+          </Space>
         </div>
       </div>
 
+      <QueryListCard
+        title={t('common.queryList')}
+        actions={(
+          <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
+            {t('currencies.action.create')}
+          </Button>
+        )}
+        selectionCount={selectedRowKeys.length}
+        selectionActions={(
+          <Button
+            danger
+            loading={deleting}
+            onClick={openBatchDeleteConfirm}
+          >
+            {t('currencies.batchDelete.button')}
+          </Button>
+        )}
+      >
+        <BizTable
+          rowKey="id"
+          columns={columns}
+          dataSource={items}
+          rowClassName={() => listStyles.clickableRow}
+          rowSelection={{
+            columnWidth: 32,
+            selectedRowKeys,
+            onChange: setSelectedRowKeys,
+            getCheckboxProps: () => ({
+              onClick: (event: React.MouseEvent) => event.stopPropagation(),
+            }),
+          }}
+          onRow={(row: Currency) => ({
+            onClick: () => openDetail(row),
+          })}
+          tdLoading={loading}
+          noData={{ text: t('currencies.empty') }}
+          page={{
+            current: page,
+            pageSize,
+            total,
+            showSizeChanger: true,
+            pageSizeOptions: PAGE_SIZE_OPTIONS,
+            showTotal: (count) => t('currencies.total', { total: count }),
+          }}
+          onChange={(pagination) => {
+            setSelectedRowKeys([]);
+            const nextPageSize = pagination.pageSize ?? pageSize;
+            setPageSize(nextPageSize);
+            setPage(nextPageSize === pageSize ? pagination.current ?? 1 : 1);
+          }}
+        />
+      </QueryListCard>
+
       <Modal
-        title={editing ? '编辑货币' : '新建货币'}
+        title={editingId != null
+          ? t('currencies.modal.editTitle')
+          : t('currencies.modal.createTitle')}
         open={formOpen}
-        okText="保存"
-        cancelText="取消"
+        okText={t('currencies.action.save')}
+        cancelText={t('currencies.action.cancel')}
         confirmLoading={submitting}
         destroyOnClose
         maskClosable={false}
@@ -361,58 +385,54 @@ const CurrenciesView = () => {
           onFinish={onSubmit}
         >
           <Form.Item
-            label="名称"
+            label={t('currencies.form.name')}
             name="name"
-            rules={[{ required: true, message: '请填写货币名称' }]}
+            rules={[{ required: true, message: t('currencies.message.nameRequired') }]}
           >
             <Input maxLength={100} />
           </Form.Item>
           <Form.Item
-            label="字母代码（可选）"
+            label={t('currencies.form.code')}
             name="code"
             rules={[{
               pattern: /^[A-Za-z_]{1,10}$/,
-              message: '须为 1~10 位字母或下划线，如 CNY',
+              message: t('currencies.message.codePattern'),
             }]}
           >
-            <Input maxLength={10} placeholder="如 CNY、MYR_IM" />
+            <Input maxLength={10} placeholder={t('currencies.form.codePlaceholder')} />
           </Form.Item>
         </Form>
       </Modal>
 
-      <Card>
-        <BizTable
-          rowKey="id"
-          size="small"
-          columns={columns}
-          dataSource={items}
-          rowSelection={{
-            columnWidth: 32,
-            selectedRowKeys,
-            onChange: setSelectedRowKeys,
-          }}
-          tdLoading={loading}
-          noData={{ text: '暂无数据' }}
-          page={{
-            current: page,
-            pageSize,
-            total,
-            showSizeChanger: true,
-            pageSizeOptions: PAGE_SIZE_OPTIONS,
-            showTotal: (count) => `共 ${count} 条`,
-          }}
-          onChange={(pagination) => {
-            setSelectedRowKeys([]);
-            const nextPageSize = pagination.pageSize ?? pageSize;
-            if (nextPageSize && nextPageSize !== pageSize) {
-              setPageSize(nextPageSize);
-              setPage(1);
-              return;
-            }
-            setPage(pagination.current ?? 1);
-          }}
-        />
-      </Card>
+      <Drawer
+        open={detailOpen}
+        title={t('currencies.modal.detailTitle')}
+        width={480}
+        destroyOnClose
+        onClose={closeDetail}
+      >
+        {detail ? (
+          <div className={listStyles.detailGrid}>
+            <div className={listStyles.detailRow}>
+              <span className={listStyles.detailLabel}>{t('currencies.column.id')}</span>
+              <span className={listStyles.detailValue}>{detail.id}</span>
+            </div>
+            <div className={listStyles.detailRow}>
+              <span className={listStyles.detailLabel}>{t('currencies.column.name')}</span>
+              <span className={listStyles.detailValue}>{detail.name}</span>
+            </div>
+            <div className={listStyles.detailRow}>
+              <span className={listStyles.detailLabel}>{t('currencies.column.code')}</span>
+              <span className={listStyles.detailValue}>{detail.code || '—'}</span>
+            </div>
+            <div className={listStyles.detailActions}>
+              <Button type="primary" onClick={openEdit}>
+                {t('currencies.action.edit')}
+              </Button>
+            </div>
+          </div>
+        ) : null}
+      </Drawer>
     </div>
   );
 };
