@@ -179,6 +179,48 @@ describe('CustomsDictMissingView', () => {
     );
   });
 
+  it('loads all missing items when dict type is empty', async () => {
+    const user = userEvent.setup();
+    let requestedType: string | null = 'unset';
+    const allResponse = {
+      items: [
+        {
+          dictType: 'country',
+          dictTypeLabel: '国家',
+          rawValue: 'KOR',
+          occurrenceCount: 12,
+        },
+        {
+          dictType: 'continent',
+          dictTypeLabel: '洲',
+          rawValue: 'ASIA-X',
+          occurrenceCount: 5,
+        },
+      ],
+      page: 1,
+      pageSize: 20,
+      total: 2,
+    };
+    server.use(
+      http.get(MISSING_URL, ({ request }) => {
+        requestedType = new URL(request.url).searchParams.get('dictType');
+        return HttpResponse.json(allResponse);
+      }),
+    );
+
+    renderWithProviders(<CustomsDictMissingView />);
+
+    expect(await screen.findByRole('button', { name: 'KOR' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'ASIA-X' })).toBeInTheDocument();
+    expect(screen.getByText('共 2 条')).toBeInTheDocument();
+    expect(requestedType).toBeNull();
+
+    await user.selectOptions(screen.getByLabelText('字典类型'), 'country');
+    await waitFor(() => {
+      expect(requestedType).toBe('country');
+    });
+  });
+
   it('renders missing list without actions column', async () => {
     const user = userEvent.setup();
     let requestedType = '';
@@ -195,11 +237,10 @@ describe('CustomsDictMissingView', () => {
     expect(screen.getByText('筛选条件')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('搜索原始值')).toBeInTheDocument();
     expect(screen.getByLabelText('字典类型')).toHaveValue('');
-    expect(screen.queryByRole('button', { name: 'KOR' })).not.toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'KOR' })).toBeInTheDocument();
     expect(requestedType).toBe('');
 
     await user.selectOptions(screen.getByLabelText('字典类型'), 'country');
-    await user.click(screen.getByRole('button', { name: '查询' }));
 
     expect(await screen.findByRole('button', { name: 'KOR' })).toBeInTheDocument();
     expect(screen.getByText('12')).toBeInTheDocument();
@@ -219,9 +260,6 @@ describe('CustomsDictMissingView', () => {
     );
 
     renderWithProviders(<CustomsDictMissingView />);
-    await screen.findByLabelText('字典类型');
-    await user.selectOptions(screen.getByLabelText('字典类型'), 'country');
-    await user.click(screen.getByRole('button', { name: '查询' }));
     await screen.findByRole('button', { name: 'KOR' });
 
     const reset = screen.getByRole('button', { name: '重置' });
@@ -256,8 +294,6 @@ describe('CustomsDictMissingView', () => {
     );
 
     renderWithProviders(<CustomsDictMissingView />);
-    await user.selectOptions(await screen.findByLabelText('字典类型'), 'country');
-    await user.click(screen.getByRole('button', { name: '查询' }));
     await user.click(await screen.findByRole('button', { name: 'KOR' }));
     expect(await screen.findByTestId('detail-drawer')).toBeInTheDocument();
     expect(screen.getByText('缺失详情')).toBeInTheDocument();

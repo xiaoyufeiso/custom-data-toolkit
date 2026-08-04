@@ -96,6 +96,7 @@ class CustomsDictRepository:
         dict_type: str | None,
         limit: int,
     ) -> list[CustomsDictMapping]:
+        """推荐与列表 `q` 一致：原始值/标准值模糊包含（不区分大小写）。"""
         normalized_raw = func.lower(func.trim(CustomsDictMapping.raw_value))
         normalized_standard = func.lower(func.trim(CustomsDictMapping.standard_value))
         escaped_prefix = (
@@ -104,24 +105,31 @@ class CustomsDictRepository:
             .replace("%", "\\%")
             .replace("_", "\\_")
         )
-        pattern = f"{escaped_prefix}%"
-        raw_prefix_match = normalized_raw.like(pattern, escape="\\")
-        standard_prefix_match = normalized_standard.like(pattern, escape="\\")
+        contains_pattern = f"%{escaped_prefix}%"
+        prefix_pattern = f"{escaped_prefix}%"
+        raw_contains = normalized_raw.like(contains_pattern, escape="\\")
+        standard_contains = normalized_standard.like(contains_pattern, escape="\\")
+        raw_prefix_match = normalized_raw.like(prefix_pattern, escape="\\")
+        standard_prefix_match = normalized_standard.like(prefix_pattern, escape="\\")
         rank = case(
             (normalized_raw == prefix.lower(), 0),
             (normalized_standard == prefix.lower(), 0),
             (raw_prefix_match, 1),
-            else_=2,
+            (standard_prefix_match, 2),
+            (raw_contains, 3),
+            else_=4,
         )
         sort_value = case(
             (normalized_raw == prefix.lower(), normalized_raw),
             (normalized_standard == prefix.lower(), normalized_standard),
             (raw_prefix_match, normalized_raw),
+            (standard_prefix_match, normalized_standard),
+            (raw_contains, normalized_raw),
             else_=normalized_standard,
         )
         statement = select(CustomsDictMapping).where(
             CustomsDictMapping.enabled == True,  # noqa: E712
-            or_(raw_prefix_match, standard_prefix_match),
+            or_(raw_contains, standard_contains),
         )
         if dict_type:
             statement = statement.where(CustomsDictMapping.dict_type == dict_type)

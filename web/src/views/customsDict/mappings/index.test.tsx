@@ -18,6 +18,21 @@ import { server } from '@/test/msw/server';
 import { renderWithProviders } from '@/test/utils/render';
 import CustomsDictMappingsView from '@/views/customsDict/mappings';
 
+vi.mock('@/views/customsDict/mappings/parseImportPreview', () => ({
+  parseCustomsDictImportPreview: vi.fn(async () => ([
+    {
+      excelRow: 2,
+      dictType: 'country',
+      dictTypeName: '国家',
+      rawValue: 'JPN',
+      hitCount: '',
+      standardValue: '日本',
+      remark: '',
+    },
+  ])),
+  ImportPreviewParseError: class ImportPreviewParseError extends Error {},
+}));
+
 vi.mock('tendata-ui', async (importOriginal) => {
   const original = await importOriginal<typeof import('tendata-ui')>();
   const ModalComponent = original.Modal as typeof original.Modal & {
@@ -111,6 +126,34 @@ vi.mock('tendata-ui', async (importOriginal) => {
         {children}
       </div>
     ) : null),
+    Tabs: ({
+      activeKey,
+      onChange,
+      items = [],
+    }: {
+      activeKey?: string;
+      onChange?: (key: string) => void;
+      items?: Array<{
+        key: string;
+        label: React.ReactNode;
+        children?: React.ReactNode;
+      }>;
+    }) => (
+      <div>
+        {items.map((item) => (
+          <button
+            key={item.key}
+            type="button"
+            role="tab"
+            aria-selected={activeKey === item.key}
+            onClick={() => onChange?.(item.key)}
+          >
+            {item.label}
+          </button>
+        ))}
+        {items.find((item) => item.key === activeKey)?.children}
+      </div>
+    ),
   };
 });
 
@@ -294,15 +337,43 @@ describe('CustomsDictMappingsView', () => {
     });
     expect(listParams).toHaveLength(initialListCalls);
 
-    await user.click(screen.getByRole('button', { name: 'USA (美国)' }));
-    expect(listParams).toHaveLength(initialListCalls);
-
-    await user.click(screen.getByRole('button', { name: '查询' }));
+    await user.click(screen.getByRole('button', { name: 'USA（美国）' }));
     await waitFor(() => {
       expect(listParams.some((params) => params.get('q') === 'USA')).toBe(true);
       expect(listParams[listParams.length - 1]?.has('rawValue')).toBe(false);
       expect(listParams[listParams.length - 1]?.has('standardValue')).toBe(false);
     });
+  });
+
+  it('shows standard-value suggestions and fills standard value on select', async () => {
+    const user = userEvent.setup();
+    let suggestionPrefix = '';
+    server.use(
+      http.get(MAPPINGS_URL, () => HttpResponse.json(listResponse)),
+      http.get(`${MAPPINGS_URL}/suggestions`, ({ request }) => {
+        suggestionPrefix = new URL(request.url).searchParams.get('prefix') ?? '';
+        return HttpResponse.json([
+          {
+            id: 1,
+            rawValue: 'USA',
+            standardValue: '美国',
+            matchField: 'standardValue',
+          },
+        ]);
+      }),
+    );
+
+    renderWithProviders(<CustomsDictMappingsView />);
+    await screen.findByText('美国');
+
+    await user.type(screen.getByPlaceholderText('搜索原始值或标准值'), '美');
+    await waitFor(() => {
+      expect(suggestionPrefix).toBe('美');
+    });
+    expect(await screen.findByRole('button', { name: '美国（USA）' })).toBeTruthy();
+
+    await user.click(screen.getByRole('button', { name: '美国（USA）' }));
+    expect(screen.getByPlaceholderText('搜索原始值或标准值')).toHaveValue('美国');
   });
 
   it('opens detail drawer from raw value link and closes via mask', async () => {
@@ -499,40 +570,19 @@ describe('CustomsDictMappingsView', () => {
     });
   });
 
-  it('exports mappings with current filters', async () => {
-    const user = userEvent.setup();
-    const exportUrl = vi.fn();
-    const createObjectURL = vi.fn(() => 'blob:mock');
-    const revokeObjectURL = vi.fn();
-    Object.defineProperty(URL, 'createObjectURL', { value: createObjectURL, configurable: true });
-    Object.defineProperty(URL, 'revokeObjectURL', { value: revokeObjectURL, configurable: true });
-
+  it('does not show list-level import/export actions', async () => {
     server.use(
       http.get(MAPPINGS_URL, () => HttpResponse.json(listResponse)),
-      http.get(`${MAPPINGS_URL}/export`, ({ request }) => {
-        exportUrl(request.url);
-        return new HttpResponse(new Blob(['xlsx']), {
-          headers: {
-            'Content-Type':
-              'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-          },
-        });
-      }),
     );
 
     renderWithProviders(<CustomsDictMappingsView />);
     await screen.findByText('美国');
-    await user.click(screen.getByRole('button', { name: /导入\/导出/ }));
-    await user.click(await screen.findByRole('menuitem', { name: '导出' }));
-
-    await waitFor(() => {
-      expect(exportUrl).toHaveBeenCalled();
-    });
-    const url = String(exportUrl.mock.calls[0][0]);
-    expect(url).toContain('enabled=true');
+    expect(screen.getByRole('button', { name: '新建映射' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /导入\/导出/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: '导出' })).toBeNull();
   });
 
-  it('imports xlsx and shows result summary', async () => {
+  it('previews selected file then imports only after confirm', async () => {
     const user = userEvent.setup();
     const importBody = vi.fn();
     server.use(
@@ -551,6 +601,13 @@ describe('CustomsDictMappingsView', () => {
 
     renderWithProviders(<CustomsDictMappingsView />);
     await screen.findByText('美国');
+    await user.click(screen.getByRole('button', { name: '新建映射' }));
+    await user.click(screen.getByRole('tab', { name: '批量导入' }));
+
+    const confirmBefore = screen.getByRole('button', { name: '确认导入' });
+    expect(confirmBefore.className).toMatch(/disabled/);
+    await user.click(confirmBefore);
+    expect(importBody).not.toHaveBeenCalled();
 
     const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
     expect(fileInput).toBeTruthy();
@@ -559,15 +616,33 @@ describe('CustomsDictMappingsView', () => {
     });
     await user.upload(fileInput, file);
 
+    expect(await screen.findByText('待导入预览')).toBeTruthy();
+    expect(screen.getAllByText('共 1 条').length).toBeGreaterThan(0);
+    expect(screen.getByText('JPN')).toBeTruthy();
+    expect(importBody).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole('button', { name: '确认导入' }));
+
     await waitFor(() => {
       expect(importBody).toHaveBeenCalled();
     });
-    const uploaded = importBody.mock.calls[0][0] as Blob;
-    expect(uploaded).toBeTruthy();
-    expect(uploaded.size).toBeGreaterThan(0);
+    expect(await screen.findByText('导入结果')).toBeTruthy();
+    expect(screen.getByText('部分导入成功')).toBeTruthy();
+    expect(screen.getByText('部分行未能导入，请查看下方失败明细')).toBeTruthy();
+    expect(screen.getByText('新建 1，更新 0，失败 1')).toBeTruthy();
+    expect(screen.getByText('第3行：标准值不能为空')).toBeTruthy();
+    expect(screen.queryByText('待导入预览')).toBeNull();
+    expect(screen.queryByRole('tab', { name: '批量导入' })).toBeNull();
+    expect(screen.queryByRole('button', { name: '确认导入' })).toBeNull();
+    expect(screen.getByRole('button', { name: '完成' })).toBeTruthy();
+
+    await user.click(screen.getByRole('button', { name: '完成' }));
+    await waitFor(() => {
+      expect(screen.queryByText('部分导入成功')).toBeNull();
+    });
   });
 
-  it('downloads import template', async () => {
+  it('downloads import template via hint link on batch tab', async () => {
     const user = userEvent.setup();
     const templateHit = vi.fn();
     Object.defineProperty(URL, 'createObjectURL', {
@@ -594,8 +669,9 @@ describe('CustomsDictMappingsView', () => {
 
     renderWithProviders(<CustomsDictMappingsView />);
     await screen.findByText('美国');
-    await user.click(screen.getByRole('button', { name: /导入\/导出/ }));
-    await user.click(await screen.findByRole('menuitem', { name: '下载模板' }));
+    await user.click(screen.getByRole('button', { name: '新建映射' }));
+    await user.click(screen.getByRole('tab', { name: '批量导入' }));
+    await user.click(screen.getByRole('button', { name: '下载模板' }));
 
     await waitFor(() => {
       expect(templateHit).toHaveBeenCalled();

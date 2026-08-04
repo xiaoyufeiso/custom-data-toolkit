@@ -335,10 +335,10 @@ Redis 失败时 MySQL 仍保存，`syncStatus` 为 `failed`/`pending`，`syncErr
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| GET | `/customs-dict/missing` | 列表；**`dictType` 必填**；可选 `rawValue`、`page`、`pageSize`；按出现次数降序 |
-| GET | `/customs-dict/missing/suggestions` | 缺失原始值前缀推荐；query：**`dictType` 必填**、`prefix`、`limit`≤10 |
+| GET | `/customs-dict/missing` | 列表；可选 `dictType`（空则聚合全部启用类型）、`rawValue`、`page`、`pageSize`；按出现次数降序 |
+| GET | `/customs-dict/missing/suggestions` | 缺失原始值前缀推荐；query：可选 `dictType`、`prefix`、`limit`≤10 |
 | POST | `/customs-dict/missing/handle` | 处理：写 MySQL（source=`missing`）→ 正式 Hash 成功后 ZREM |
-| GET | `/customs-dict/missing/export` | 导出当前筛选全量 xlsx（不改 Redis） |
+| GET | `/customs-dict/missing/export` | 导出当前筛选全量 xlsx（不改 Redis；无 `dictType` 时导出全部启用类型） |
 
 处理 body：
 

@@ -144,10 +144,17 @@ const CurrenciesView = () => {
     form.resetFields();
   };
 
-  const onSearch = () => {
+  const commitKeyword = (nextQ: string) => {
+    const trimmed = nextQ.trim();
+    setQ(nextQ);
+    setSuggestions([]);
     setSelectedRowKeys([]);
     setPage(1);
-    setKeyword(q.trim());
+    setKeyword(trimmed);
+  };
+
+  const onSearch = () => {
+    commitKeyword(q);
   };
 
   const onResetSearch = () => {
@@ -275,13 +282,18 @@ const CurrenciesView = () => {
               }))}
               filterOption={false}
               listHeight={240}
-              onChange={(value) => setQ(String(value))}
+              onChange={(value) => {
+                const next = String(value);
+                setQ(next);
+                if (!next.trim()) {
+                  commitKeyword('');
+                }
+              }}
               onSelect={(value) => {
-                setQ(String(value));
-                setSuggestions([]);
+                commitKeyword(String(value));
               }}
               onKeyDown={(event) => {
-                if (event.key === 'Enter') onSearch();
+                if (event.key === 'Enter') commitKeyword(q);
               }}
               style={{ width: 160 }}
             />

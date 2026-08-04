@@ -1,5 +1,5 @@
 const rates = {
-  'rates.search.codePlaceholder': '字母代码（如 CNY）',
+  'rates.search.codePlaceholder': '搜索字母代码',
   'rates.dateMode.all': '全部日期',
   'rates.dateMode.single': '指定日期',
   'rates.dateMode.range': '日期范围',

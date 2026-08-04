@@ -215,43 +215,63 @@ const RatesView = () => {
     load();
   }, [load]);
 
-  const onSearch = () => {
-    const code = filterDraft.code.trim();
+  const buildApplied = (
+    draft: FilterDraft,
+    mode: 'soft' | 'strict',
+  ): AppliedFilter | null => {
+    const code = draft.code.trim();
     if (code && !/^[A-Za-z_]{1,10}$/.test(code)) {
-      message.warning(t('rates.message.codeInvalid'));
-      return;
+      if (mode === 'strict') {
+        message.warning(t('rates.message.codeInvalid'));
+      }
+      return null;
     }
 
     const next: AppliedFilter = {};
     if (code) next.code = code.toUpperCase();
 
-    if (filterDraft.dateMode === 'single') {
-      if (!filterDraft.date) {
+    if (draft.dateMode === 'single') {
+      if (draft.date) {
+        next.date = draft.date;
+      } else if (mode === 'strict') {
         message.warning(t('rates.message.dateRequired'));
-        return;
+        return null;
       }
-      next.date = filterDraft.date;
-    } else if (filterDraft.dateMode === 'range') {
-      const { dateFrom, dateTo } = filterDraft;
-      if (!dateFrom || !dateTo) {
+    } else if (draft.dateMode === 'range') {
+      const { dateFrom, dateTo } = draft;
+      if (dateFrom && dateTo) {
+        if (dateFrom > dateTo) {
+          if (mode === 'strict') {
+            message.warning(t('rates.message.rangeInvalid'));
+          }
+          return null;
+        }
+        next.dateFrom = dateFrom;
+        next.dateTo = dateTo;
+      } else if (mode === 'strict') {
         message.warning(t('rates.message.rangeRequired'));
-        return;
+        return null;
       }
-      if (dateFrom > dateTo) {
-        message.warning(t('rates.message.rangeInvalid'));
-        return;
-      }
-      next.dateFrom = dateFrom;
-      next.dateTo = dateTo;
     }
 
-    if (filterDraft.checked === 'true') next.checked = true;
-    if (filterDraft.checked === 'false') next.checked = false;
-    if (filterDraft.sortOrder) next.sortOrder = filterDraft.sortOrder;
+    if (draft.checked === 'true') next.checked = true;
+    if (draft.checked === 'false') next.checked = false;
+    if (draft.sortOrder) next.sortOrder = draft.sortOrder;
+    return next;
+  };
 
+  const commitFilters = (nextDraft: FilterDraft, mode: 'soft' | 'strict' = 'soft') => {
+    setFilterDraft(nextDraft);
+    const next = buildApplied(nextDraft, mode);
+    if (next === null) return;
+    setCodeSuggestions([]);
     setSelectedRowKeys([]);
     setPage(1);
     setApplied(next);
+  };
+
+  const onSearch = () => {
+    commitFilters(filterDraft, 'strict');
   };
 
   const onResetFilters = () => {
@@ -482,16 +502,18 @@ const RatesView = () => {
               }))}
               filterOption={false}
               listHeight={240}
-              onChange={(value) => setFilterDraft((prev) => ({
-                ...prev,
-                code: String(value),
-              }))}
+              onChange={(value) => {
+                const nextCode = String(value);
+                setFilterDraft((prev) => ({ ...prev, code: nextCode }));
+                if (!nextCode.trim()) {
+                  commitFilters({ ...filterDraft, code: '' });
+                }
+              }}
               onSelect={(value) => {
-                setFilterDraft((prev) => ({ ...prev, code: String(value) }));
-                setCodeSuggestions([]);
+                commitFilters({ ...filterDraft, code: String(value) });
               }}
               onKeyDown={(event) => {
-                if (event.key === 'Enter') onSearch();
+                if (event.key === 'Enter') commitFilters(filterDraft, 'strict');
               }}
               style={{ width: 160 }}
               maxLength={10}
@@ -505,23 +527,25 @@ const RatesView = () => {
                 { value: 'range', label: t('rates.dateMode.range') },
               ]}
               onChange={(dateMode?: DateMode) => {
-                setFilterDraft((prev) => ({
-                  ...prev,
+                commitFilters({
+                  ...filterDraft,
                   dateMode,
-                  date: dateMode === 'single' ? prev.date : '',
-                  dateFrom: dateMode === 'range' ? prev.dateFrom : '',
-                  dateTo: dateMode === 'range' ? prev.dateTo : '',
-                }));
+                  date: dateMode === 'single' ? filterDraft.date : '',
+                  dateFrom: dateMode === 'range' ? filterDraft.dateFrom : '',
+                  dateTo: dateMode === 'range' ? filterDraft.dateTo : '',
+                });
               }}
               style={{ width: 120 }}
             />
             {filterDraft.dateMode === 'single' ? (
               <DatePicker
                 value={filterDraft.date ? dayjs(filterDraft.date) : null}
-                onChange={(_date, dateString) => setFilterDraft((prev) => ({
-                  ...prev,
-                  date: dateString as string,
-                }))}
+                onChange={(_date, dateString) => {
+                  commitFilters({
+                    ...filterDraft,
+                    date: (dateString as string) || '',
+                  });
+                }}
               />
             ) : null}
             {filterDraft.dateMode === 'range' ? (
@@ -530,11 +554,15 @@ const RatesView = () => {
                   filterDraft.dateFrom ? dayjs(filterDraft.dateFrom) : null,
                   filterDraft.dateTo ? dayjs(filterDraft.dateTo) : null,
                 ]}
-                onChange={(_dates, dateStrings) => setFilterDraft((prev) => ({
-                  ...prev,
-                  dateFrom: dateStrings[0],
-                  dateTo: dateStrings[1],
-                }))}
+                onChange={(_dates, dateStrings) => {
+                  const dateFrom = dateStrings[0] || '';
+                  const dateTo = dateStrings[1] || '';
+                  const nextDraft = { ...filterDraft, dateFrom, dateTo };
+                  setFilterDraft(nextDraft);
+                  if ((dateFrom && dateTo) || (!dateFrom && !dateTo)) {
+                    commitFilters(nextDraft);
+                  }
+                }}
               />
             ) : null}
             <Select
@@ -545,10 +573,9 @@ const RatesView = () => {
                 { value: 'true', label: t('rates.checked.true') },
                 { value: 'false', label: t('rates.checked.false') },
               ]}
-              onChange={(checked?: FilterDraft['checked']) => setFilterDraft((prev) => ({
-                ...prev,
-                checked,
-              }))}
+              onChange={(checked?: FilterDraft['checked']) => {
+                commitFilters({ ...filterDraft, checked });
+              }}
               style={{ width: 120 }}
             />
           </Space>

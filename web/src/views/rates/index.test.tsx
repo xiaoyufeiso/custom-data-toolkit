@@ -331,7 +331,7 @@ describe('RatesView', () => {
     renderWithProviders(<RatesView />, { locale: 'en' });
 
     expect(await screen.findByRole('button', { name: 'Create rate' })).toBeInTheDocument();
-    expect(screen.getByPlaceholderText('Currency code (e.g. CNY)')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Search letter code')).toBeInTheDocument();
     expect(screen.getByText('1 items')).toBeInTheDocument();
     expect(screen.getByText('Query List')).toBeInTheDocument();
   });
@@ -421,7 +421,7 @@ describe('RatesView', () => {
     renderWithProviders(<RatesView />);
     await screen.findByText('人民币');
 
-    await user.type(screen.getByPlaceholderText('字母代码（如 CNY）'), 'cny');
+    await user.type(screen.getByPlaceholderText('搜索字母代码'), 'cny');
     await user.click(screen.getByRole('button', { name: '查询' }));
 
     await waitFor(() => {
@@ -449,7 +449,7 @@ describe('RatesView', () => {
     renderWithProviders(<RatesView />);
     await screen.findByText('人民币');
 
-    const codeInput = screen.getByPlaceholderText('字母代码（如 CNY）');
+    const codeInput = screen.getByPlaceholderText('搜索字母代码');
     await user.type(codeInput, 'cny');
     await user.selectOptions(screen.getByRole('combobox', { name: '全部日期' }), 'single');
     await user.selectOptions(screen.getByRole('combobox', { name: '全部状态' }), 'false');
@@ -473,10 +473,11 @@ describe('RatesView', () => {
     expect(screen.queryByRole('region', { name: '批量操作' })).not.toBeInTheDocument();
   });
 
-  it('suggests code prefixes without filtering until explicitly requested', async () => {
+  it('suggests code prefixes and filters when selecting or pressing Enter', async () => {
     const user = userEvent.setup();
     let rateListRequests = 0;
     const suggestionRequests: URLSearchParams[] = [];
+    const requestedCodes: Array<string | null> = [];
     server.use(
       http.get(CURRENCIES_URL, () => HttpResponse.json({
         items: [],
@@ -501,8 +502,9 @@ describe('RatesView', () => {
           },
         ]);
       }),
-      http.get(RATES_URL, () => {
+      http.get(RATES_URL, ({ request }) => {
         rateListRequests += 1;
+        requestedCodes.push(new URL(request.url).searchParams.get('code'));
         return HttpResponse.json(listResponse);
       }),
     );
@@ -510,7 +512,7 @@ describe('RatesView', () => {
     renderWithProviders(<RatesView />);
     await screen.findByText('人民币');
 
-    const input = screen.getByPlaceholderText('字母代码（如 CNY）');
+    const input = screen.getByPlaceholderText('搜索字母代码');
     await user.type(input, 'cn');
     expect(await screen.findByRole('button', { name: 'CNY (人民币)' })).toBeInTheDocument();
     expect(suggestionRequests.some(
@@ -520,12 +522,9 @@ describe('RatesView', () => {
 
     await user.click(screen.getByRole('button', { name: 'CNY (人民币)' }));
     expect(input).toHaveValue('CNY');
-    expect(rateListRequests).toBe(1);
-
-    await user.click(input);
-    await user.keyboard('{Enter}');
     await waitFor(() => {
       expect(rateListRequests).toBe(2);
+      expect(requestedCodes).toContain('CNY');
     });
   });
 

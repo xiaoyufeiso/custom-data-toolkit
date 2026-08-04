@@ -183,7 +183,7 @@ export async function batchResyncCustomsDictMappings(ids: number[]): Promise<{
 }
 
 export async function listCustomsDictMissing(params: {
-  dictType: string;
+  dictType?: string;
   rawValue?: string;
   page?: number;
   pageSize?: number;
@@ -196,14 +196,13 @@ export async function listCustomsDictMissing(params: {
 }
 
 export async function listCustomsDictMissingSuggestions(
-  dictType: string,
-  prefix: string,
+  params: { dictType?: string; prefix: string },
   signal?: AbortSignal,
 ): Promise<CustomsDictMissingSuggestion[]> {
   const { data } = await http.get<CustomsDictMissingSuggestion[]>(
     '/customs-dict/missing/suggestions',
     {
-      params: { dictType, prefix, limit: 10 },
+      params: { ...params, limit: 10 },
       signal,
     },
   );
@@ -223,7 +222,7 @@ export async function handleCustomsDictMissing(payload: {
 }
 
 export async function exportCustomsDictMissing(params: {
-  dictType: string;
+  dictType?: string;
   rawValue?: string;
 }): Promise<Blob> {
   const { data } = await http.get<Blob>('/customs-dict/missing/export', {

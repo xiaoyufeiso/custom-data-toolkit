@@ -1,5 +1,5 @@
 const rates = {
-  'rates.search.codePlaceholder': 'Currency code (e.g. CNY)',
+  'rates.search.codePlaceholder': 'Search letter code',
   'rates.dateMode.all': 'All dates',
   'rates.dateMode.single': 'Specific date',
   'rates.dateMode.range': 'Date range',

@@ -6,7 +6,7 @@ import {
 } from 'react-router-dom';
 import {
   Breadcrumb,
-  Button,
+  Dropdown,
   Layout,
   Menu,
   message,
@@ -21,6 +21,40 @@ import { getApiErrorMessage } from '@/shared/utils/apiError';
 import styles from './index.module.less';
 
 const { Sider, Header, Content } = Layout;
+
+/** 下拉触发器用的实心小三角（非 DownOutlined 长箭头） */
+const IconDown = ({ className }: { className?: string }) => (
+  <svg
+    className={className}
+    width="10"
+    height="10"
+    viewBox="0 0 1024 1024"
+    aria-hidden
+    focusable="false"
+  >
+    <path
+      fill="currentColor"
+      d="M840.4 300H183.6c-19.7 0-30.7 20.8-18.5 35l328.4 380.8c9.4 10.9 27.5 10.9 37 0L858.9 335c12.2-14.2 1.2-35-18.5-35z"
+    />
+  </svg>
+);
+
+/** tendata-ui Dropdown 类型未暴露 antd 透传 props，运行时可用 */
+type HeaderUserDropdownProps = {
+  trigger?: Array<'click' | 'hover' | 'contextMenu'>;
+  disabled?: boolean;
+  menu?: {
+    items: Array<{
+      key: string;
+      label: React.ReactNode;
+      disabled?: boolean;
+      onClick?: () => void;
+    }>;
+  };
+  children?: React.ReactNode;
+};
+
+const HeaderUserDropdown = Dropdown as React.FC<HeaderUserDropdownProps>;
 
 /**
  * 从自描述路由表中派生出菜单可见项。
@@ -160,16 +194,33 @@ const AppLayout = () => {
         </div>
         <div className={styles.headerActions}>
           <LanguageSwitcher />
-          <span className={styles.userName} title={user?.username}>
-            {user?.username ?? '—'}
-          </span>
-          <Button
-            type="link"
-            loading={loggingOut}
-            onClick={() => void onLogout()}
+          <HeaderUserDropdown
+            trigger={['click']}
+            disabled={loggingOut}
+            menu={{
+              items: [
+                {
+                  key: 'logout',
+                  label: t('common.action.logout'),
+                  disabled: loggingOut,
+                  onClick: () => {
+                    void onLogout();
+                  },
+                },
+              ],
+            }}
           >
-            {t('common.action.logout')}
-          </Button>
+            <button
+              type="button"
+              className={styles.userMenuTrigger}
+              aria-label={user?.username ?? t('common.action.logout')}
+            >
+              <span className={styles.userName} title={user?.username}>
+                {user?.username ?? '—'}
+              </span>
+              <IconDown className={styles.userCaret} />
+            </button>
+          </HeaderUserDropdown>
         </div>
       </Header>
       <Layout className={styles.main}>

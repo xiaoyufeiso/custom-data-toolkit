@@ -207,13 +207,15 @@ describe('CurrenciesView', () => {
     );
   });
 
-  it('shows case-insensitive prefix suggestions without searching automatically', async () => {
+  it('searches when selecting a suggestion or pressing Enter', async () => {
     const user = userEvent.setup();
     let listRequests = 0;
     const suggestionPrefixes: string[] = [];
+    const requestedQ: Array<string | null> = [];
     server.use(
-      http.get(CURRENCIES_URL, () => {
+      http.get(CURRENCIES_URL, ({ request }) => {
         listRequests += 1;
+        requestedQ.push(new URL(request.url).searchParams.get('q'));
         return HttpResponse.json(listResponse);
       }),
       http.get(CURRENCY_SUGGESTIONS_URL, ({ request }) => {
@@ -248,12 +250,16 @@ describe('CurrenciesView', () => {
 
     await user.click(screen.getByRole('button', { name: 'CNY (人民币)' }));
     expect(input).toHaveValue('CNY');
-    expect(listRequests).toBe(1);
-
-    await user.click(input);
-    await user.keyboard('{Enter}');
     await waitFor(() => {
       expect(listRequests).toBe(2);
+      expect(requestedQ).toContain('CNY');
+    });
+
+    await user.clear(input);
+    await user.type(input, 'cnh');
+    await user.keyboard('{Enter}');
+    await waitFor(() => {
+      expect(requestedQ).toContain('cnh');
     });
   });
 

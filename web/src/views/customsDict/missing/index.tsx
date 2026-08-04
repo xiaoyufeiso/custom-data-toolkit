@@ -96,15 +96,10 @@ const CustomsDictMissingView = () => {
 
   const load = useCallback(async () => {
     if (!typesReady) return;
-    if (!applied.dictType) {
-      setItems([]);
-      setTotal(0);
-      return;
-    }
     setLoading(true);
     try {
       const data = await listCustomsDictMissing({
-        dictType: applied.dictType,
+        dictType: applied.dictType || undefined,
         rawValue: applied.rawValue || undefined,
         page,
         pageSize,
@@ -124,7 +119,7 @@ const CustomsDictMissingView = () => {
 
   useEffect(() => {
     const prefix = draft.rawValue.trim();
-    if (!prefix || !draft.dictType) {
+    if (!prefix) {
       setSuggestions([]);
       return undefined;
     }
@@ -132,8 +127,10 @@ const CustomsDictMissingView = () => {
     const timer = window.setTimeout(async () => {
       try {
         const data = await listCustomsDictMissingSuggestions(
-          draft.dictType,
-          prefix,
+          {
+            dictType: draft.dictType || undefined,
+            prefix,
+          },
           controller.signal,
         );
         setSuggestions(data);
@@ -198,17 +195,27 @@ const CustomsDictMissingView = () => {
     }
   };
 
+  const commitFilters = (next: FilterDraft) => {
+    const normalized: FilterDraft = {
+      ...next,
+      rawValue: next.rawValue.trim(),
+    };
+    setDraft(next);
+    setSuggestions([]);
+    setPage(1);
+    setApplied(normalized);
+  };
+
   const onExport = async () => {
-    if (!applied.dictType) {
-      message.warning(t('customsDict.message.dictTypeRequired'));
-      return;
-    }
     try {
       const blob = await exportCustomsDictMissing({
-        dictType: applied.dictType,
+        dictType: applied.dictType || undefined,
         rawValue: applied.rawValue || undefined,
       });
-      downloadBlob(blob, `customs-dict-missing-${applied.dictType}.xlsx`);
+      const filename = applied.dictType
+        ? `customs-dict-missing-${applied.dictType}.xlsx`
+        : 'customs-dict-missing-all.xlsx';
+      downloadBlob(blob, filename);
       message.success(t('customsDict.message.exportSuccess'));
     } catch (error) {
       message.error(getApiErrorMessage(error, t('customsDict.message.loadFailed')));
@@ -258,10 +265,9 @@ const CustomsDictMissingView = () => {
               placeholder={t('customsDict.filter.dictType')}
               style={{ width: 120 }}
               options={typeOptions}
-              value={draft.dictType}
+              value={draft.dictType || undefined}
               onChange={(value) => {
-                setDraft((prev) => ({ ...prev, dictType: value }));
-                setSuggestions([]);
+                commitFilters({ ...draft, dictType: value ?? '' });
               }}
             />
             <AutoComplete
@@ -276,22 +282,19 @@ const CustomsDictMissingView = () => {
               }))}
               filterOption={false}
               listHeight={240}
-              onChange={(value) => setDraft((prev) => ({
-                ...prev,
-                rawValue: String(value),
-              }))}
+              onChange={(value) => {
+                const nextRaw = String(value);
+                setDraft((prev) => ({ ...prev, rawValue: nextRaw }));
+                if (!nextRaw.trim()) {
+                  commitFilters({ ...draft, rawValue: '' });
+                }
+              }}
               onSelect={(value) => {
-                setDraft((prev) => ({ ...prev, rawValue: String(value) }));
-                setSuggestions([]);
+                commitFilters({ ...draft, rawValue: String(value) });
               }}
               onKeyDown={(event) => {
                 if (event.key === 'Enter') {
-                  if (!draft.dictType) {
-                    message.warning(t('customsDict.message.dictTypeRequired'));
-                    return;
-                  }
-                  setPage(1);
-                  setApplied({ ...draft, rawValue: draft.rawValue.trim() });
+                  commitFilters({ ...draft, rawValue: draft.rawValue.trim() });
                 }
               }}
             />
@@ -300,19 +303,14 @@ const CustomsDictMissingView = () => {
             <Button
               type="primary"
               onClick={() => {
-                if (!draft.dictType) {
-                  message.warning(t('customsDict.message.dictTypeRequired'));
-                  return;
-                }
-                setPage(1);
-                setApplied({ ...draft, rawValue: draft.rawValue.trim() });
+                commitFilters({ ...draft, rawValue: draft.rawValue.trim() });
               }}
             >
               {t('common.action.query')}
             </Button>
             <Button
               onClick={() => {
-                const reset: FilterDraft = { rawValue: '' };
+                const reset: FilterDraft = { dictType: '', rawValue: '' };
                 setDraft(reset);
                 setApplied(reset);
                 setSuggestions([]);

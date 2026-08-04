@@ -204,3 +204,15 @@ def test_mappings_q_or_filter_and_suggestions(client: TestClient) -> None:
     body = suggestions.json()
     assert len(body) <= 10
     assert any(item["rawValue"] == raw and item["matchField"] == "rawValue" for item in body)
+
+    by_standard = client.get(
+        "/api/v1/customs-dict/mappings/suggestions",
+        params={"prefix": standard[-6:], "dictType": "country"},
+        headers=headers,
+    )
+    assert by_standard.status_code == 200
+    std_body = by_standard.json()
+    assert any(
+        item["standardValue"] == standard and item["matchField"] == "standardValue"
+        for item in std_body
+    )

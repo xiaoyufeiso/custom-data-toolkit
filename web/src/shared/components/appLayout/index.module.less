@@ -56,13 +56,36 @@
   align-items: center;
 }
 
+.userMenuTrigger {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  max-width: 180px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  font: inherit;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.userMenuTrigger:hover,
+.userMenuTrigger:focus-visible {
+  color: var(--color-text);
+}
+
 .userName {
   max-width: 140px;
   overflow: hidden;
-  color: var(--color-text-muted);
   font-size: 14px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.userCaret {
+  flex: 0 0 auto;
+  display: block;
 }
 
 .main {

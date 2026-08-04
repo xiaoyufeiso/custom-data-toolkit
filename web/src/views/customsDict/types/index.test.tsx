@@ -268,33 +268,23 @@ describe('CustomsDictTypesView', () => {
     expect(listParams).toHaveLength(initialCalls);
 
     await user.click(screen.getByRole('button', { name: 'country (国家)' }));
-    expect(listParams).toHaveLength(initialCalls);
-
-    await user.click(screen.getByRole('button', { name: '查询' }));
     await waitFor(() => {
       expect(listParams.some((params) => params.get('q') === 'country')).toBe(true);
     });
   });
 
-  it('opens detail drawer from code link and deletes from detail', async () => {
+  it('opens detail drawer from code link with edit only', async () => {
     const user = userEvent.setup();
     server.use(
       http.get(TYPES_URL, () => HttpResponse.json(listResponse)),
-      http.post(`${TYPES_URL}/1/disable`, () => HttpResponse.json(
-        { code: 'CustomsDictType.HasMappings', message: '该类型下仍有映射记录，无法删除。' },
-        { status: 409 },
-      )),
     );
 
     renderWithProviders(<CustomsDictTypesView />);
     await user.click(await screen.findByRole('button', { name: 'country' }));
     expect(await screen.findByTestId('detail-drawer')).toBeInTheDocument();
     expect(screen.getByText('类型详情')).toBeInTheDocument();
-
-    await user.click(screen.getByRole('button', { name: '删除' }));
-    await waitFor(() => {
-      expect(screen.getByTestId('detail-drawer')).toBeInTheDocument();
-    });
+    expect(screen.getByRole('button', { name: '编辑' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: '删除' })).toBeNull();
   });
 
   it('batch deletes selected types and reports HasMappings failures', async () => {

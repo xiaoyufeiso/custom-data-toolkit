@@ -124,14 +124,17 @@ class CustomsDictService:
         for mapping in mappings:
             normalized_raw = mapping.raw_value.strip().casefold()
             normalized_standard = mapping.standard_value.strip().casefold()
-            if normalized_raw == normalized_prefix or normalized_raw.startswith(
-                normalized_prefix,
-            ):
-                match_field = "rawValue"
-            else:
-                match_field = "standardValue"
-            suggestions.append((mapping, match_field))
-        return suggestions
+            raw_hit = normalized_prefix in normalized_raw
+            standard_hit = normalized_prefix in normalized_standard
+            # 同一行可同时命中两列时拆成两条，保证标准值推荐可见可选
+            if raw_hit:
+                suggestions.append((mapping, "rawValue"))
+            if standard_hit:
+                suggestions.append((mapping, "standardValue"))
+            if not raw_hit and not standard_hit:
+                # 仓储已按包含过滤；兜底避免空结果
+                suggestions.append((mapping, "rawValue"))
+        return suggestions[:limit]
 
     def get(self, mapping_id: int) -> CustomsDictMapping:
         mapping = self.repository.get_by_id(mapping_id)
@@ -296,66 +299,73 @@ class CustomsDictService:
     def list_missing(
         self,
         *,
-        dict_type: str,
+        dict_type: str | None,
         raw_value: str | None,
         page: int,
         page_size: int,
     ) -> tuple[list[dict[str, object]], int]:
-        cleaned_type = self._require_existing_type(dict_type)
         cleaned_raw = normalize_dict_text(raw_value) if raw_value else None
         if cleaned_raw == "":
             cleaned_raw = None
+        type_codes = self._missing_type_codes(dict_type)
         try:
-            items, total = self.redis_store.list_missing_page(
-                dict_type=cleaned_type,
-                raw_value=cleaned_raw,
-                page=page,
-                page_size=page_size,
-            )
+            rows = self._collect_missing_rows(type_codes=type_codes, raw_value=cleaned_raw)
         except Exception as exc:  # noqa: BLE001
             raise AppException(
                 f"读取缺失字典失败：{sanitize_redis_error(exc)}",
                 error_code="CustomsDict.MissingReadFailed",
             ) from exc
-        label = self._type_label(cleaned_type)
-        return [
-            {
-                "dict_type": cleaned_type,
-                "dict_type_label": label,
-                "raw_value": member,
-                "occurrence_count": int(score),
-            }
-            for member, score in items
-        ], total
+        rows.sort(
+            key=lambda item: (
+                -int(item["occurrence_count"]),  # type: ignore[arg-type]
+                str(item["dict_type"]),
+                str(item["raw_value"]).casefold(),
+            ),
+        )
+        total = len(rows)
+        start = (page - 1) * page_size
+        return rows[start : start + page_size], total
 
     def list_missing_suggestions(
         self,
         *,
-        dict_type: str,
+        dict_type: str | None,
         prefix: str,
         limit: int,
     ) -> list[dict[str, object]]:
-        cleaned_type = self._require_existing_type(dict_type)
         cleaned_prefix = prefix.strip()
         if not cleaned_prefix:
             raise AppException("推荐前缀不能为空。")
+        type_codes = self._missing_type_codes(dict_type)
+        merged: dict[str, int] = {}
         try:
-            items = self.redis_store.list_missing_suggestions(
-                dict_type=cleaned_type,
-                prefix=cleaned_prefix,
-                limit=limit,
-            )
+            for code in type_codes:
+                items = self.redis_store.list_missing_suggestions(
+                    dict_type=code,
+                    prefix=cleaned_prefix,
+                    limit=limit,
+                )
+                for member, score in items:
+                    key = str(member)
+                    count = int(score)
+                    if key not in merged or count > merged[key]:
+                        merged[key] = count
         except Exception as exc:  # noqa: BLE001
             raise AppException(
                 f"读取缺失字典失败：{sanitize_redis_error(exc)}",
                 error_code="CustomsDict.MissingReadFailed",
             ) from exc
+        ranked = sorted(
+            merged.items(),
+            key=lambda item: (
+                0 if item[0].casefold() == cleaned_prefix.casefold() else 1,
+                -item[1],
+                item[0].casefold(),
+            ),
+        )
         return [
-            {
-                "raw_value": member,
-                "occurrence_count": int(score),
-            }
-            for member, score in items
+            {"raw_value": member, "occurrence_count": count}
+            for member, count in ranked[:limit]
         ]
 
     def handle_missing(
@@ -397,38 +407,79 @@ class CustomsDictService:
     def export_missing_xlsx(
         self,
         *,
-        dict_type: str,
+        dict_type: str | None,
         raw_value: str | None,
     ) -> bytes:
         from io import BytesIO
 
         from openpyxl import Workbook
 
-        cleaned_type = self._require_existing_type(dict_type)
         cleaned_raw = normalize_dict_text(raw_value) if raw_value else None
         if cleaned_raw == "":
             cleaned_raw = None
+        type_codes = self._missing_type_codes(dict_type)
         try:
-            items = self.redis_store.list_missing_all(
-                dict_type=cleaned_type,
-                raw_value=cleaned_raw,
-            )
+            rows = self._collect_missing_rows(type_codes=type_codes, raw_value=cleaned_raw)
         except Exception as exc:  # noqa: BLE001
             raise AppException(
                 f"导出缺失字典失败：{sanitize_redis_error(exc)}",
                 error_code="CustomsDict.MissingReadFailed",
             ) from exc
+        rows.sort(
+            key=lambda item: (
+                -int(item["occurrence_count"]),  # type: ignore[arg-type]
+                str(item["dict_type"]),
+                str(item["raw_value"]).casefold(),
+            ),
+        )
 
         workbook = Workbook()
         sheet = workbook.active
         sheet.title = "missing"
         sheet.append(list(CUSTOMS_DICT_XLSX_HEADERS))
-        label = self._type_label(cleaned_type)
-        for member, score in items:
-            sheet.append([cleaned_type, label, member, int(score), "", ""])
+        for item in rows:
+            sheet.append(
+                [
+                    item["dict_type"],
+                    item["dict_type_label"],
+                    item["raw_value"],
+                    int(item["occurrence_count"]),  # type: ignore[arg-type]
+                    "",
+                    "",
+                ]
+            )
         buffer = BytesIO()
         workbook.save(buffer)
         return buffer.getvalue()
+
+    def _missing_type_codes(self, dict_type: str | None) -> list[str]:
+        if dict_type is not None and dict_type.strip():
+            return [self._require_existing_type(dict_type)]
+        return [row.code for row in self.type_repository.list_enabled_options()]
+
+    def _collect_missing_rows(
+        self,
+        *,
+        type_codes: list[str],
+        raw_value: str | None,
+    ) -> list[dict[str, object]]:
+        rows: list[dict[str, object]] = []
+        for code in type_codes:
+            items = self.redis_store.list_missing_all(
+                dict_type=code,
+                raw_value=raw_value,
+            )
+            label = self._type_label(code)
+            for member, score in items:
+                rows.append(
+                    {
+                        "dict_type": code,
+                        "dict_type_label": label,
+                        "raw_value": member,
+                        "occurrence_count": int(score),
+                    }
+                )
+        return rows
 
     def export_mappings_xlsx(
         self,

@@ -19,7 +19,7 @@ missing_router = APIRouter(prefix="/customs-dict/missing", tags=["customs-dict"]
 def list_missing(
     _auth: CurrentAuthDep,
     service: CustomsDictService = CustomsDictServiceDep,
-    dict_type: str = Query(..., alias="dictType"),
+    dict_type: str | None = Query(default=None, alias="dictType"),
     raw_value: str | None = Query(default=None, alias="rawValue"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100, alias="pageSize"),
@@ -50,7 +50,7 @@ def list_missing(
 def list_missing_suggestions(
     _auth: CurrentAuthDep,
     service: CustomsDictService = CustomsDictServiceDep,
-    dict_type: str = Query(..., alias="dictType"),
+    dict_type: str | None = Query(default=None, alias="dictType"),
     prefix: str = Query(..., min_length=1, max_length=100),
     limit: int = Query(10, ge=1, le=10),
 ) -> list[CustomsDictMissingSuggestion]:
@@ -88,11 +88,15 @@ def handle_missing(
 def export_missing(
     _auth: CurrentAuthDep,
     service: CustomsDictService = CustomsDictServiceDep,
-    dict_type: str = Query(..., alias="dictType"),
+    dict_type: str | None = Query(default=None, alias="dictType"),
     raw_value: str | None = Query(default=None, alias="rawValue"),
 ) -> Response:
     content = service.export_missing_xlsx(dict_type=dict_type, raw_value=raw_value)
-    filename = f"customs-dict-missing-{dict_type}.xlsx"
+    filename = (
+        f"customs-dict-missing-{dict_type}.xlsx"
+        if dict_type and dict_type.strip()
+        else "customs-dict-missing-all.xlsx"
+    )
     return Response(
         content=content,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

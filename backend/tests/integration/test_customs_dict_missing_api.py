@@ -136,6 +136,34 @@ def test_missing_list_handle_export_and_zrem(
     assert any(row[2] == raw_lo for row in rows[1:])
 
 
+def test_missing_list_all_types_when_dict_type_omitted(
+    client: TestClient,
+    fake_redis: fakeredis.FakeRedis,
+) -> None:
+    headers = _login(client)
+    suffix = datetime.now(UTC).strftime("%H%M%S%f")
+    country_raw = f"全国缺失-{suffix}"
+    continent_raw = f"全洲缺失-{suffix}"
+    fake_redis.zadd(missing_dict_key("country"), {country_raw: 7})
+    fake_redis.zadd(missing_dict_key("continent"), {continent_raw: 11})
+
+    listed = client.get("/api/v1/customs-dict/missing", headers=headers)
+    assert listed.status_code == 200, listed.text
+    body = listed.json()
+    raw_values = {item["rawValue"] for item in body["items"]}
+    assert country_raw in raw_values
+    assert continent_raw in raw_values
+    assert body["items"][0]["rawValue"] == continent_raw
+    assert body["items"][0]["occurrenceCount"] == 11
+
+    exported = client.get("/api/v1/customs-dict/missing/export", headers=headers)
+    assert exported.status_code == 200
+    workbook = load_workbook(BytesIO(exported.content))
+    rows = list(workbook.active.iter_rows(values_only=True))
+    assert any(row[2] == country_raw for row in rows[1:])
+    assert any(row[2] == continent_raw for row in rows[1:])
+
+
 def test_missing_suggestions_prefix(
     client: TestClient,
     fake_redis: fakeredis.FakeRedis,
@@ -155,3 +183,11 @@ def test_missing_suggestions_prefix(
     body = suggestions.json()
     assert len(body) <= 10
     assert any(item["rawValue"] == raw and item["occurrenceCount"] == 3 for item in body)
+
+    cross = client.get(
+        "/api/v1/customs-dict/missing/suggestions",
+        params={"prefix": "SuggestMiss"},
+        headers=headers,
+    )
+    assert cross.status_code == 200
+    assert any(item["rawValue"] == raw for item in cross.json())

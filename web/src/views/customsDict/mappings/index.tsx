@@ -9,21 +9,23 @@ import {
 } from 'react';
 import BizTable from '@tendata-biz-components/biz-table';
 import {
-  DownloadOutlined,
+  CloseCircleFilled,
   PlusOutlined,
   ReloadOutlined,
+  SuccessFilled,
   UploadOutlined,
+  WarningTriangleOutlined,
 } from '@tendata-ui/icon';
 import {
   AutoComplete,
   Button,
   Drawer,
-  Dropdown,
   Form,
   Input,
   Modal,
   Select,
   Space,
+  Tabs,
   Tag,
   message,
 } from 'tendata-ui';
@@ -32,12 +34,12 @@ import {
   batchResyncCustomsDictMappings,
   createCustomsDictMapping,
   downloadCustomsDictImportTemplate,
-  exportCustomsDictMappings,
   importCustomsDictMappings,
   listCustomsDictMappingSuggestions,
   listCustomsDictMappings,
   listCustomsDictTypeOptions,
   updateCustomsDictMapping,
+  type CustomsDictImportResult,
   type CustomsDictMapping,
   type CustomsDictMappingSuggestion,
   type CustomsDictTypeOption,
@@ -46,24 +48,14 @@ import QueryListCard from '@/shared/components/queryListCard';
 import { useTranslate } from '@/shared/hooks';
 import listStyles from '@/shared/styles/listPage.module.less';
 import { getApiErrorCode, getApiErrorMessage } from '@/shared/utils/apiError';
+import {
+  parseCustomsDictImportPreview,
+  type ImportPreviewRow,
+} from './parseImportPreview';
 
 type ColumnsType = NonNullable<ComponentProps<typeof BizTable>['columns']>;
 
-/** tendata-ui Dropdown 类型未透出 antd menu/trigger，运行时可用 */
-type IoDropdownProps = {
-  trigger?: Array<'click' | 'hover' | 'contextMenu'>;
-  menu?: {
-    items: Array<{
-      key: string;
-      icon?: React.ReactNode;
-      label: React.ReactNode;
-      disabled?: boolean;
-      onClick?: () => void;
-    }>;
-  };
-  children?: React.ReactNode;
-};
-const IoDropdown = Dropdown as unknown as React.FC<IoDropdownProps>;
+type CreateTabKey = 'single' | 'import';
 
 const DEFAULT_PAGE_SIZE = 20;
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
@@ -89,7 +81,7 @@ type FormState = {
 };
 
 const emptyForm: FormState = {
-  dictType: 'country',
+  dictType: '',
   rawValue: '',
   standardValue: '',
 };
@@ -114,12 +106,29 @@ const CustomsDictMappingsView = () => {
   const [selectedRowKeys, setSelectedRowKeys] = useState<Key[]>([]);
   const [formOpen, setFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [createTab, setCreateTab] = useState<CreateTabKey>('single');
   const [detailOpen, setDetailOpen] = useState(false);
   const [detail, setDetail] = useState<CustomsDictMapping | null>(null);
   const [importing, setImporting] = useState(false);
+  const [previewParsing, setPreviewParsing] = useState(false);
+  const [pendingImportFile, setPendingImportFile] = useState<File | null>(null);
+  const [importPreviewRows, setImportPreviewRows] = useState<ImportPreviewRow[]>([]);
+  const [importPreviewError, setImportPreviewError] = useState<string | null>(null);
+  const [importResult, setImportResult] = useState<CustomsDictImportResult | null>(null);
   const [typeOptionsRaw, setTypeOptionsRaw] = useState<CustomsDictTypeOption[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [form] = Form.useForm<FormState>();
+
+  const resetImportDraft = () => {
+    setPendingImportFile(null);
+    setImportPreviewRows([]);
+    setImportPreviewError(null);
+    setImportResult(null);
+    setPreviewParsing(false);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
 
   const batchBusy = batchDeleteLoading || batchResyncLoading;
 
@@ -221,24 +230,39 @@ const CustomsDictMappingsView = () => {
 
   const openCreate = () => {
     setEditingId(null);
-    form.setFieldsValue(emptyForm);
+    setCreateTab('single');
+    resetImportDraft();
+    form.resetFields();
     setFormOpen(true);
+    // destroyOnClose 下需等 Form 挂载后再写入，否则默认类型不显示
+    window.setTimeout(() => {
+      form.setFieldsValue({
+        ...emptyForm,
+        dictType: typeOptionsRaw[0]?.code ?? '',
+      });
+    }, 0);
   };
 
   const openEdit = () => {
     if (!detail) return;
     setEditingId(detail.id);
-    form.setFieldsValue({
-      dictType: detail.dictType,
-      rawValue: detail.rawValue,
-      standardValue: detail.standardValue,
-    });
+    setCreateTab('single');
+    resetImportDraft();
     setFormOpen(true);
+    window.setTimeout(() => {
+      form.setFieldsValue({
+        dictType: detail.dictType,
+        rawValue: detail.rawValue,
+        standardValue: detail.standardValue,
+      });
+    }, 0);
   };
 
   const closeForm = () => {
     setFormOpen(false);
     setEditingId(null);
+    setCreateTab('single');
+    resetImportDraft();
     form.resetFields();
   };
 
@@ -380,24 +404,19 @@ const CustomsDictMappingsView = () => {
     },
   ];
 
-  const onExport = async () => {
-    try {
-      const blob = await exportCustomsDictMappings({
-        dictType: applied.dictType,
-        q: applied.q || undefined,
-        enabled: true,
-      });
-      downloadBlob(blob, 'customs-dict-mappings.xlsx');
-      message.success(t('customsDict.message.exportSuccess'));
-    } catch (error) {
-      message.error(getApiErrorMessage(error, t('customsDict.message.loadFailed')));
-    }
-  };
-
   const onSearch = () => {
     setPage(1);
     setSelectedRowKeys([]);
     setApplied({ ...draft, q: draft.q.trim() });
+  };
+
+  const commitFilters = (next: FilterDraft) => {
+    const normalized: FilterDraft = { ...next, q: next.q.trim() };
+    setDraft({ ...next, q: next.q });
+    setSuggestions([]);
+    setPage(1);
+    setSelectedRowKeys([]);
+    setApplied(normalized);
   };
 
   const onResetSearch = () => {
@@ -419,39 +438,375 @@ const CustomsDictMappingsView = () => {
     }
   };
 
-  const onImportFile = async (file: File) => {
-    setImporting(true);
+  const onSelectImportFile = async (file: File) => {
+    setImportResult(null);
+    setPendingImportFile(file);
+    setImportPreviewRows([]);
+    setImportPreviewError(null);
+    setPreviewParsing(true);
     try {
-      const result = await importCustomsDictMappings(file);
-      message.success(t('customsDict.message.importSuccess', {
-        created: result.created,
-        updated: result.updated,
-        failed: result.failed,
-      }));
-      if (result.failed > 0) {
-        const preview = (result.errors ?? [])
-          .slice(0, 3)
-          .map((item) => t('customsDict.message.importErrorRow', {
-            row: item.row,
-            message: item.message,
-          }))
-          .join('；');
-        message.warning(
-          preview
-            ? `${t('customsDict.message.importPartial')} ${preview}`
-            : t('customsDict.message.importPartial'),
-        );
-      }
-      await load();
+      const rows = await parseCustomsDictImportPreview(file);
+      setImportPreviewRows(rows);
     } catch (error) {
-      message.error(getApiErrorMessage(error, t('customsDict.message.importFailed')));
+      setPendingImportFile(null);
+      setImportPreviewRows([]);
+      setImportPreviewError(
+        error instanceof Error
+          ? error.message
+          : t('customsDict.message.importFailed'),
+      );
     } finally {
-      setImporting(false);
+      setPreviewParsing(false);
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
     }
   };
+
+  const onConfirmImport = async () => {
+    if (!pendingImportFile || importPreviewRows.length === 0) return;
+    setImporting(true);
+    try {
+      const result = await importCustomsDictMappings(pendingImportFile);
+      setPendingImportFile(null);
+      setImportPreviewRows([]);
+      setImportPreviewError(null);
+      setImportResult(result);
+      await load();
+    } catch (error) {
+      message.error(getApiErrorMessage(error, t('customsDict.message.importFailed')));
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const canConfirmImport = (
+    pendingImportFile != null
+    && importPreviewRows.length > 0
+    && importPreviewError == null
+    && !previewParsing
+  );
+
+  const showImportResult = importResult != null;
+
+  const mappingForm = (
+    <Form form={form} layout="vertical" initialValues={emptyForm}>
+      <Form.Item
+        name="dictType"
+        label={t('customsDict.form.dictType')}
+        rules={[{ required: true, message: t('customsDict.message.dictTypeRequired') }]}
+      >
+        <Select
+          options={typeOptions}
+          disabled={editingId != null}
+          placeholder={t('customsDict.filter.dictType')}
+        />
+      </Form.Item>
+      <Form.Item
+        name="rawValue"
+        label={t('customsDict.form.rawValue')}
+        rules={[{ required: true, message: t('customsDict.message.rawRequired') }]}
+      >
+        <Input disabled={editingId != null} />
+      </Form.Item>
+      <Form.Item
+        name="standardValue"
+        label={t('customsDict.form.standardValue')}
+        rules={[{ required: true, message: t('customsDict.message.standardRequired') }]}
+      >
+        <Input />
+      </Form.Item>
+    </Form>
+  );
+
+  const importPanel = (
+    <div>
+      <p style={{ marginTop: 0, marginBottom: 12, color: 'rgba(0, 0, 0, 0.45)', fontSize: 13 }}>
+        {t('customsDict.import.hintPrefix')}
+        <a
+          role="button"
+          tabIndex={0}
+          style={{ color: '#1677ff', cursor: 'pointer' }}
+          onClick={(event) => {
+            event.preventDefault();
+            void onDownloadTemplate();
+          }}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault();
+              void onDownloadTemplate();
+            }
+          }}
+        >
+          {t('customsDict.action.importTemplate')}
+        </a>
+        {t('customsDict.import.hintSuffix')}
+      </p>
+      <Button
+        icon={<UploadOutlined />}
+        loading={previewParsing}
+        onClick={() => fileInputRef.current?.click()}
+      >
+        {t('customsDict.action.import')}
+      </Button>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        style={{ display: 'none' }}
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          if (file) {
+            void onSelectImportFile(file);
+          }
+        }}
+      />
+      {pendingImportFile ? (
+        <div style={{ marginTop: 8, color: 'rgba(0, 0, 0, 0.65)', fontSize: 13 }}>
+          {t('customsDict.import.fileName', { name: pendingImportFile.name })}
+        </div>
+      ) : null}
+      {importPreviewError ? (
+        <div style={{ marginTop: 12, color: '#ff4d4f' }}>{importPreviewError}</div>
+      ) : null}
+      {importPreviewRows.length > 0 ? (
+        <div style={{ marginTop: 16 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+            <strong>{t('customsDict.import.previewTitle')}</strong>
+            <span style={{ color: 'rgba(0, 0, 0, 0.45)' }}>
+              {t('customsDict.import.previewCount', { count: importPreviewRows.length })}
+            </span>
+          </div>
+          <div style={{ maxHeight: 240, overflow: 'auto', border: '1px solid #f0f0f0' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <thead>
+                <tr style={{ background: '#fafafa', position: 'sticky', top: 0 }}>
+                  <th style={{ padding: '8px 12px', textAlign: 'left', whiteSpace: 'nowrap' }}>
+                    {t('customsDict.import.column.dictType')}
+                  </th>
+                  <th style={{ padding: '8px 12px', textAlign: 'left', whiteSpace: 'nowrap' }}>
+                    {t('customsDict.import.column.dictTypeName')}
+                  </th>
+                  <th style={{ padding: '8px 12px', textAlign: 'left', whiteSpace: 'nowrap' }}>
+                    {t('customsDict.import.column.rawValue')}
+                  </th>
+                  <th style={{ padding: '8px 12px', textAlign: 'left', whiteSpace: 'nowrap' }}>
+                    {t('customsDict.import.column.standardValue')}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {importPreviewRows.map((row) => (
+                  <tr key={row.excelRow} style={{ borderTop: '1px solid #f0f0f0' }}>
+                    <td style={{ padding: '8px 12px' }}>{row.dictType}</td>
+                    <td style={{ padding: '8px 12px' }}>{row.dictTypeName}</td>
+                    <td style={{ padding: '8px 12px' }}>{row.rawValue}</td>
+                    <td style={{ padding: '8px 12px' }}>{row.standardValue}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+
+  const importResultPanel = (() => {
+    if (!importResult) return null;
+
+    const succeeded = importResult.created + importResult.updated;
+    const status = importResult.failed === 0
+      ? 'success'
+      : succeeded === 0
+        ? 'failed'
+        : 'partial';
+
+    const statusTone = {
+      success: {
+        icon: <SuccessFilled style={{ fontSize: 56, color: '#52c41a' }} />,
+        title: t('customsDict.import.status.success'),
+        desc: t('customsDict.import.status.successDesc'),
+        bannerBg: '#f6ffed',
+        bannerBorder: '#b7eb8f',
+        titleColor: '#389e0d',
+      },
+      partial: {
+        icon: <WarningTriangleOutlined style={{ fontSize: 56, color: '#faad14' }} />,
+        title: t('customsDict.import.status.partial'),
+        desc: t('customsDict.import.status.partialDesc'),
+        bannerBg: '#fffbe6',
+        bannerBorder: '#ffe58f',
+        titleColor: '#d48806',
+      },
+      failed: {
+        icon: <CloseCircleFilled style={{ fontSize: 56, color: '#ff4d4f' }} />,
+        title: t('customsDict.import.status.failed'),
+        desc: t('customsDict.import.status.failedDesc'),
+        bannerBg: '#fff2f0',
+        bannerBorder: '#ffccc7',
+        titleColor: '#cf1322',
+      },
+    }[status];
+
+    const statCard = (
+      label: string,
+      value: number,
+      color: string,
+      bg: string,
+    ) => (
+      <div
+        style={{
+          flex: 1,
+          minWidth: 0,
+          textAlign: 'center',
+          padding: '14px 8px',
+          borderRadius: 8,
+          background: bg,
+        }}
+      >
+        <div style={{ fontSize: 28, fontWeight: 700, lineHeight: 1.2, color }}>{value}</div>
+        <div style={{ marginTop: 6, fontSize: 13, color: 'rgba(0, 0, 0, 0.55)' }}>{label}</div>
+      </div>
+    );
+
+    return (
+      <div>
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            padding: '20px 16px 16px',
+            marginBottom: 16,
+            borderRadius: 8,
+            background: statusTone.bannerBg,
+            border: `1px solid ${statusTone.bannerBorder}`,
+          }}
+        >
+          {statusTone.icon}
+          <div
+            style={{
+              marginTop: 12,
+              fontSize: 20,
+              fontWeight: 600,
+              color: statusTone.titleColor,
+            }}
+          >
+            {statusTone.title}
+          </div>
+          <div
+            style={{
+              marginTop: 6,
+              fontSize: 13,
+              color: 'rgba(0, 0, 0, 0.55)',
+              textAlign: 'center',
+            }}
+          >
+            {statusTone.desc}
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
+          {statCard(
+            t('customsDict.import.stat.created'),
+            importResult.created,
+            '#1677ff',
+            '#e6f4ff',
+          )}
+          {statCard(
+            t('customsDict.import.stat.updated'),
+            importResult.updated,
+            '#13c2c2',
+            '#e6fffb',
+          )}
+          {statCard(
+            t('customsDict.import.stat.failed'),
+            importResult.failed,
+            importResult.failed > 0 ? '#ff4d4f' : 'rgba(0, 0, 0, 0.45)',
+            importResult.failed > 0 ? '#fff1f0' : '#fafafa',
+          )}
+        </div>
+
+        <div
+          style={{
+            marginBottom: (importResult.errors?.length ?? 0) > 0 ? 12 : 0,
+            color: 'rgba(0, 0, 0, 0.45)',
+            fontSize: 13,
+            textAlign: 'center',
+          }}
+        >
+          {t('customsDict.import.resultSummary', {
+            created: importResult.created,
+            updated: importResult.updated,
+            failed: importResult.failed,
+          })}
+        </div>
+
+        {(importResult.errors?.length ?? 0) > 0 ? (
+          <div>
+            <div
+              style={{
+                marginBottom: 8,
+                fontWeight: 600,
+                color: '#cf1322',
+              }}
+            >
+              {t('customsDict.import.errorTitle')}
+            </div>
+            <ul
+              style={{
+                margin: 0,
+                paddingLeft: 20,
+                maxHeight: 200,
+                overflow: 'auto',
+                border: '1px solid #ffccc7',
+                borderRadius: 8,
+                background: '#fff2f0',
+                paddingTop: 10,
+                paddingBottom: 10,
+                paddingRight: 12,
+              }}
+            >
+              {importResult.errors.slice(0, 50).map((item) => (
+                <li key={`${item.row}-${item.message}`} style={{ marginBottom: 4 }}>
+                  {t('customsDict.message.importErrorRow', {
+                    row: item.row,
+                    message: item.message,
+                  })}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+      </div>
+    );
+  })();
+
+  const showCreateSingleFooter = editingId != null || createTab === 'single';
+  const importFooter = showImportResult ? (
+    <Button type="primary" onClick={closeForm}>
+      {t('customsDict.action.done')}
+    </Button>
+  ) : (
+    <Space>
+      <Button onClick={closeForm}>{t('customsDict.action.cancel')}</Button>
+      <Button
+        type="primary"
+        loading={importing}
+        disabled={!canConfirmImport}
+        onClick={() => void onConfirmImport()}
+      >
+        {t('customsDict.action.confirmImport')}
+      </Button>
+    </Space>
+  );
+
+  const modalTitle = (() => {
+    if (editingId != null) return t('customsDict.modal.editTitle');
+    if (showImportResult) return t('customsDict.modal.importResultTitle');
+    return t('customsDict.modal.createTitle');
+  })();
 
   return (
     <div className={listStyles.page}>
@@ -466,10 +821,9 @@ const CustomsDictMappingsView = () => {
               placeholder={t('customsDict.filter.dictType')}
               style={{ width: 120 }}
               options={typeOptions}
-              value={draft.dictType}
+              value={draft.dictType || undefined}
               onChange={(value) => {
-                setDraft((prev) => ({ ...prev, dictType: value }));
-                setSuggestions([]);
+                commitFilters({ ...draft, dictType: value || undefined });
               }}
             />
             <AutoComplete
@@ -477,22 +831,30 @@ const CustomsDictMappingsView = () => {
               placeholder={t('customsDict.search.mappingPlaceholder')}
               style={{ width: 160 }}
               value={draft.q}
-              options={suggestions.map((suggestion) => ({
-                key: `${suggestion.id}-${suggestion.matchField}`,
-                value: suggestion.matchField === 'rawValue'
-                  ? suggestion.rawValue
-                  : suggestion.standardValue,
-                label: `${suggestion.rawValue} (${suggestion.standardValue})`,
-              }))}
-              filterOption={false}
+              options={suggestions.map((suggestion) => {
+                const byStandard = suggestion.matchField === 'standardValue';
+                const fillValue = byStandard
+                  ? suggestion.standardValue
+                  : suggestion.rawValue;
+                return {
+                  key: `${suggestion.id}-${suggestion.matchField}-${fillValue}`,
+                  value: fillValue,
+                  label: byStandard
+                    ? `${suggestion.standardValue}（${suggestion.rawValue}）`
+                    : `${suggestion.rawValue}（${suggestion.standardValue}）`,
+                };
+              })}
+              filterOption={() => true}
               listHeight={240}
-              onChange={(value) => setDraft((prev) => ({
-                ...prev,
-                q: String(value),
-              }))}
+              onChange={(value) => {
+                const nextQ = String(value);
+                setDraft((prev) => ({ ...prev, q: nextQ }));
+                if (!nextQ.trim()) {
+                  commitFilters({ ...draft, q: '' });
+                }
+              }}
               onSelect={(value) => {
-                setDraft((prev) => ({ ...prev, q: String(value) }));
-                setSuggestions([]);
+                commitFilters({ ...draft, q: String(value) });
               }}
               onKeyDown={(event) => {
                 if (event.key === 'Enter') onSearch();
@@ -520,58 +882,9 @@ const CustomsDictMappingsView = () => {
       <QueryListCard
         title={t('common.queryList')}
         actions={(
-          <Space>
-            <IoDropdown
-              trigger={['click']}
-              menu={{
-                items: [
-                  {
-                    key: 'import',
-                    icon: <UploadOutlined />,
-                    label: t('customsDict.action.import'),
-                    disabled: importing,
-                    onClick: () => fileInputRef.current?.click(),
-                  },
-                  {
-                    key: 'export',
-                    icon: <DownloadOutlined />,
-                    label: t('customsDict.action.export'),
-                    onClick: () => {
-                      void onExport();
-                    },
-                  },
-                  {
-                    key: 'template',
-                    icon: <DownloadOutlined />,
-                    label: t('customsDict.action.importTemplate'),
-                    onClick: () => {
-                      void onDownloadTemplate();
-                    },
-                  },
-                ],
-              }}
-            >
-              <Button loading={importing}>
-                {t('customsDict.action.importExport')}
-              </Button>
-            </IoDropdown>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-              style={{ display: 'none' }}
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                if (file) {
-                  void onImportFile(file);
-                }
-                event.target.value = '';
-              }}
-            />
-            <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
-              {t('customsDict.action.create')}
-            </Button>
-          </Space>
+          <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
+            {t('customsDict.action.create')}
+          </Button>
         )}
         selectionCount={selectedRowKeys.length}
         selectionActions={(
@@ -632,40 +945,43 @@ const CustomsDictMappingsView = () => {
 
       <Modal
         open={formOpen}
-        title={editingId != null
-          ? t('customsDict.modal.editTitle')
-          : t('customsDict.modal.createTitle')}
+        title={modalTitle}
         onCancel={closeForm}
-        onOk={() => void submitForm()}
+        onOk={showCreateSingleFooter ? () => void submitForm() : undefined}
         confirmLoading={submitting}
         destroyOnClose
         maskClosable={false}
         okText={t('customsDict.action.save')}
         cancelText={t('customsDict.action.cancel')}
+        footer={showCreateSingleFooter ? undefined : importFooter}
+        width={editingId == null ? 720 : undefined}
       >
-        <Form form={form} layout="vertical" initialValues={emptyForm}>
-          <Form.Item
-            name="dictType"
-            label={t('customsDict.form.dictType')}
-            rules={[{ required: true, message: t('customsDict.message.dictTypeRequired') }]}
-          >
-            <Select options={typeOptions} disabled={editingId != null} />
-          </Form.Item>
-          <Form.Item
-            name="rawValue"
-            label={t('customsDict.form.rawValue')}
-            rules={[{ required: true, message: t('customsDict.message.rawRequired') }]}
-          >
-            <Input disabled={editingId != null} />
-          </Form.Item>
-          <Form.Item
-            name="standardValue"
-            label={t('customsDict.form.standardValue')}
-            rules={[{ required: true, message: t('customsDict.message.standardRequired') }]}
-          >
-            <Input />
-          </Form.Item>
-        </Form>
+        {editingId != null ? mappingForm : null}
+        {editingId == null && showImportResult ? importResultPanel : null}
+        {editingId == null && !showImportResult ? (
+          <Tabs
+            activeKey={createTab}
+            onChange={(key) => {
+              const next = key as CreateTabKey;
+              setCreateTab(next);
+              if (next === 'single') {
+                resetImportDraft();
+              }
+            }}
+            items={[
+              {
+                key: 'single',
+                label: t('customsDict.modal.createTab.single'),
+                children: mappingForm,
+              },
+              {
+                key: 'import',
+                label: t('customsDict.modal.createTab.import'),
+                children: importPanel,
+              },
+            ]}
+          />
+        ) : null}
       </Modal>
 
       <Drawer

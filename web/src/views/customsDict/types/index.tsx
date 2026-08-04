@@ -253,6 +253,15 @@ const CustomsDictTypesView = () => {
     setPage(1);
   };
 
+  const commitKeyword = (nextQ: string) => {
+    const trimmed = nextQ.trim();
+    setDraftQ(nextQ);
+    setSuggestions([]);
+    setAppliedQ(trimmed);
+    setSelectedRowKeys([]);
+    setPage(1);
+  };
+
   const onResetSearch = () => {
     setDraftQ('');
     setAppliedQ('');
@@ -312,13 +321,18 @@ const CustomsDictTypesView = () => {
               }))}
               filterOption={false}
               listHeight={240}
-              onChange={(value) => setDraftQ(String(value))}
+              onChange={(value) => {
+                const next = String(value);
+                setDraftQ(next);
+                if (!next.trim()) {
+                  commitKeyword('');
+                }
+              }}
               onSelect={(value) => {
-                setDraftQ(String(value));
-                setSuggestions([]);
+                commitKeyword(String(value));
               }}
               onKeyDown={(event) => {
-                if (event.key === 'Enter') onSearch();
+                if (event.key === 'Enter') commitKeyword(draftQ);
               }}
               style={{ width: 160 }}
             />
@@ -458,11 +472,6 @@ const CustomsDictTypesView = () => {
             <div className={listStyles.detailActions}>
               <Button type="primary" onClick={openEdit}>
                 {t('customsDict.action.edit')}
-              </Button>
-              <Button loading={submitting} onClick={() => openToggleConfirm(detail)}>
-                {detail.enabled
-                  ? t('customsDict.action.disable')
-                  : t('customsDict.action.enable')}
               </Button>
             </div>
           </div>
