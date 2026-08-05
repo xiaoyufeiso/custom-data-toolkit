@@ -13,6 +13,7 @@ const RequireAuth = ({ children }: Props) => {
 
   useEffect(() => {
     let cancelled = false;
+    setState('loading');
     fetchMe()
       .then(() => {
         if (!cancelled) setState('ok');

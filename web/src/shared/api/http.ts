@@ -1,4 +1,6 @@
 import axios from 'axios';
+import { notifySessionUnauthorized } from '@/shared/auth/sessionGate';
+import { clearSessionUser } from '@/shared/auth/sessionUser';
 
 const CSRF_COOKIE = 'cdt_csrf';
 
@@ -27,3 +29,22 @@ http.interceptors.request.use((config) => {
   }
   return config;
 });
+
+http.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (!axios.isAxiosError(error)) {
+      return Promise.reject(error);
+    }
+    const status = error.response?.status;
+    const code = (error.response?.data as { code?: string } | undefined)?.code;
+    const url = String(error.config?.url ?? '');
+    const isLoginOrCsrf = url.includes('/auth/login') || url.includes('/auth/csrf');
+    // 仅 Session 失效（含停用清会话）；改密密码错误等 Auth.LoginFailed 不踢出
+    if (status === 401 && code === 'Auth.Unauthorized' && !isLoginOrCsrf) {
+      clearSessionUser();
+      notifySessionUnauthorized();
+    }
+    return Promise.reject(error);
+  },
+);
