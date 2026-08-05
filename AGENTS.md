@@ -86,7 +86,6 @@ MUST NOT：Casdoor/Casbin、自助注册、爬虫逻辑、无鉴权对外写接�
 
 ## Known follow-ups（交接）
 
-- 归档 `add-admin-user-mgmt`、`add-viewer-readonly-role`、`add-admin-audit-log`（合并 auth/audit 领域 spec）
 - 字典搁置：整表覆盖全量、处理历史
 - （可选）`standardize-admin-ui-components` 登录页 / i18n / 视觉收口后归档
 - （可选）API 契约迁 OpenAPI 后降级 `docs/api.md`

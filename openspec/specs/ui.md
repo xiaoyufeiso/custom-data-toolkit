@@ -71,7 +71,7 @@
 - **缺失字典**：读 Redis ZSET；未选类型时聚合全部启用类型；原始值模糊筛选；处理（正式同步成功后删除 missing）；可导出；无导入
 - **字典类型**：关键词模糊匹配编码或名称
 - 三页文本搜索对齐货币页：`AutoComplete` 宽 160、debounce 推荐；选中推荐、回车、清空或点「查询」即提交；字典类型等下拉变更即查；标准字典推荐按原始值/标准值模糊包含（与列表 `q` 一致），命中标准值时选项以标准值优先展示并可填入
-- 不做：处理历史（见 `openspec/specs/customs-dict/spec.md` Deferred）；管理端操作审计见 `add-admin-audit-log`
+- 不做：处理历史（见 `openspec/specs/customs-dict/spec.md` Deferred）；管理端操作审计见 `openspec/specs/audit/spec.md`
 
 ### API Key 列表（前端搁置）
 - 后端管理 API 仍可用；前端路由/页面/服务已移除（2026-07-31）

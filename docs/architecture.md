@@ -58,7 +58,7 @@ tendata-customs-tools/  # 克隆目录名可不同；Python 包仍为 custom_dat
 - 汇率唯一性与外键约束的最终保证。
 - API Key 管理 UI（2026-07-31 起搁置；后端 `/api-keys` 与对外 `X-API-Key` 鉴权仍保留）。
 - 存储 API Key 明文。
-- 处理历史 UI（搁置）；管理端操作审计见 `openspec/changes/add-admin-audit-log/`；不做整表覆盖全量同步。
+- 处理历史 UI（搁置）；管理端操作审计见 `openspec/specs/audit/spec.md`；不做整表覆盖全量同步。
 
 建议域划分：
 

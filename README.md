@@ -93,4 +93,4 @@ git push -u tendata main
 
 ## 当前状态
 
-管理端与对外 globiz API、用户 / viewer / 审计、Session 守卫已落地；部分 OpenSpec change 待归档。进度见 [`docs/progress.md`](docs/progress.md)。
+管理端与对外 globiz API、用户 / viewer / 审计、Session 守卫已落地并归档。进度见 [`docs/progress.md`](docs/progress.md)。

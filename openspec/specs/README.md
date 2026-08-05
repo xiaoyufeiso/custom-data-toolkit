@@ -2,12 +2,12 @@
 
 | 领域 | 文件 | 版本 | 状态 | Owner | 最后更新 |
 |------|------|------|------|-------|----------|
-| 认证 | auth/spec.md | 1.0 | active | TBD | 2026-08-04（用户管理 delta 见 change） |
+| 认证 | auth/spec.md | 1.1 | active | TBD | 2026-08-05 |
+| 操作审计 | audit/spec.md | 1.0 | active | TBD | 2026-08-05 |
 | 货币 | currency/spec.md | 1.1 | active | TBD | 2026-07-31 |
-| 汇率 / 对外查询 / API Key（后端） | rate/spec.md | 1.2 | active | TBD | 2026-08-04 |
+| 汇率 / 对外查询 / API Key（后端） | rate/spec.md | 1.3 | active | TBD | 2026-08-05 |
 | 海关字典 | customs-dict/spec.md | 0.3 | active | TBD | 2026-08-04 |
-| UI 交互摘要 | ui.md | — | active | TBD | 2026-08-04 |
-| 操作审计（delta） | changes/add-admin-audit-log/ | — | implemented | TBD | 2026-08-04 |
+| UI 交互摘要 | ui.md | — | active | TBD | 2026-08-05 |
 
 稳定产品/架构正文已迁出 OpenSpec 全局文件，见 `docs/product.md`、`docs/architecture.md`。
 
@@ -15,9 +15,6 @@
 
 | 变更 | 路径 | 状态 |
 |------|------|------|
-| 管理端用户管理（角色 + 软停用） | `openspec/changes/add-admin-user-mgmt/` | implemented（待归档；角色已由 viewer change 覆盖） |
-| viewer 只读角色 | `openspec/changes/add-viewer-readonly-role/` | implemented（待归档） |
-| 管理端操作审计 | `openspec/changes/add-admin-audit-log/` | implemented（待归档） |
 | 管理端 UI 组件库化与视觉统一 | `openspec/changes/standardize-admin-ui-components/` | proposed（货币/汇率完成；登录页/i18n/视觉收口待实施） |
 | 货币同名软提醒 | `openspec/changes/add-duplicate-currency-name-warnings/` | deferred |
 | 货币列表关联汇率数量 | `openspec/changes/add-currency-rate-counts/` | deferred |
@@ -26,6 +23,10 @@
 
 | 变更 | 路径 | 归档日期 |
 |------|------|----------|
+| 管理端用户管理（角色 + 软停用） | `openspec/changes/archive/add-admin-user-mgmt/` | 2026-08-05 |
+| viewer 只读角色 | `openspec/changes/archive/add-viewer-readonly-role/` | 2026-08-05 |
+| 管理端操作审计 | `openspec/changes/archive/add-admin-audit-log/` | 2026-08-05 |
+| 对外 API 对齐 globiz | `openspec/changes/archive/align-public-api-globiz/` | 2026-08-05 |
 | 管理端列表 UI 统一 | `openspec/changes/archive/unify-admin-list-ui/` | 2026-08-04 |
 | 字典类型管理 | `openspec/changes/archive/add-customs-dict-types/` | 2026-08-04 |
 | 标准字典导入/导出 | `openspec/changes/archive/add-customs-dict-import/` | 2026-08-04 |

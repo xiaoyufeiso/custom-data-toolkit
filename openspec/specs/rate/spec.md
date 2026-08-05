@@ -1,6 +1,6 @@
 # Rate Specification
 
-> 权威层：汇率管理与对外查询（复用表 `rate`）。来源：`add-currency-rate-mgmt` + `add-page-bulk-delete` + `add-rate-batch-check`（2026-07-31 归档）+ `improve-rate-create-currency-picker`（2026-08-04 归档）。
+> 权威层：汇率管理与对外查询（复用表 `rate`）。来源：`add-currency-rate-mgmt` + `add-page-bulk-delete` + `add-rate-batch-check`（2026-07-31 归档）+ `improve-rate-create-currency-picker`（2026-08-04 归档）+ `align-public-api-globiz`（2026-08-05 归档）。
 
 ## Requirements
 

@@ -4,8 +4,8 @@
 
 ## 当前状态
 
-- 阶段：用户管理 / viewer 只读 / 操作审计已实现；Session 多标签同步与停用踢出已落地；三 change 待归档；`main` 有大量未提交改动
-- 整体状态：含字典全链路 + 列表 UI + 用户管理 + viewer 只读 + 操作审计 + Session 守卫；剩余可选 `standardize-admin-ui-components`
+- 阶段：用户管理 / viewer / 审计 / globiz 对外 API 已归档；Session 守卫已落地；剩余可选 `standardize-admin-ui-components`
+- 整体状态：MVP 主链路完成；活跃 change 仅 UI 组件库化收口与两项 Deferred
 - 最后更新：2026-08-05
 
 ## 里程碑
@@ -18,9 +18,10 @@
 | 标准字典导入/导出 | 完成（已归档） |
 | 字典类型管理 | 完成（已归档） |
 | 管理端列表 UI 统一 | 完成（已归档） |
-| 管理端用户管理 | 完成（待归档 `add-admin-user-mgmt`） |
-| viewer 只读角色 | 完成（待归档 `add-viewer-readonly-role`） |
-| 管理端操作审计 | 完成（待归档 `add-admin-audit-log`） |
+| 管理端用户管理 | 完成（已归档） |
+| viewer 只读角色 | 完成（已归档） |
+| 管理端操作审计 | 完成（已归档） |
+| 对外 API 对齐 globiz | 完成（已归档） |
 
 ## 阻塞
 
@@ -28,12 +29,15 @@
 
 ## 下一步
 
-1. 提交并 push：用户管理 / viewer / 操作审计 / Session 守卫
-2. 归档 `add-admin-user-mgmt` + `add-viewer-readonly-role` + `add-admin-audit-log`
-3. （可选）`standardize-admin-ui-components`：登录页 / i18n / 视觉收口后归档
-4. （可选）E5 Redis 友好错误文案；API 契约迁 OpenAPI
+1. （可选）`standardize-admin-ui-components`：登录页 / i18n / 视觉收口后归档
+2. （可选）E5 Redis 友好错误文案；API 契约迁 OpenAPI
 
 ## 日志（摘录）
+
+### 2026-08-05（OpenSpec 归档）
+
+- 归档：`add-admin-user-mgmt`、`add-viewer-readonly-role`、`add-admin-audit-log`、`align-public-api-globiz`
+- 领域：`auth` 1.1（用户管理 + viewer）、新建 `audit` 1.0、`rate` 1.3（globiz 来源注记）
 
 ### 2026-08-05（对外 API 对齐 globiz）
 
