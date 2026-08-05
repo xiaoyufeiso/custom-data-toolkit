@@ -122,20 +122,25 @@ def test_admin_api_key_and_public_rates_flow(client: TestClient) -> None:
     assert "key" not in target
 
     public_ok = client.get(
+        "/rates/",
+        params={
+            "currencyCode": code,
+            "dateStart": date.today().isoformat(),
+            "dateEnd": date.today().isoformat(),
+            "size": 20,
+        },
+        headers={"X-API-Key": plaintext_key},
+    )
+    assert public_ok.status_code == 200
+    assert any(item["id"] == rate_id for item in public_ok.json()["results"])
+
+    # 旧契约已废弃
+    legacy = client.get(
         "/api/v1/public/rates",
         params={"code": code, "date": date.today().isoformat()},
         headers={"X-API-Key": plaintext_key},
     )
-    assert public_ok.status_code == 200
-    assert len(public_ok.json()["items"]) >= 1
-
-    code_not_found = client.get(
-        "/api/v1/public/rates",
-        params={"code": "QQQ", "date": date.today().isoformat()},
-        headers={"X-API-Key": plaintext_key},
-    )
-    assert code_not_found.status_code == 404
-    assert code_not_found.json()["code"] == "Currency.NotFound"
+    assert legacy.status_code == 404
 
     disabled = client.patch(
         f"/api/v1/api-keys/{key_id}",
@@ -146,12 +151,12 @@ def test_admin_api_key_and_public_rates_flow(client: TestClient) -> None:
     assert disabled.json()["enabled"] is False
 
     public_rejected = client.get(
-        "/api/v1/public/rates",
-        params={"code": code, "date": date.today().isoformat()},
+        "/rates/",
+        params={"currencyCode": code, "size": 5},
         headers={"X-API-Key": plaintext_key},
     )
     assert public_rejected.status_code == 401
-    assert public_rejected.json()["code"] == "Auth.InvalidApiKey"
+    assert "detail" in public_rejected.json()
 
     # cleanup
     key_deleted = client.delete(f"/api/v1/api-keys/{key_id}", headers=headers)

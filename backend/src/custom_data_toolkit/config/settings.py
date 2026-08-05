@@ -17,9 +17,11 @@ class AppSettings(BaseSettings):
     session_cookie_name: str = "cdt_session"
     session_ttl_seconds: int = 604800
     cors_allowed_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
-    redis_url: str = "redis://127.0.0.1:6379/0"
+    redis_url: str = "redis://127.0.0.1:16379/0"
     admin_bootstrap_username: str = "admin"
     admin_bootstrap_password: str = "change-me"
+    # 对外 globiz API：true=必须 X-API-Key；false=匿名可读（仅运维改环境变量）
+    public_api_auth_enabled: bool = True
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

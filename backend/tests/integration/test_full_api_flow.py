@@ -297,53 +297,43 @@ class TestPublicRates:
         assert res.status_code == 201
         return res.json()["key"]
 
-    def test_query_by_code_single_date(self, client: TestClient):
+    def test_query_by_currency_code_and_date_range(self, client: TestClient):
         key = self._create_key(client)
         res = client.get(
-            "/api/v1/public/rates",
-            params={"code": "CNY", "date": "2026-07-01"},
+            "/rates/",
+            params={
+                "currencyCode": "CNY",
+                "dateStart": "2026-07-01",
+                "dateEnd": "2026-07-03",
+                "size": 100,
+            },
             headers={"X-API-Key": key},
         )
         assert res.status_code == 200
         data = res.json()
-        assert len(data["items"]) == 1
-        assert data["items"][0]["currencyCode"] == "CNY"
-        assert data["items"][0]["date"] == "2026-07-01"
-
-    def test_query_by_code_date_range(self, client: TestClient):
-        key = self._create_key(client)
-        res = client.get(
-            "/api/v1/public/rates",
-            params={"code": "CNY", "dateFrom": "2026-07-01", "dateTo": "2026-07-03"},
-            headers={"X-API-Key": key},
-        )
-        assert res.status_code == 200
-        assert len(res.json()["items"]) == 3
+        assert data["count"] >= 3
+        assert all(item["currency"] == "CNY" for item in data["results"])
 
     def test_invalid_key_rejected(self, client: TestClient):
         res = client.get(
-            "/api/v1/public/rates",
-            params={"code": "CNY", "date": "2026-07-01"},
+            "/rates/",
+            params={"currencyCode": "CNY", "size": 5},
             headers={"X-API-Key": "cdt_invalid_key_here"},
         )
         assert res.status_code == 401
+        assert "detail" in res.json()
 
-    def test_nonexistent_code_404(self, client: TestClient):
+    def test_currency_detail_not_found(self, client: TestClient):
+        key = self._create_key(client)
+        res = client.get("/currencies/999999999/", headers={"X-API-Key": key})
+        assert res.status_code == 404
+        assert res.json()["detail"] == "Not found."
+
+    def test_legacy_public_rates_removed(self, client: TestClient):
         key = self._create_key(client)
         res = client.get(
             "/api/v1/public/rates",
-            params={"code": "ZZZ", "date": "2026-07-01"},
+            params={"code": "CNY", "date": "2026-07-01"},
             headers={"X-API-Key": key},
         )
         assert res.status_code == 404
-
-    def test_underscore_code_works(self, client: TestClient):
-        """验证带下划线的 code（MYR_IM）可正常查询（虽无汇率数据应返回空列表）"""
-        key = self._create_key(client)
-        res = client.get(
-            "/api/v1/public/rates",
-            params={"code": "MYR_IM", "date": "2026-07-01"},
-            headers={"X-API-Key": key},
-        )
-        assert res.status_code == 200
-        assert res.json()["items"] == []
