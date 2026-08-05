@@ -4,6 +4,7 @@ import {
 import {
   Link, useLocation, useNavigate, useRoutes,
 } from 'react-router-dom';
+import { AccountOutlined as IconUser } from '@tendata-ui/icon';
 import {
   Breadcrumb,
   Dropdown,
@@ -13,17 +14,19 @@ import {
 } from 'tendata-ui';
 import routes, { AppRouteObject } from '@/router';
 import {
-  fetchMe, logout, type AdminUser,
+  logout, type AdminRole, type AdminUser,
 } from '@/services/auth';
+import { getSessionUser } from '@/shared/auth/sessionUser';
+import { useSessionGuard } from '@/shared/auth/useSessionGuard';
 import LanguageSwitcher from '@/shared/components/languageSwitcher';
-import { useTranslate } from '@/shared/hooks';
+import { useTranslate, type TranslateFn } from '@/shared/hooks';
 import { getApiErrorMessage } from '@/shared/utils/apiError';
 import styles from './index.module.less';
 
 const { Sider, Header, Content } = Layout;
 
 /** 下拉触发器用的实心小三角（非 DownOutlined 长箭头） */
-const IconDown = ({ className }: { className?: string }) => (
+const IconCaret = ({ className }: { className?: string }) => (
   <svg
     className={className}
     width="10"
@@ -40,8 +43,12 @@ const IconDown = ({ className }: { className?: string }) => (
 );
 
 /** tendata-ui Dropdown 类型未暴露 antd 透传 props，运行时可用 */
-type HeaderUserDropdownProps = {
+type UserDropdownProps = {
   trigger?: Array<'click' | 'hover' | 'contextMenu'>;
+  placement?: 'topLeft' | 'top' | 'topRight' | 'bottomLeft' | 'bottom' | 'bottomRight';
+  /** 相对触发器偏移；负 y 再向上，使浮窗落在分割线上方 */
+  align?: { offset?: [number, number] };
+  overlayClassName?: string;
   disabled?: boolean;
   menu?: {
     items: Array<{
@@ -54,13 +61,32 @@ type HeaderUserDropdownProps = {
   children?: React.ReactNode;
 };
 
-const HeaderUserDropdown = Dropdown as React.FC<HeaderUserDropdownProps>;
+const UserDropdown = Dropdown as React.FC<UserDropdownProps>;
 
 /**
- * 从自描述路由表中派生出菜单可见项。
+ * 角色未知时：不展示带 roles 限制的菜单（避免 viewer 闪出「用户管理」）。
+ * 角色已知时：按 roles 过滤。
  */
-const getMenuRoutes = (items: AppRouteObject[]) => items.filter(
-  (r) => r.meta?.menu && !r.meta?.hidden && typeof r.path === 'string',
+const routeVisibleToRole = (route: AppRouteObject, role: AdminRole | undefined) => {
+  const roles = route.meta?.roles;
+  if (!roles || roles.length === 0) return true;
+  if (role == null) return false;
+  return roles.includes(role);
+};
+
+/**
+ * 从自描述路由表中派生出侧栏菜单可见项。
+ */
+const getMenuRoutes = (
+  items: AppRouteObject[],
+  role: AdminRole | undefined,
+) => items.filter(
+  (r) => (
+    r.meta?.menu
+    && !r.meta?.hidden
+    && typeof r.path === 'string'
+    && routeVisibleToRole(r, role)
+  ),
 );
 
 type MenuItem = {
@@ -69,12 +95,46 @@ type MenuItem = {
   children?: MenuItem[];
 };
 
+const buildMenuItems = (
+  menuRoutes: AppRouteObject[],
+  t: TranslateFn,
+): MenuItem[] => {
+  const groupMap = new Map<string, MenuItem>();
+  return menuRoutes.reduce<MenuItem[]>((items, r) => {
+    const path = r.path as string;
+    const label = (
+      <Link to={path}>
+        {r.meta?.titleKey ? t(r.meta.titleKey) : path}
+      </Link>
+    );
+
+    if (r.meta?.group) {
+      const groupKey = r.meta.group;
+      let groupItem = groupMap.get(groupKey);
+      if (!groupItem) {
+        groupItem = {
+          key: groupKey,
+          label: r.meta.groupTitleKey ? t(r.meta.groupTitleKey) : groupKey,
+          children: [],
+        };
+        groupMap.set(groupKey, groupItem);
+        items.push(groupItem);
+      }
+      groupItem.children?.push({ key: path, label });
+    } else {
+      items.push({ key: path, label });
+    }
+    return items;
+  }, []);
+};
+
 const AppLayout = () => {
   const element = useRoutes(routes);
   const t = useTranslate();
   const navigate = useNavigate();
   const { pathname } = useLocation();
-  const [user, setUser] = useState<AdminUser | null>(null);
+  // 登录接口已写入 sessionStorage：首屏按缓存角色渲染，避免菜单闪烁
+  const [user, setUser] = useState<AdminUser | null>(() => getSessionUser());
   const [loggingOut, setLoggingOut] = useState(false);
 
   const isPublicPage = useMemo(() => {
@@ -83,51 +143,29 @@ const AppLayout = () => {
   }, [pathname]);
 
   useEffect(() => {
-    if (isPublicPage) return undefined;
-    let cancelled = false;
-    fetchMe()
-      .then((me) => {
-        if (!cancelled) setUser(me);
-      })
-      .catch(() => {
-        if (!cancelled) setUser(null);
-      });
-    return () => {
-      cancelled = true;
-    };
+    if (isPublicPage) return;
+    const cached = getSessionUser();
+    if (cached) {
+      setUser(cached);
+    }
   }, [isPublicPage, pathname]);
 
-  const menuRoutes = useMemo(() => getMenuRoutes(routes), []);
+  useSessionGuard({
+    enabled: !isPublicPage,
+    user,
+    setUser,
+    pathname,
+  });
 
-  const menuItems = useMemo(() => {
-    const groupMap = new Map<string, MenuItem>();
-    return menuRoutes.reduce<MenuItem[]>((items, r) => {
-      const path = r.path as string;
-      const label = (
-        <Link to={path}>
-          {r.meta?.titleKey ? t(r.meta.titleKey) : path}
-        </Link>
-      );
+  const menuRoutes = useMemo(
+    () => getMenuRoutes(routes, user?.role),
+    [user?.role],
+  );
 
-      if (r.meta?.group) {
-        const groupKey = r.meta.group;
-        let groupItem = groupMap.get(groupKey);
-        if (!groupItem) {
-          groupItem = {
-            key: groupKey,
-            label: r.meta.groupTitleKey ? t(r.meta.groupTitleKey) : groupKey,
-            children: [],
-          };
-          groupMap.set(groupKey, groupItem);
-          items.push(groupItem);
-        }
-        groupItem.children?.push({ key: path, label });
-      } else {
-        items.push({ key: path, label });
-      }
-      return items;
-    }, []);
-  }, [menuRoutes, t]);
+  const menuItems = useMemo(
+    () => buildMenuItems(menuRoutes, t),
+    [menuRoutes, t],
+  );
 
   /**
    * 受控的菜单选中项：
@@ -145,13 +183,15 @@ const AppLayout = () => {
   }, [pathname, menuRoutes]);
 
   const activeRoute = useMemo(
-    () => menuRoutes
+    () => routes
       .filter((route) => {
-        const path = route.path as string;
-        return pathname === path || pathname.startsWith(`${path}/`);
+        const path = route.path;
+        return typeof path === 'string'
+          && Boolean(route.meta?.titleKey)
+          && (pathname === path || pathname.startsWith(`${path}/`));
       })
       .sort((a, b) => String(b.path).length - String(a.path).length)[0],
-    [pathname, menuRoutes],
+    [pathname],
   );
 
   const breadcrumbItems = useMemo(() => {
@@ -173,6 +213,7 @@ const AppLayout = () => {
     setLoggingOut(true);
     try {
       await logout();
+      setUser(null);
       navigate('/login', { replace: true });
     } catch (error) {
       message.error(getApiErrorMessage(error, t('common.logoutFailed')));
@@ -185,6 +226,22 @@ const AppLayout = () => {
     return element;
   }
 
+  const openKeys = menuRoutes
+    .filter((r) => r.meta?.group)
+    .map((r) => r.meta!.group as string)
+    .filter((v, i, a) => a.indexOf(v) === i);
+
+  const userMenuItems: NonNullable<UserDropdownProps['menu']>['items'] = [
+    {
+      key: 'logout',
+      label: t('common.action.logout'),
+      disabled: loggingOut,
+      onClick: () => {
+        void onLogout();
+      },
+    },
+  ];
+
   return (
     <Layout className={styles.appLayout}>
       <Header className={styles.header}>
@@ -194,33 +251,6 @@ const AppLayout = () => {
         </div>
         <div className={styles.headerActions}>
           <LanguageSwitcher />
-          <HeaderUserDropdown
-            trigger={['click']}
-            disabled={loggingOut}
-            menu={{
-              items: [
-                {
-                  key: 'logout',
-                  label: t('common.action.logout'),
-                  disabled: loggingOut,
-                  onClick: () => {
-                    void onLogout();
-                  },
-                },
-              ],
-            }}
-          >
-            <button
-              type="button"
-              className={styles.userMenuTrigger}
-              aria-label={user?.username ?? t('common.action.logout')}
-            >
-              <span className={styles.userName} title={user?.username}>
-                {user?.username ?? '—'}
-              </span>
-              <IconDown className={styles.userCaret} />
-            </button>
-          </HeaderUserDropdown>
         </div>
       </Header>
       <Layout className={styles.main}>
@@ -231,16 +261,38 @@ const AppLayout = () => {
           breakpoint="lg"
           collapsedWidth={64}
         >
-          <Menu
-            mode="inline"
-            selectedKeys={selectedKeys}
-            defaultOpenKeys={menuRoutes
-              .filter((r) => r.meta?.group)
-              .map((r) => r.meta!.group as string)
-              .filter((v, i, a) => a.indexOf(v) === i)}
-            items={menuItems}
-            className={styles.sideMenu}
-          />
+          <div className={styles.siderInner}>
+            <Menu
+              mode="inline"
+              selectedKeys={selectedKeys}
+              defaultOpenKeys={openKeys}
+              items={menuItems}
+              className={styles.sideMenu}
+            />
+            <div className={styles.siderUser}>
+              <UserDropdown
+                trigger={['click']}
+                placement="topLeft"
+                // siderUser padding-top 12px：把浮窗抬到 border-top 分割线上方
+                align={{ offset: [0, -16] }}
+                overlayClassName={styles.siderUserDropdown}
+                disabled={loggingOut}
+                menu={{ items: userMenuItems }}
+              >
+                <button
+                  type="button"
+                  className={styles.siderUserTrigger}
+                  aria-label={user?.username ?? t('common.action.logout')}
+                >
+                  <IconUser className={styles.siderUserIcon} />
+                  <span className={styles.siderUserName} title={user?.username}>
+                    {user?.username ?? '—'}
+                  </span>
+                  <IconCaret className={styles.siderUserCaret} />
+                </button>
+              </UserDropdown>
+            </div>
+          </div>
         </Sider>
         <Content className={styles.content} data-admin-content>
           <div className={styles.contentBody}>

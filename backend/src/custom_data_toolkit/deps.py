@@ -5,7 +5,12 @@ from sqlmodel import Session
 
 from custom_data_toolkit.config.settings import settings
 from custom_data_toolkit.db.session import get_session
-from custom_data_toolkit.middleware.error_handler import CsrfFailedException, UnauthorizedException
+from custom_data_toolkit.middleware.error_handler import (
+    CsrfFailedException,
+    ForbiddenException,
+    UnauthorizedException,
+)
+from custom_data_toolkit.models.admin import AdminRole
 from custom_data_toolkit.repositories import AuthRepository
 from custom_data_toolkit.services import AuthService
 from custom_data_toolkit.services.auth_service import AuthContext
@@ -51,6 +56,22 @@ def get_current_auth(
 
 
 CurrentAuthDep = Annotated[AuthContext, Depends(get_current_auth)]
+
+
+def require_admin(auth: CurrentAuthDep) -> AuthContext:
+    if auth.user.role != AdminRole.ADMIN.value or not auth.user.enabled:
+        raise ForbiddenException(error_code="AdminUser.Forbidden")
+    return auth
+
+
+def require_writer(auth: CurrentAuthDep) -> AuthContext:
+    """业务写操作：仅启用中的 admin。"""
+    if auth.user.role != AdminRole.ADMIN.value or not auth.user.enabled:
+        raise ForbiddenException(
+            "没有写操作权限。",
+            error_code="Auth.Forbidden",
+        )
+    return auth
 
 
 def require_login_csrf(request: Request) -> str:

@@ -27,7 +27,7 @@ alwaysApply: true
 - 实现已搁置的整表覆盖全量/操作日志/处理历史；字典 Redis 禁止擅自整表覆盖
 - 添加自助注册或 Casdoor/Casbin（MVP）
 - 提交 `.env`、密码或 API Key 明文
-- 在对外 `/public/*` 提供写接口
+- 在对外公开 HTTP（globiz 根路径）提供写接口
 - 用 PostgreSQL 替换已决定的 MySQL 复用方案（除非新增 ADR）
 - 以“代码看起来正确”代替 Verify/Test
 - 恢复或新建与权威文档双写的停用文件（见 `docs/archive/README.md`）

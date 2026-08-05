@@ -114,22 +114,24 @@ The picker scope MUST be limited to the create-rate form (MUST NOT be required o
 - WHEN the client calls the existing create rate API
 - THEN the request still uses `currencyId` (and other existing fields) with no new required fields for this change
 
-### Requirement: Public Rate Query with API Key
-The system MUST expose `GET /api/v1/public/rates` authenticated by `X-API-Key`.
-Callers MUST supply `code` and either `date` or `dateFrom`+`dateTo`.
-If the currency code does not exist, the system MUST return 404.
-If the currency exists but no rates match, the system MUST return 200 with an empty `items` list.
+### Requirement: Public Globiz Read API
+The system MUST expose root-path read-only currency/rate APIs per `deploy/api/globiz-rates-api.md`
+(`GET /`, `/currencies/`, `/currencies/{id}/`, `/rates/`, `/rates/{id}/`, `/openapi`).
+Pagination MUST use `page`/`size` (default size 5, max 1000) and respond with `count`/`next`/`previous`/`results`.
+Rate list MAY filter by optional `currencyCode`, `dateStart`, `dateEnd`.
+When `PUBLIC_API_AUTH_ENABLED` is true, callers MUST supply a valid `X-API-Key`; when false, anonymous read is allowed.
+`GET /api/v1/public/rates` MUST NOT be available.
 Public endpoints MUST NOT allow writes.
 
-#### Scenario: Query with valid key
-- GIVEN an enabled API key and rates for `CNY` on 2026-07-29
-- WHEN the client calls public rates with that key, code `CNY`, and date `2026-07-29`
-- THEN the response is 200 and includes the rate data
+#### Scenario: Query rates with valid key
+- GIVEN auth enabled, an enabled API key, and rates for `CNY`
+- WHEN the client calls `GET /rates/?currencyCode=CNY&size=20` with that key
+- THEN the response is 200 with globiz page shape and matching `results`
 
-#### Scenario: Invalid key rejected
-- GIVEN a missing, wrong, or disabled API key
-- WHEN the client calls public rates
-- THEN the system returns 401 `Auth.InvalidApiKey`
+#### Scenario: Invalid key rejected when auth enabled
+- GIVEN `PUBLIC_API_AUTH_ENABLED=true` and a missing/wrong/disabled API key
+- WHEN the client calls a globiz public endpoint
+- THEN the system returns 401 with `detail`
 
 ### Requirement: API Key Administration
 Authenticated admins MUST be able to create, list, enable/disable, and delete API keys via admin HTTP API.

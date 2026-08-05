@@ -32,10 +32,11 @@
 - 日期：2026-07-29
 - 状态：Accepted
 - 背景：管理端是浏览器后台；对外查询是系统间调用。
-- 决策：管理端 Session Cookie + CSRF；对外 `/public/*` 使用 `X-API-Key`。
+- 决策：管理端 Session Cookie + CSRF；对外公开 HTTP 使用可选 `X-API-Key`（环境变量开关）。
 - 原因：浏览器场景适合 Cookie；服务调用适合静态 Key；二者隔离降低误用风险。
 - 后果：需实现会话表与 api_keys 表；Key 只存哈希；文档与中间件需分区清晰。
 - 扩展：未来可换 Casdoor，但业务资源不绑定外部 ID 细节。
+- 补丁（2026-08-05）：对外路径对齐 globiz 根路径契约；`PUBLIC_API_AUTH_ENABLED` 控制是否强制 Key。
 
 ## ADR-004：首版不开放自助注册
 
@@ -98,7 +99,8 @@
 - 日期：2026-07-29
 - 状态：Accepted
 - 背景：调用方可按货币名或 code 查询；海关字典未来可能承担「名称 ↔ code」映射，但需求未定。
-- 决策：对外 `GET /public/rates` **只接受 `code`**，不接受 `name`。管理端列表可用 `q` 按 name/code 搜索。
+- 决策：对外汇率列表按 globiz 契约使用可选 `currencyCode`（及日期筛选），不提供按货币名称查询。管理端列表可用 `q` 按 name/code 搜索。
+- 补丁（2026-08-05）：对外权威改为 `deploy/api/globiz-rates-api.md` 根路径 API；废弃 `/api/v1/public/rates`。
 - 原因：名称易重名/多语言/不规范；code 稳定。名称映射留给后续字典能力，避免现在猜需求。
 - 后果：调用方若只有中文名，需先在管理端或未来字典服务解析出 code；本系统 MVP 不提供按名查汇率。
 

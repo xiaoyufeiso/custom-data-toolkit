@@ -2,9 +2,9 @@
 
 > 状态：API Baseline（draft，**过渡权威**）  
 > 目标：迁出为 OpenAPI（生成或手写 `openapi.yaml`）后，本文降级为索引。  
-> Base URL：`/api/v1`  
-> 管理端认证：HttpOnly Session Cookie + CSRF  
-> 对外认证：`X-API-Key`
+> 管理端 Base URL：`/api/v1`（Session Cookie + CSRF）  
+> 对外公开 API：根路径（**无** `/api` 前缀），权威见 `deploy/api/globiz-rates-api.md`  
+> 对外鉴权：由环境变量 `PUBLIC_API_AUTH_ENABLED` 控制（默认 `true` 时需 `X-API-Key`）
 
 ## 1. 通用约定
 
@@ -40,10 +40,12 @@
 - 写请求头：`X-CSRF-Token: <token>`。
 - 失败：403，错误码 `Auth.CsrfFailed`。
 
-### 1.3 API Key
+### 1.3 API Key（对外公开 API）
 
 - 请求头：`X-API-Key: <plain-key>`。
-- 仅用于 `/api/v1/public/*`。
+- 用于根路径公开只读接口（`/`、`/currencies/`、`/rates/`、`/openapi`）。
+- `PUBLIC_API_AUTH_ENABLED=false` 时不校验（仅运维改环境变量；调用方与管理端 UI 不可改）。
+- 已废弃：`GET /api/v1/public/rates`。
 
 ## 2. 错误格式
 
@@ -93,10 +95,47 @@
 ```
 
 登录成功：设置 Session Cookie，返回当前用户（不含密码）。
+返回体含 `id`、`username`、`role`（`admin` | `viewer`）、`enabled`。
+停用账号（`enabled=false`）登录失败：401，文案与错误凭证相同（不暴露账号状态）。
 
-修改密码成功后：撤销**其他**会话，当前会话保留。
+修改密码成功后：撤销**其他**会话，当前会话保留（admin / viewer 均可自改密）。
 
 **无** `/auth/register`。
+
+### 3.1 管理端用户（仅 `admin`）
+
+Session + CSRF。`viewer` 访问返回 403，`AdminUser.Forbidden`。
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/admin-users` | 分页列表；可选 `q`（用户名模糊）、`role`、`enabled`、`page`、`pageSize` |
+| POST | `/admin-users` | 创建；body：`username`、`password`、`role`（默认 `viewer`） |
+| PATCH | `/admin-users/{id}` | 改 `role` / `enabled`；不可改用户名 |
+| POST | `/admin-users/{id}/reset-password` | 管理员设新密码（无需旧密码） |
+
+约束：
+
+- 用户名 trim 后唯一，长度 3–64；密码仅存哈希，长度 ≥ 8；响应永不回传密码。
+- 禁止停用自己：409，`AdminUser.CannotDisableSelf`。
+- 禁止停用或降级最后一个启用的 `admin`：409，`AdminUser.LastAdmin`（事务内锁定启用 admin 行后校验，防并发互停）。
+- 用户名冲突：409，`AdminUser.DuplicateUsername`。
+- 停用用户时删除其全部 session。
+
+业务写接口（货币/汇率/字典变更、导入、API Key、导入模板）仅 `admin`：`viewer` 返回 403，`Auth.Forbidden`。  
+字典导出（标准/缺失 `GET .../export`）对已登录 `admin`/`viewer` 开放。
+
+### 3.2 操作审计（仅 `admin`）
+
+Session。`viewer` 访问返回 403，`AdminUser.Forbidden`。  
+成功写操作后落库；登录/退出、只读 GET、字典 export、导入模板**不**记。  
+`summary` 禁止含密码或 API Key 明文。批量请求记一行。
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/audit-logs` | 分页列表；可选 `actorUsername`、`action`、`resourceType`、`createdFrom`、`createdTo`、`sortOrder`（`asc`/`desc`，省略为默认时间倒序）、`page`、`pageSize` |
+| GET | `/audit-logs/{id}` | 详情（含 `summary`） |
+
+无写/删审计接口。未登录 401。
 
 ## 4. 货币
 
@@ -233,37 +272,29 @@
 
 列表项 MUST NOT 包含完整 `key`。
 
-## 7. 对外公开接口
+## 7. 对外公开接口（globiz 契约）
+
+权威细节：`deploy/api/globiz-rates-api.md`。路径在应用**根**上，无 `/api/v1` 前缀。
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| GET | `/public/rates` | 按货币 **code** 查询汇率 |
+| GET | `/` | 入口链接（currencies / rates / openapi） |
+| GET | `/currencies/` | 货币分页列表 |
+| GET | `/currencies/{id}/` | 单个货币 |
+| GET | `/rates/` | 汇率分页列表 |
+| GET | `/rates/{id}/` | 单条汇率 |
+| GET | `/openapi` | OpenAPI JSON |
 
-查询参数：
+分页参数：`page`（默认 1）、`size`（默认 5，最大 1000）。  
+分页响应：`count` / `next` / `previous` / `results`。
 
-- `code`：必填（货币字母码，如 `CNY`、`MYR_IM`）。**不支持按货币名称查询**（名称映射留给后续海关字典；见 ADR-009 / ADR-010）。
-- 时间：`date` **或** `dateFrom`+`dateTo`（必填其一；区间时两者都必填且 from≤to）
+汇率列表可选筛选：`currencyCode`、`dateStart`、`dateEnd`（`YYYY-MM-DD`）。  
+汇率项字段：`id`、`data`、`currency`（代码字符串）、`date`（**无** `checked`）。
 
-鉴权：`X-API-Key`
+鉴权：`PUBLIC_API_AUTH_ENABLED=true`（默认）时必须有效 `X-API-Key`；`false` 时匿名可读。  
+错误：公开路由优先 `{"detail": "..."}`（如 404 `Not found.` / `Invalid page.`）。
 
-成功：200
-
-```json
-{
-  "items": [
-    {
-      "currencyCode": "CNY",
-      "date": "2026-07-29",
-      "data": "7.1200",
-      "checked": true
-    }
-  ]
-}
-```
-
-- 货币 code 不存在：404，`Currency.NotFound`
-- 无汇率记录：200，`items: []`
-- API Key 无效：401，`Auth.InvalidApiKey`
+已废弃：`GET /api/v1/public/rates`（及旧 `items`/`currencyCode`/`dateFrom` 契约）。
 
 ## 8. 海关数据字典（管理端）
 

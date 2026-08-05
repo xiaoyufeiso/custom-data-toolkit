@@ -4,9 +4,9 @@
 
 ## 当前状态
 
-- 阶段：功能分支已合并；已完成 OpenSpec 归档
-- 整体状态：`main` 含字典全链路 + 管理端列表 UI；剩余可选 `standardize-admin-ui-components` 登录页/i18n 收口
-- 最后更新：2026-08-04
+- 阶段：用户管理 / viewer 只读 / 操作审计已实现；Session 多标签同步与停用踢出已落地；三 change 待归档；`main` 有大量未提交改动
+- 整体状态：含字典全链路 + 列表 UI + 用户管理 + viewer 只读 + 操作审计 + Session 守卫；剩余可选 `standardize-admin-ui-components`
+- 最后更新：2026-08-05
 
 ## 里程碑
 
@@ -18,17 +18,53 @@
 | 标准字典导入/导出 | 完成（已归档） |
 | 字典类型管理 | 完成（已归档） |
 | 管理端列表 UI 统一 | 完成（已归档） |
+| 管理端用户管理 | 完成（待归档 `add-admin-user-mgmt`） |
+| viewer 只读角色 | 完成（待归档 `add-viewer-readonly-role`） |
+| 管理端操作审计 | 完成（待归档 `add-admin-audit-log`） |
 
 ## 阻塞
 
-无。整表覆盖 / 处理历史 / 操作日志等仍为 Deferred。
+无。整表覆盖 / 字典处理历史仍为 Deferred。
 
 ## 下一步
 
-1. （可选）`standardize-admin-ui-components`：登录页 / i18n / 视觉收口后归档
-2. （可选）E5 Redis 友好错误文案；API 契约迁 OpenAPI
+1. 提交并 push：用户管理 / viewer / 操作审计 / Session 守卫
+2. 归档 `add-admin-user-mgmt` + `add-viewer-readonly-role` + `add-admin-audit-log`
+3. （可选）`standardize-admin-ui-components`：登录页 / i18n / 视觉收口后归档
+4. （可选）E5 Redis 友好错误文案；API 契约迁 OpenAPI
 
 ## 日志（摘录）
+
+### 2026-08-05（对外 API 对齐 globiz）
+
+- 权威：`deploy/api/globiz-rates-api.md`；根路径 `/currencies/`、`/rates/` 等
+- `PUBLIC_API_AUTH_ENABLED` 运维开关；废弃 `/api/v1/public/rates`
+- pytest：`test_globiz_public_api` 等相关通过
+
+### 2026-08-05（Session 多标签 / 停用踢出）
+
+- 前端 `useSessionGuard`：focus / 可见性 / 约 10s 轮询 / BroadcastChannel 重验 `/auth/me`
+- Cookie 换账号 → Toast「账号已切换」并刷新侧栏；非 admin 离开系统管理页
+- `401 Auth.Unauthorized`（含停用清 Session）→ Toast「登录已失效」并踢回登录
+- 文档：`openspec/specs/ui.md`、`docs/product.md` 已回写；相关 vitest 通过
+
+### 2026-08-04（操作审计）
+
+- OpenSpec `add-admin-audit-log`：表 `admin_audit_log`、写接口埋点、`GET /audit-logs`
+- 前端侧栏 `/audit-logs`：点操作文案开详情；批量一行展示数量
+- pytest + vitest 通过
+
+### 2026-08-04（viewer 只读）
+
+- `operator` → `viewer`；迁移 `0006`；`require_writer` 挂业务写/API Key/导入模板
+- viewer：可读 + 字典 export；前端隐藏写操作；pytest + vitest 通过
+
+### 2026-08-04（用户管理）
+
+- OpenSpec change `add-admin-user-mgmt`：`admin`/`operator` + `enabled` 软停用
+- 后端：迁移、`/admin-users` CRUD、`require_admin`、登录/me/session 对齐；pytest 8 passed
+- 前端：`/admin-users` 页、`RequireAdmin`；入口改左下角用户下拉（admin：用户管理+退出；operator：退出）
+- 文档：`api.md` / `product.md` / `ui.md` 已回写
 
 ### 2026-08-04（合并与归档）
 

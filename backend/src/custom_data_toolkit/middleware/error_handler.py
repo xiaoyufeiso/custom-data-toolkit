@@ -72,6 +72,18 @@ class CsrfFailedException(AppException):
         super().__init__(message)
 
 
+class ForbiddenException(AppException):
+    status_code = 403
+    error_code = "AdminUser.Forbidden"
+
+    def __init__(
+        self,
+        message: str = "没有权限执行此操作。",
+        error_code: str | None = None,
+    ) -> None:
+        super().__init__(message, error_code=error_code or self.error_code)
+
+
 def register_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(AppException)
     async def handle_app_exception(request: Request, exc: AppException) -> JSONResponse:

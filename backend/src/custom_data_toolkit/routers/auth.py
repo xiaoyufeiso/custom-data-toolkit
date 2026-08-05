@@ -14,6 +14,7 @@ from custom_data_toolkit.routers.auth_schemas import (
     CsrfResponse,
     LoginRequest,
 )
+from custom_data_toolkit.services.audit_service import record_admin_audit
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -79,12 +80,22 @@ def login(
     issue = service.login(body.username, body.password)
     _set_session_cookie(response, issue.session_token)
     _set_csrf_cookie(response, issue.csrf_token)
-    return AdminPublic(id=issue.user.id, username=issue.user.username)  # type: ignore[arg-type]
+    return AdminPublic(
+        id=issue.user.id,  # type: ignore[arg-type]
+        username=issue.user.username,
+        role=issue.user.role,
+        enabled=issue.user.enabled,
+    )
 
 
 @router.get("/me", response_model=AdminPublic)
 def me(auth: CurrentAuthDep) -> AdminPublic:
-    return AdminPublic(id=auth.user.id, username=auth.user.username)  # type: ignore[arg-type]
+    return AdminPublic(
+        id=auth.user.id,  # type: ignore[arg-type]
+        username=auth.user.username,
+        role=auth.user.role,
+        enabled=auth.user.enabled,
+    )
 
 
 @router.post("/logout", status_code=204)
@@ -110,4 +121,11 @@ def change_password(
         session_row=auth.session,
         current_password=body.current_password,
         new_password=body.new_password,
+    )
+    record_admin_audit(
+        auth,
+        action="auth.change_password",
+        resource_type="admin_user",
+        resource_ids=[auth.user.id],
+        summary={"changed": True},
     )

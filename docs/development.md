@@ -8,6 +8,7 @@
 - Node.js + pnpm（前端）
 - Python 3.12+ + uv（后端）
 - MySQL 8（本地或 Docker；账号约定见下）
+- Docker（本地海关字典 Redis；见下）
 - 工作区优先：`/home/fei/custom-data-toolkit`（WSL）
 
 ## 2. 本地搭建
@@ -15,10 +16,49 @@
 ```text
 1. MySQL 可用（开发库 + 测试库）
 2. 导入外部表 DDL：deploy/sql/schema.sql（currency / rate）
-3. cd backend && cp -n .env.example .env && uv sync --group dev --group test
-4. alembic upgrade head
-5. cd web && pnpm install
-6. 分别启动 backend / web，或 scripts/tendata-fullstack.mjs（若可用）
+3. 启动本地 Redis（海关字典；见 §2.1）
+4. cd backend && cp -n .env.example .env && uv sync --group dev --group test
+5. alembic upgrade head
+6. cd web && pnpm install
+7. 分别启动 backend / web，或 scripts/tendata-fullstack.mjs（若可用）
+```
+
+### 2.1 本地 Redis（海关字典）
+
+本机约定容器名 `cdt-redis`：主机 `127.0.0.1:16379` → 容器 `6379`，AOF 持久化到 Docker volume `cdt-redis-data`。  
+`backend/.env` 中 `REDIS_URL=redis://127.0.0.1:16379/0`（与 `.env.example` 一致）。
+
+首次创建（仅一次）：
+
+```bash
+docker run -d --name cdt-redis \
+  --restart unless-stopped \
+  -p 127.0.0.1:16379:6379 \
+  -v cdt-redis-data:/data \
+  redis:7-alpine \
+  redis-server --appendonly yes
+```
+
+每次开发前若容器已存在但未运行，启动：
+
+```bash
+docker start cdt-redis
+```
+
+常用检查：
+
+```bash
+docker ps --filter name=cdt-redis
+redis-cli -h 127.0.0.1 -p 16379 ping   # 若本机装了 redis-cli
+```
+
+说明：自动化测试使用 fakeredis，不依赖该容器；联调标准/缺失字典时需要真实 Redis。
+
+可选种子脚本（backend 目录）：
+
+```bash
+uv run python scripts/seed_missing_dict.py          # 缺失字典 Redis 测试数据
+uv run python scripts/seed_audit_logs.py --replace  # 审计日志：覆盖全部 action 各 1 条
 ```
 
 WSL 建库示例（主机/库名须与 `backend/.env` 一致；应用账号固定 `customs_app`）：
@@ -56,6 +96,7 @@ docker run -d --name cdt-mysql \
 
 | 场景 | 命令 |
 |---|---|
+| 启动 Redis | `docker start cdt-redis`（首次见 §2.1） |
 | 后端依赖 | `cd backend && uv sync --group dev --group test` |
 | 后端开发 | `cd backend && ~/.local/bin/uv run uvicorn custom_data_toolkit.main:app --reload --host 127.0.0.1 --port 8000` |
 | 后端测试 | `cd backend && uv run pytest` |
@@ -65,13 +106,16 @@ docker run -d --name cdt-mysql \
 | 前端开发（UAT） | `cd web && pnpm start:uat` |
 | 前端测试 | `cd web && pnpm test`（以 package.json scripts 为准） |
 
-本地联调时分别打开两个终端，从项目根目录启动前后端：
+本地联调时先起 Redis，再分别打开两个终端启动前后端：
 
 ```bash
+# Redis（海关字典联调需要）
+docker start cdt-redis
+
 # 前端
 cd web
 pnpm start:uat
-
+==
 # 后端
 cd backend
 ~/.local/bin/uv run uvicorn custom_data_toolkit.main:app \
@@ -111,7 +155,7 @@ plan →（用户确认）→ implement → verify → test → review → docum
 
 - MySQL 约束与 Alembic；登录/CSRF/会话。
 - 货币 CRUD 与有汇率删除冲突；汇率唯一键冲突。
-- API Key 创建可用、停用后 401；`/public/rates` 单日与区间。
+- API Key 创建可用、停用后对外 401（当 `PUBLIC_API_AUTH_ENABLED=true`）；globiz `GET /rates/` 等可用。
 
 ### 前端
 

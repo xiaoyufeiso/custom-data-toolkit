@@ -18,6 +18,8 @@ class ChangePasswordRequest(CamelModel):
 class AdminPublic(CamelModel):
     id: int
     username: str
+    role: str
+    enabled: bool
 
 
 class CsrfResponse(CamelModel):

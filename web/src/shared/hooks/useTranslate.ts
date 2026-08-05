@@ -1,6 +1,8 @@
 import { useCallback } from 'react';
 import { useIntl, type PrimitiveType } from 'react-intl';
 import about from '@/locales/en/about';
+import adminUsers from '@/locales/en/adminUsers';
+import auditLogs from '@/locales/en/auditLogs';
 import common from '@/locales/en/common';
 import currencies from '@/locales/en/currencies';
 import customsDict from '@/locales/en/customsDict';
@@ -19,6 +21,8 @@ import rates from '@/locales/en/rates';
  */
 export type MessageId =
   | keyof typeof common
+  | keyof typeof adminUsers
+  | keyof typeof auditLogs
   | keyof typeof currencies
   | keyof typeof customsDict
   | keyof typeof home

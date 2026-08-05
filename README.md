@@ -46,10 +46,11 @@ Agent / CLI 请在此目录打开；勿长期依赖 `/mnt/d/实习/...`。
 ## 本地启动
 
 1. MySQL 可达；导入 `deploy/sql/schema.sql`（见 `docs/development.md`）
-2. `cd backend && cp -n .env.example .env && uv sync --group dev --group test`
-3. `cd backend && uv run alembic upgrade head`
-4. `cd web && pnpm install`
-5. 分别启动前后端，或 `node scripts/tendata-fullstack.mjs dev`（若脚本可用）
+2. 启动 Redis：`docker start cdt-redis`（首次创建命令见 `docs/development.md` §2.1；`REDIS_URL` 默认 `127.0.0.1:16379`）
+3. `cd backend && cp -n .env.example .env && uv sync --group dev --group test`
+4. `cd backend && uv run alembic upgrade head`
+5. `cd web && pnpm install`
+6. 分别启动前后端，或 `node scripts/tendata-fullstack.mjs dev`（若脚本可用）
 
 ## 当前阶段
 

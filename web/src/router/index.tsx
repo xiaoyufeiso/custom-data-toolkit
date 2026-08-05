@@ -1,8 +1,10 @@
 import React, { lazy, Suspense } from 'react';
 import { IndexRouteObject, NonIndexRouteObject, Navigate } from 'react-router-dom';
 import Loading from '@/shared/components/loading';
+import RequireAdmin from '@/shared/components/requireAdmin';
 import RequireAuth from '@/shared/components/requireAuth';
 import type { MessageId } from '@/shared/hooks';
+import type { AdminRole } from '@/services/auth';
 
 export interface RouteMeta {
   titleKey?: MessageId;
@@ -11,6 +13,8 @@ export interface RouteMeta {
   group?: string;
   /** 分组显示名称对应的 i18n key */
   groupTitleKey?: MessageId;
+  /** 可见角色；缺省表示所有已登录用户 */
+  roles?: AdminRole[];
   icon?: React.ReactNode;
   hidden?: boolean;
   public?: boolean;
@@ -29,6 +33,8 @@ const Rates = lazy(() => import('@/pages/rates'));
 const CustomsDictMappings = lazy(() => import('@/pages/customsDict/mappings'));
 const CustomsDictMissing = lazy(() => import('@/pages/customsDict/missing'));
 const CustomsDictTypes = lazy(() => import('@/pages/customsDict/types'));
+const AdminUsers = lazy(() => import('@/pages/adminUsers'));
+const AuditLogs = lazy(() => import('@/pages/auditLogs'));
 
 const lazyLoad = (Component: React.LazyExoticComponent<React.ComponentType>) => (
   <Suspense fallback={<Loading />}>
@@ -89,6 +95,28 @@ const routes: AppRouteObject[] = [
       menu: true,
       group: 'customsDict',
       groupTitleKey: 'common.customsDict',
+    },
+  },
+  {
+    path: '/admin-users',
+    element: <RequireAdmin>{lazyLoad(AdminUsers)}</RequireAdmin>,
+    meta: {
+      titleKey: 'common.adminUsers',
+      menu: true,
+      group: 'system',
+      groupTitleKey: 'common.system',
+      roles: ['admin'],
+    },
+  },
+  {
+    path: '/audit-logs',
+    element: <RequireAdmin>{lazyLoad(AuditLogs)}</RequireAdmin>,
+    meta: {
+      titleKey: 'common.auditLogs',
+      menu: true,
+      group: 'system',
+      groupTitleKey: 'common.system',
+      roles: ['admin'],
     },
   },
   { path: '*', element: <Navigate to="/currencies" replace /> },

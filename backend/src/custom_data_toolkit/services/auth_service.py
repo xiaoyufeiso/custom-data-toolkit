@@ -9,6 +9,7 @@ from custom_data_toolkit.middleware.error_handler import (
     UnauthorizedException,
 )
 from custom_data_toolkit.models import AdminSession, AdminUser
+from custom_data_toolkit.models.admin import AdminRole
 from custom_data_toolkit.repositories import AuthRepository
 from custom_data_toolkit.security import (
     digest_equal,
@@ -43,6 +44,8 @@ class AuthService:
         user = AdminUser(
             username=settings.admin_bootstrap_username.strip(),
             password_hash=hash_password(settings.admin_bootstrap_password),
+            role=AdminRole.ADMIN.value,
+            enabled=True,
             created_at=now,
             updated_at=now,
         )
@@ -52,7 +55,11 @@ class AuthService:
     def login(self, username: str, password: str) -> SessionIssue:
         cleaned = username.strip()
         user = self.repository.get_user_by_username(cleaned)
-        ok = bool(user and verify_password(user.password_hash, password))
+        ok = bool(
+            user
+            and user.enabled
+            and verify_password(user.password_hash, password)
+        )
         if not ok:
             raise LoginFailedException()
         assert user is not None
@@ -74,7 +81,10 @@ class AuthService:
             self.repository.commit()
             raise UnauthorizedException()
         user = self.repository.get_user_by_id(session_row.user_id)
-        if user is None:
+        if user is None or not user.enabled:
+            if session_row is not None:
+                self.repository.delete_session(session_row)
+                self.repository.commit()
             raise UnauthorizedException()
         return AuthContext(user=user, session=session_row)
 

@@ -19,4 +19,13 @@ export const handlers: RequestHandler[] = [
       email: 'mock@tendata.net',
     })
   )),
+  // 业务页 useCanWrite：默认视为 admin，单测可 server.use 覆盖为 viewer
+  http.get(`${TEST_API_ORIGIN}/api/v1/auth/me`, () => (
+    HttpResponse.json({
+      id: 1,
+      username: 'admin',
+      role: 'admin',
+      enabled: true,
+    })
+  )),
 ];

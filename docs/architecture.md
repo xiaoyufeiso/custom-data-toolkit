@@ -57,7 +57,7 @@ custom-data-toolkit/
 - 汇率唯一性与外键约束的最终保证。
 - API Key 管理 UI（2026-07-31 起搁置；后端 `/api-keys` 与对外 `X-API-Key` 鉴权仍保留）。
 - 存储 API Key 明文。
-- 处理历史 / 操作日志 UI（搁置）；不做整表覆盖全量同步。
+- 处理历史 UI（搁置）；管理端操作审计见 `openspec/changes/add-admin-audit-log/`；不做整表覆盖全量同步。
 
 建议域划分：
 
@@ -99,13 +99,14 @@ routers → services → repositories → models
 
 ```text
 浏览器 ──Session+CSRF──► /api/v1/auth|currencies|rates|api-keys|customs-dict...
-外部系统 ──X-API-Key──► /api/v1/public/rates
+外部系统 ──(可选) X-API-Key──► /currencies/|/rates/（globiz 根路径）
 下游 / 第三方 ──共用 Redis──► customs:{type}:dict（Hash）与 :missing（ZSET）
 ```
 
-- 管理端与对外 API 鉴权链路 MUST 隔离。
+- 管理端与对外 API 鉴权链路 MUST 隔离；对外权威见 `deploy/api/globiz-rates-api.md`。
+- 对外鉴权开关：`PUBLIC_API_AUTH_ENABLED`（运维环境变量；默认开启 Key 校验）。
 - API Key 仅存哈希；校验时对提交明文做同样哈希比对。
-- 字典：本系统经管理端流程对约定 key 做增量写/删 missing；第三方也可写正式 Hash；不得在对外 `/public/*` 提供字典写接口。
+- 字典：本系统经管理端流程对约定 key 做增量写/删 missing；第三方也可写正式 Hash；不得在对外公开 HTTP 提供字典写接口。
 
 ## 6. 数据与外部系统
 

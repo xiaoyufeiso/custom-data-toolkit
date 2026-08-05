@@ -1,4 +1,6 @@
 import about from './about';
+import adminUsers from './adminUsers';
+import auditLogs from './auditLogs';
 import common from './common';
 import currencies from './currencies';
 import customsDict from './customsDict';
@@ -7,6 +9,8 @@ import rates from './rates';
 
 const en: Record<string, string> = {
   ...common,
+  ...adminUsers,
+  ...auditLogs,
   ...currencies,
   ...customsDict,
   ...home,

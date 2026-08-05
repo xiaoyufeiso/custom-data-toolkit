@@ -54,11 +54,15 @@ def test_login_success_and_me(client: TestClient) -> None:
     assert login.status_code == 200
     body = login.json()
     assert body["username"] == settings.admin_bootstrap_username
+    assert body["role"] == "admin"
+    assert body["enabled"] is True
     assert "password" not in body
 
     me = client.get("/api/v1/auth/me")
     assert me.status_code == 200
     assert me.json()["username"] == settings.admin_bootstrap_username
+    assert me.json()["role"] == "admin"
+    assert me.json()["enabled"] is True
 
 
 def test_login_failed_generic(client: TestClient) -> None:
