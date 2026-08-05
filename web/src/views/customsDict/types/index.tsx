@@ -21,7 +21,6 @@ import {
 import {
   createCustomsDictType,
   disableCustomsDictType,
-  enableCustomsDictType,
   listCustomsDictTypeSuggestions,
   listCustomsDictTypes,
   updateCustomsDictType,
@@ -159,40 +158,6 @@ const CustomsDictTypesView = () => {
     } finally {
       setSubmitting(false);
     }
-  };
-
-  const onToggle = async (row: CustomsDictTypeItem) => {
-    setSubmitting(true);
-    try {
-      const updated = row.enabled
-        ? await disableCustomsDictType(row.id)
-        : await enableCustomsDictType(row.id);
-      message.success(t('customsDict.message.saveSuccess'));
-      if (!updated.enabled) {
-        closeDetail();
-      } else {
-        setDetail(updated);
-      }
-      await load();
-    } catch (error) {
-      message.error(getApiErrorMessage(error, t('customsDict.message.loadFailed')));
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const openToggleConfirm = (row: CustomsDictTypeItem) => {
-    if (!row.enabled) {
-      void onToggle(row);
-      return;
-    }
-    Modal.confirm({
-      children: Children,
-      centered: true,
-      title: t('customsDict.disable.confirmTitle'),
-      content: t('customsDict.disable.confirmContent'),
-      onOk: () => onToggle(row),
-    });
   };
 
   const onBatchDisable = async () => {

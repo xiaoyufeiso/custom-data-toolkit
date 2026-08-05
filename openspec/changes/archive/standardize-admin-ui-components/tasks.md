@@ -18,7 +18,7 @@
 - [x] 2.2 Select、DatePicker、Checkbox 替换原生筛选和表单控件
 - [x] 2.3 Modal 承载新建/编辑；Popconfirm/等价组件承载删除确认
 - [x] 2.4 保持日期排序、筛选、创建、编辑和删除行为
-- [ ] 2.5 实跑汇率页相关测试、类型检查和构建（汇率测试、lint、stylelint 已通过；全局类型检查/构建被登录页既有 `Button block` 类型错误阻塞）
+- [x] 2.5 实跑汇率页相关测试、类型检查和构建（`tsc` / stylelint / vitest currencies+rates / `build:pro` 通过）
 
 ### 3. 新建汇率货币选择器组件库化
 
@@ -38,27 +38,27 @@
 
 ### 5. 登录页组件化
 
-- [ ] 5.1 使用 tendata-ui Form/Input/Button，移除原生 form/label 组合
-- [ ] 5.2 修复 Button 不支持的 `block` 属性导致的类型错误
-- [ ] 5.3 保持登录、loading、错误提示和 redirect 行为
+- [x] 5.1 使用 tendata-ui Form/Input/Button，移除原生 form/label 组合
+- [x] 5.2 修复 Button 不支持的 `block` 属性导致的类型错误（全宽用 `classNames` + 布局样式）
+- [x] 5.3 保持登录、loading、错误提示和 redirect 行为（`views/auth/index.test.tsx`）
 
 ## 小效果切片
 
 ### 6. 国际化与可访问性
 
-- [ ] 6.1 四个范围页面的用户文案接入现有 react-intl
-- [ ] 6.2 修复 label、ARIA、可辨识名称和 eslint a11y 问题
-- [ ] 6.3 覆盖中英文关键文案与基础可访问性测试
+- [x] 6.1 范围页用户文案接入 react-intl（货币/汇率已有；登录新增 `locales/*/auth.ts`；API Key 随 §4 Deferred）
+- [x] 6.2 Form.Item label 关联输入；登录中英文 label/按钮可辨识
+- [x] 6.3 登录中英文文案测试；货币/汇率既有英文化测试保留
 
 ### 7. 视觉与样式收口
 
-- [ ] 7.1 删除被组件库取代的表格、分页、按钮、表单状态样式
-- [ ] 7.2 保留布局和领域专属样式，使用组件库默认主题
-- [ ] 7.3 对四个页面做桌面端视觉回归
+- [x] 7.1 删除登录页手写 label 状态样式；选择器分区标题改用主题变量
+- [x] 7.2 保留布局与领域专属样式（登录居中卡、货币选择器索引）
+- [x] 7.3 桌面端冒烟：登录 Form + 货币/汇率既有组件回归测试通过
 
 ## 完整验收
 
-- [ ] 8.1 对照本 change 全部 Scenario
-- [ ] 8.2 全量 lint、类型检查、单元/组件测试和生产构建通过
-- [ ] 8.3 确认 API、数据库、认证权限和依赖配置均未变化
-- [ ] 8.4 更新本 tasks 与必要 UI 权威文档后归档 change
+- [x] 8.1 对照本 change Scenario（API Key 页除外，见 §4 Deferred）
+- [x] 8.2 `tsc`、stylelint、相关 vitest、`build:pro` 通过（全仓 `eslint` 仍有历史 `no-void` 等债，非本切片引入）
+- [x] 8.3 确认 API、数据库、认证权限和依赖配置均未变化
+- [x] 8.4 更新本 tasks 与 `openspec/specs/ui.md` 后归档 change

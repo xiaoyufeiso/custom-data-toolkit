@@ -4,8 +4,8 @@
 
 ## 当前状态
 
-- 阶段：用户管理 / viewer / 审计 / globiz 对外 API 已归档；Session 守卫已落地；剩余可选 `standardize-admin-ui-components`
-- 整体状态：MVP 主链路完成；活跃 change 仅 UI 组件库化收口与两项 Deferred
+- 阶段：MVP 主链路与管理端 UI 组件库化已完成并归档；活跃仅两项 Deferred
+- 整体状态：用户/viewer/审计/globiz/Session/登录页 Form+i18n 均已落地
 - 最后更新：2026-08-05
 
 ## 里程碑
@@ -22,6 +22,7 @@
 | viewer 只读角色 | 完成（已归档） |
 | 管理端操作审计 | 完成（已归档） |
 | 对外 API 对齐 globiz | 完成（已归档） |
+| 管理端 UI 组件库化 | 完成（已归档；API Key 页仍 deferred） |
 
 ## 阻塞
 
@@ -29,10 +30,15 @@
 
 ## 下一步
 
-1. （可选）`standardize-admin-ui-components`：登录页 / i18n / 视觉收口后归档
-2. （可选）E5 Redis 友好错误文案；API 契约迁 OpenAPI
+1. （可选）E5 Redis 友好错误文案；API 契约迁 OpenAPI
+2. （可选）恢复前端 API Key 管理 UI
 
 ## 日志（摘录）
+
+### 2026-08-05（UI 组件库化收口并归档）
+
+- 登录页：tendata-ui Form/Input/Button；`locales/*/auth.ts`；成功/失败/redirect 测试
+- `tsc` / stylelint / 相关 vitest 43 / `build:pro` 通过；归档 `standardize-admin-ui-components`
 
 ### 2026-08-05（OpenSpec 归档）
 

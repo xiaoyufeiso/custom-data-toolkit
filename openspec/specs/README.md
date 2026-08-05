@@ -15,7 +15,6 @@
 
 | 变更 | 路径 | 状态 |
 |------|------|------|
-| 管理端 UI 组件库化与视觉统一 | `openspec/changes/standardize-admin-ui-components/` | proposed（货币/汇率完成；登录页/i18n/视觉收口待实施） |
 | 货币同名软提醒 | `openspec/changes/add-duplicate-currency-name-warnings/` | deferred |
 | 货币列表关联汇率数量 | `openspec/changes/add-currency-rate-counts/` | deferred |
 
@@ -23,6 +22,7 @@
 
 | 变更 | 路径 | 归档日期 |
 |------|------|----------|
+| 管理端 UI 组件库化与视觉统一 | `openspec/changes/archive/standardize-admin-ui-components/` | 2026-08-05（API Key 页仍 deferred） |
 | 管理端用户管理（角色 + 软停用） | `openspec/changes/archive/add-admin-user-mgmt/` | 2026-08-05 |
 | viewer 只读角色 | `openspec/changes/archive/add-viewer-readonly-role/` | 2026-08-05 |
 | 管理端操作审计 | `openspec/changes/archive/add-admin-audit-log/` | 2026-08-05 |

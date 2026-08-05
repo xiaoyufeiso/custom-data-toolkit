@@ -3,6 +3,7 @@ import { useIntl, type PrimitiveType } from 'react-intl';
 import about from '@/locales/en/about';
 import adminUsers from '@/locales/en/adminUsers';
 import auditLogs from '@/locales/en/auditLogs';
+import auth from '@/locales/en/auth';
 import common from '@/locales/en/common';
 import currencies from '@/locales/en/currencies';
 import customsDict from '@/locales/en/customsDict';
@@ -23,6 +24,7 @@ export type MessageId =
   | keyof typeof common
   | keyof typeof adminUsers
   | keyof typeof auditLogs
+  | keyof typeof auth
   | keyof typeof currencies
   | keyof typeof customsDict
   | keyof typeof home

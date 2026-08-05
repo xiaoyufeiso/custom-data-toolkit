@@ -254,7 +254,6 @@ describe('CustomsDictMissingView', () => {
   });
 
   it('uses bordered reset and link-style refresh', async () => {
-    const user = userEvent.setup();
     server.use(
       http.get(MISSING_URL, () => HttpResponse.json(listResponse)),
     );

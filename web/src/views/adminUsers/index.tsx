@@ -72,7 +72,7 @@ const AdminUsersView = () => {
   }>();
   const [editForm] = Form.useForm<{
     role: AdminRole;
-    enabled: boolean;
+    enabled: 'true' | 'false';
   }>();
   const [resetForm] = Form.useForm<{ password: string }>();
 
@@ -136,7 +136,10 @@ const AdminUsersView = () => {
 
   const openEdit = () => {
     if (!detail) return;
-    editForm.setFieldsValue({ role: detail.role, enabled: detail.enabled });
+    editForm.setFieldsValue({
+      role: detail.role,
+      enabled: detail.enabled ? 'true' : 'false',
+    });
     setEditOpen(true);
   };
 
@@ -180,7 +183,7 @@ const AdminUsersView = () => {
     try {
       const updated = await updateAdminUser(detail.id, {
         role: values.role,
-        enabled: values.enabled,
+        enabled: values.enabled === 'true',
       });
       message.success(t('adminUsers.message.updated'));
       setDetail(updated);
@@ -545,8 +548,8 @@ const AdminUsersView = () => {
           <Form.Item name="enabled" label={t('adminUsers.form.enabled')}>
             <Select
               options={[
-                { value: true, label: t('adminUsers.enabled.true') },
-                { value: false, label: t('adminUsers.enabled.false') },
+                { value: 'true', label: t('adminUsers.enabled.true') },
+                { value: 'false', label: t('adminUsers.enabled.false') },
               ]}
             />
           </Form.Item>

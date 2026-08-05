@@ -15,7 +15,8 @@
   - 分页：`showSizeChanger` + `pageSizeOptions`；改页大小回第 1 页；刷新/重载清空行选中
   - 查询主按钮文案统一 `common.action.query`（「查询」）
 - 登录等 `meta.public` 页：隐藏侧栏，仅保留顶栏
-- 组件库：优先 tendata-ui（随 Tendata/公司前端模板）
+- 组件库：优先 tendata-ui（随 Tendata/公司前端模板）；业务列表优先 `@tendata-biz-components/biz-table`；新建/编辑用 Modal + Form；确认用 Modal.confirm / Popconfirm，禁止 `window.confirm`
+- 用户可见文案走现有 `react-intl` / `useTranslate`（含登录页）
 - 反馈：操作成功/失败 Toast 或等价提示；删除需确认
 
 ## 页面流程
@@ -29,12 +30,12 @@
 ## 核心页面交互规则
 
 ### 登录页
-- 用户名、密码；无注册入口
+- 用户名、密码；无注册入口；tendata-ui `Form` / `Input` / `Button`（无原生 form/label）
+- 文案走 `auth.*` / `common.appName` 国际化
 - 错误信息不区分用户是否存在（含停用账号）
 - 登录成功后缓存当前用户角色供侧栏同步渲染；退出时清除；角色未知时不展示 `roles` 限制菜单（避免 viewer 闪出用户管理）
 - 多标签 / 同浏览器换账号：窗口聚焦、页可见、约 10s 轮询与 `BroadcastChannel` 重验 `/auth/me`；身份变化 Toast「账号已切换」并刷新侧栏；若当前页仅 admin 可进则退回业务首页
 - Session 失效（含停用清会话）：任意管理端请求 `401 Auth.Unauthorized` 或重验失败 → Toast「登录已失效」并踢回登录（不向用户暴露「已停用」）
-- 登录页视觉/组件库对齐仍见活跃 change `standardize-admin-ui-components`
 
 ### 用户管理（仅 admin）
 - 路由 `/admin-users`；侧栏「系统管理」分组；`roles: ['admin']` + `RequireAdmin`；viewer 侧栏不可见，直链重定向业务首页并 Toast
