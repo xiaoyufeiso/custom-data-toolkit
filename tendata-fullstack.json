@@ -1,5 +1,5 @@
 {
-  "name": "custom-data-toolkit",
+  "name": "tendata-customs-tools",
   "packageManager": "pnpm",
   "frontend": {
     "dir": "web",

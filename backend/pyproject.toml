@@ -1,5 +1,5 @@
 [project]
-name = "custom-data-toolkit"
+name = "tendata-customs-tools"
 version = "1.0.0.dev0"
 requires-python = ">=3.12"
 dependencies = [

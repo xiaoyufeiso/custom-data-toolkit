@@ -1,8 +1,10 @@
-# Custom Data Toolkit — AI Coding Instructions
+# Tendata Customs Tools — AI Coding Instructions
 
 ## Workspace
 
-- Canonical checkout (WSL): `/home/fei/custom-data-toolkit`
+- Product / repo name: `tendata-customs-tools`（公司仓可为 `customs-tools`）
+- Python package path（勿擅自改）: `custom_data_toolkit`
+- Canonical checkout (WSL, 目录名可与产品名不同): `/home/fei/custom-data-toolkit`
 - Windows mirror (legacy): `D:\实习\custom-data-toolkit` — prefer WSL path for Agent / CLI
 - Process skill (outside repo): `D:\实习\fullstack-ai-development-workflow\SKILL.md`  
   （或本机 skill 目录中的 `fullstack-ai-development-workflow`）

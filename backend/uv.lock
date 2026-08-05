@@ -332,61 +332,6 @@ wheels = [
 ]
 
 [[package]]
-name = "custom-data-toolkit"
-version = "1.0.0.dev0"
-source = { editable = "." }
-dependencies = [
-    { name = "alembic" },
-    { name = "argon2-cffi" },
-    { name = "cryptography" },
-    { name = "fastapi" },
-    { name = "openpyxl" },
-    { name = "pydantic-settings" },
-    { name = "pymysql" },
-    { name = "python-multipart" },
-    { name = "redis" },
-    { name = "sqlmodel" },
-    { name = "uvicorn" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "ruff" },
-]
-test = [
-    { name = "fakeredis" },
-    { name = "httpx" },
-    { name = "pytest" },
-    { name = "pytest-asyncio" },
-    { name = "pytest-cov" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "alembic", specifier = ">=1.14,<2" },
-    { name = "argon2-cffi", specifier = ">=23.1,<26" },
-    { name = "cryptography", specifier = ">=42,<47" },
-    { name = "fastapi", specifier = ">=0.130,<1" },
-    { name = "openpyxl", specifier = ">=3.1.5" },
-    { name = "pydantic-settings", specifier = ">=2.0,<3" },
-    { name = "pymysql", specifier = ">=1.1,<2" },
-    { name = "python-multipart", specifier = ">=0.0.9" },
-    { name = "redis", specifier = ">=8.1.0" },
-    { name = "sqlmodel", specifier = ">=0.0.38,<1" },
-    { name = "uvicorn", specifier = ">=0.40,<1" },
-]
-
-[package.metadata.requires-dev]
-dev = [{ name = "ruff", specifier = ">=0.15" }]
-test = [
-    { name = "fakeredis", specifier = ">=2.37.0" },
-    { name = "httpx", specifier = ">=0.27" },
-    { name = "pytest", specifier = ">=9.0" },
-    { name = "pytest-asyncio", specifier = ">=0.24" },
-    { name = "pytest-cov", specifier = ">=5.0" },
-]
-
-[[package]]
 name = "et-xmlfile"
 version = "2.0.0"
 source = { registry = "https://pypi.org/simple" }
@@ -940,6 +885,61 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/eb/e3/7c1dc7381d9f8ab7d854328ebfa884e62cb3f3d8549ddfd37c7814f42afa/starlette-1.3.1.tar.gz", hash = "sha256:05d0213193f2fbaae60e2ecb593b4add4262ad4e46536b54abe36f11a71724e0", size = 2703240, upload-time = "2026-06-12T09:23:11.602Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/ec/bb/2799cc2ede3ed41131f8975621e7213dfc7ef4acbbaadfa440f32500c370/starlette-1.3.1-py3-none-any.whl", hash = "sha256:c7372aae11c3c3f26a42df7bd626cec2f47d03483d261d369516a615a53714c6", size = 73632, upload-time = "2026-06-12T09:23:10.017Z" },
+]
+
+[[package]]
+name = "tendata-customs-tools"
+version = "1.0.0.dev0"
+source = { editable = "." }
+dependencies = [
+    { name = "alembic" },
+    { name = "argon2-cffi" },
+    { name = "cryptography" },
+    { name = "fastapi" },
+    { name = "openpyxl" },
+    { name = "pydantic-settings" },
+    { name = "pymysql" },
+    { name = "python-multipart" },
+    { name = "redis" },
+    { name = "sqlmodel" },
+    { name = "uvicorn" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "ruff" },
+]
+test = [
+    { name = "fakeredis" },
+    { name = "httpx" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "pytest-cov" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "alembic", specifier = ">=1.14,<2" },
+    { name = "argon2-cffi", specifier = ">=23.1,<26" },
+    { name = "cryptography", specifier = ">=42,<47" },
+    { name = "fastapi", specifier = ">=0.130,<1" },
+    { name = "openpyxl", specifier = ">=3.1.5" },
+    { name = "pydantic-settings", specifier = ">=2.0,<3" },
+    { name = "pymysql", specifier = ">=1.1,<2" },
+    { name = "python-multipart", specifier = ">=0.0.9" },
+    { name = "redis", specifier = ">=8.1.0" },
+    { name = "sqlmodel", specifier = ">=0.0.38,<1" },
+    { name = "uvicorn", specifier = ">=0.40,<1" },
+]
+
+[package.metadata.requires-dev]
+dev = [{ name = "ruff", specifier = ">=0.15" }]
+test = [
+    { name = "fakeredis", specifier = ">=2.37.0" },
+    { name = "httpx", specifier = ">=0.27" },
+    { name = "pytest", specifier = ">=9.0" },
+    { name = "pytest-asyncio", specifier = ">=0.24" },
+    { name = "pytest-cov", specifier = ">=5.0" },
 ]
 
 [[package]]

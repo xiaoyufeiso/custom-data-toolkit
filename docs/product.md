@@ -1,4 +1,4 @@
-# Custom Data Toolkit — 产品真相
+# Tendata Customs Tools — 产品真相
 
 > 权威层：稳定产品边界与业务不变量。  
 > 交付级需求与行为场景见 OpenSpec change / 领域 spec，不在本文展开字段级细节。
@@ -7,7 +7,7 @@
 
 海关数据处理链路中，爬虫已将全球货币汇率写入现有 MySQL，但缺少统一后台维护界面与稳定的对外查询 API。
 
-**Custom Data Toolkit** 提供：
+**Tendata Customs Tools** 提供：
 
 - 管理端维护货币、汇率与对外 API Key；
 - 外部系统通过 globiz 风格公开 API 查询货币/汇率（鉴权可由运维开关）；

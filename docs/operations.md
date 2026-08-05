@@ -1,4 +1,4 @@
-# Custom Data Toolkit — 运维与交付
+# Tendata Customs Tools — 运维与交付
 
 > 权威层：环境配置名、部署顺序、迁移执行、健康检查与回滚边界。  
 > 本地开发步骤见 `development.md`。不在本文保存真实密钥。
@@ -15,22 +15,36 @@
          Redis（海关字典正式 Hash + 缺失 ZSET，可与第三方共用）
 ```
 
-## 2. 环境变量（名称，非密钥）
+## 2. 环境配置结构（方便他人部署）
 
-提交 `.env.example`，不提交 `.env`。
+```text
+backend/.env.example   → 仓库模板（变量名 + 占位 + 注释）
+backend/.env           → 运行时（gitignore；每人/每环境自备）
+deploy/env/README.md   → 给部署者的短说明
+```
+
+**以后遵循：**
+
+1. 只提交 `.env.example`，不提交真实 `.env`
+2. 新人：`cp backend/.env.example backend/.env` 后改本机/目标环境值
+3. UAT/生产：用服务器环境变量或密钥系统注入同名变量，勿把生产密码写回 Git
+4. 代码不读死主机；一律经 Settings / 环境变量
+5. 产品名 `tendata-customs-tools` 与 Python 包 `custom_data_toolkit` 分离（改名不强制改 import）
+
+变量清单以 `backend/.env.example` 为准。常用项：
 
 | 变量 | 说明 |
 |---|---|
-| `DATABASE_URL` | MySQL 连接串 |
-| `SESSION_COOKIE_NAME` | 默认 `cdt_session` |
-| `SESSION_TTL_SECONDS` | 默认 `604800`（7 天） |
-| `CORS_ORIGINS` | 前端源，须支持 credentials |
-| `ADMIN_BOOTSTRAP_USERNAME` | 首启管理员用户名 |
-| `ADMIN_BOOTSTRAP_PASSWORD` | 首启管理员密码（仅本地/受控环境） |
-| `REDIS_URL` | 海关字典共用 Redis（正式 Hash / 缺失 ZSET）；本地默认 `redis://127.0.0.1:16379/0`（Docker 映射，见 `development.md`） |
-| `APP_ENV` | `development` / `production` |
+| `APP_NAME` | 默认 `tendata-customs-tools` |
+| `APP_ENV` | `development` / `production`（影响 Cookie `Secure`） |
+| `DATABASE_URL` / `TEST_DATABASE_URL` | MySQL |
+| `REDIS_URL` | 海关字典 Redis |
+| `CORS_ALLOWED_ORIGINS` | 前端源（credentials） |
+| `SESSION_COOKIE_NAME` / `SESSION_TTL_SECONDS` | Session |
+| `ADMIN_BOOTSTRAP_*` | 空库首启管理员（仅受控环境） |
+| `PUBLIC_API_AUTH_ENABLED` | 对外 globiz 是否强制 API Key |
 
-生产环境：`Secure` Cookie、禁止把 bootstrap 密码写入仓库或日志。
+生产：`APP_ENV=production`、强 bootstrap 密码、正确 CORS；禁止把密码写入仓库或日志。
 
 ## 3. 构建与启动顺序
 

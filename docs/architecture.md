@@ -1,4 +1,4 @@
-# Custom Data Toolkit 系统架构
+# Tendata Customs Tools 系统架构
 
 > 状态：Architecture Baseline（draft）  
 > 目标：本机/内网可运行的后台管理系统 MVP  
@@ -28,11 +28,12 @@
 ## 2. 项目结构（目标骨架）
 
 ```text
-custom-data-toolkit/
+tendata-customs-tools/  # 克隆目录名可不同；Python 包仍为 custom_data_toolkit
 ├─ web/                    # React 前端
-├─ backend/                # FastAPI 后端
+├─ backend/                # FastAPI 后端（src/custom_data_toolkit）
 ├─ docs/                   # 传统工程文档
 ├─ openspec/               # SDD / Spec 真相来源与变更
+├─ deploy/                 # sql / 对外 API 文档 / env 说明
 ├─ AGENTS.md
 └─ README.md
 ```

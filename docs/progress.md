@@ -1,4 +1,4 @@
-# Custom Data Toolkit 开发进展
+# Tendata Customs Tools 开发进展
 
 > 可选状态板（无看板时使用）。不替代 Git 历史，不复述 OpenSpec `tasks.md` 每一项。
 

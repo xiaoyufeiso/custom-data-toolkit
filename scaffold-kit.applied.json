@@ -1,6 +1,6 @@
 {
   "appliedAt": "2026-07-29T02:39:33.664Z",
-  "profileName": "custom-data-toolkit",
+  "profileName": "tendata-customs-tools",
   "frontendPack": "react-vite",
   "backendPack": "python-fastapi"
 }

@@ -1,4 +1,4 @@
-﻿# Custom Data Toolkit — 开发手册
+﻿# Tendata Customs Tools — 开发手册
 
 > 权威层：贡献者如何在本地搭建、开发、测试与提交流程。  
 > 不是架构说明（见 `architecture.md`），也不是部署运维（见 `operations.md`）。
@@ -9,7 +9,7 @@
 - Python 3.12+ + uv（后端）
 - MySQL 8（本地或 Docker；账号约定见下）
 - Docker（本地海关字典 Redis；见下）
-- 工作区优先：`/home/fei/custom-data-toolkit`（WSL）
+- 工作区优先：本机 checkout 目录（示例 `/home/fei/custom-data-toolkit`；与产品名 `tendata-customs-tools` 可不同）
 
 ## 2. 本地搭建
 
@@ -64,7 +64,7 @@ uv run python scripts/seed_audit_logs.py --replace  # 审计日志：覆盖全�
 WSL 建库示例（主机/库名须与 `backend/.env` 一致；应用账号固定 `customs_app`）：
 
 ```bash
-cd ~/custom-data-toolkit
+cd /path/to/tendata-customs-tools   # 或你的本地克隆目录
 
 mysql -h 172.28.112.1 -P 3306 -u root -p -e "
 CREATE DATABASE IF NOT EXISTS customs_data_toolkit CHARACTER SET utf8;

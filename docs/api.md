@@ -1,4 +1,4 @@
-# Custom Data Toolkit API 规格
+# Tendata Customs Tools API 规格
 
 > 状态：API Baseline（draft，**过渡权威**）  
 > 目标：迁出为 OpenAPI（生成或手写 `openapi.yaml`）后，本文降级为索引。  

@@ -1,4 +1,4 @@
-# Custom Data Toolkit — 外部数据契约
+# Tendata Customs Tools — 外部数据契约
 
 > 权威层：本系统**不拥有**、但必须兼容读写的外部/既有表语义。  
 > 应用自有表（`admin_users`、`admin_sessions`、`api_keys` 等）以 Alembic 迁移与模型为准，不在此重复维护 DDL。
