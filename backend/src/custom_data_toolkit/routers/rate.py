@@ -2,7 +2,7 @@ from datetime import date
 
 from fastapi import APIRouter, Depends, Query, status
 
-from custom_data_toolkit.deps import CurrentAuthDep, SessionDep, require_session_csrf
+from custom_data_toolkit.deps import CurrentAuthDep, SessionDep, require_session_csrf, require_writer
 from custom_data_toolkit.models import Currency, Rate
 from custom_data_toolkit.repositories.rate_repository import RateRepository
 from custom_data_toolkit.routers.common_schemas import BatchIdsRequest
@@ -12,6 +12,8 @@ from custom_data_toolkit.routers.rate_schemas import (
     RatePublic,
     RateUpdateRequest,
 )
+from custom_data_toolkit.services.audit_service import record_admin_audit
+from custom_data_toolkit.services.auth_service import AuthContext
 from custom_data_toolkit.services.rate_service import RateService
 
 router = APIRouter(prefix="/rates", tags=["rates"])
@@ -74,7 +76,7 @@ def list_rates(
 @router.post("", response_model=RatePublic, status_code=status.HTTP_201_CREATED)
 def create_rate(
     body: RateCreateRequest,
-    _auth: CurrentAuthDep,
+    auth: AuthContext = Depends(require_writer),
     _csrf: None = Depends(require_session_csrf),
     service: RateService = RateServiceDep,
 ) -> RatePublic:
@@ -84,27 +86,52 @@ def create_rate(
         data=body.data,
         checked=body.checked,
     )
+    record_admin_audit(
+        auth,
+        action="rate.create",
+        resource_type="rate",
+        resource_ids=[rate.id],
+        summary={
+            "currencyId": currency.id,
+            "currencyCode": currency.code,
+            "date": str(rate.date),
+        },
+    )
     return _to_public(rate, currency)
 
 
 @router.post("/batch-delete", status_code=status.HTTP_204_NO_CONTENT)
 def batch_delete_rates(
     body: BatchIdsRequest,
-    _auth: CurrentAuthDep,
+    auth: AuthContext = Depends(require_writer),
     _csrf: None = Depends(require_session_csrf),
     service: RateService = RateServiceDep,
 ) -> None:
     service.delete_batch(body.ids)
+    record_admin_audit(
+        auth,
+        action="rate.batch_delete",
+        resource_type="rate",
+        resource_ids=body.ids,
+        summary={"count": len(body.ids)},
+    )
 
 
 @router.post("/batch-check", status_code=status.HTTP_204_NO_CONTENT)
 def batch_check_rates(
     body: BatchIdsRequest,
-    _auth: CurrentAuthDep,
+    auth: AuthContext = Depends(require_writer),
     _csrf: None = Depends(require_session_csrf),
     service: RateService = RateServiceDep,
 ) -> None:
     service.check_batch(body.ids)
+    record_admin_audit(
+        auth,
+        action="rate.batch_check",
+        resource_type="rate",
+        resource_ids=body.ids,
+        summary={"count": len(body.ids)},
+    )
 
 
 @router.get("/{rate_id}", response_model=RatePublic)
@@ -121,19 +148,37 @@ def get_rate(
 def update_rate(
     rate_id: int,
     body: RateUpdateRequest,
-    _auth: CurrentAuthDep,
+    auth: AuthContext = Depends(require_writer),
     _csrf: None = Depends(require_session_csrf),
     service: RateService = RateServiceDep,
 ) -> RatePublic:
     rate, currency = service.update(rate_id, data=body.data, checked=body.checked)
+    record_admin_audit(
+        auth,
+        action="rate.update",
+        resource_type="rate",
+        resource_ids=[rate.id],
+        summary={
+            "currencyCode": currency.code,
+            "date": str(rate.date),
+            "checked": rate.checked,
+        },
+    )
     return _to_public(rate, currency)
 
 
 @router.delete("/{rate_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_rate(
     rate_id: int,
-    _auth: CurrentAuthDep,
+    auth: AuthContext = Depends(require_writer),
     _csrf: None = Depends(require_session_csrf),
     service: RateService = RateServiceDep,
 ) -> None:
     service.delete(rate_id)
+    record_admin_audit(
+        auth,
+        action="rate.delete",
+        resource_type="rate",
+        resource_ids=[rate_id],
+        summary={"count": 1},
+    )

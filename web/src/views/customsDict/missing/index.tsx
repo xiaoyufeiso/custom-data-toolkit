@@ -29,7 +29,7 @@ import {
   type CustomsDictTypeOption,
 } from '@/services/customsDict';
 import QueryListCard from '@/shared/components/queryListCard';
-import { useTranslate } from '@/shared/hooks';
+import { useCanWrite, useTranslate } from '@/shared/hooks';
 import listStyles from '@/shared/styles/listPage.module.less';
 import { getApiErrorMessage } from '@/shared/utils/apiError';
 
@@ -54,6 +54,7 @@ const downloadBlob = (blob: Blob, filename: string) => {
 
 const CustomsDictMissingView = () => {
   const t = useTranslate();
+  const canWrite = useCanWrite();
   const [items, setItems] = useState<CustomsDictMissingItem[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -418,9 +419,11 @@ const CustomsDictMissingView = () => {
               <span className={listStyles.detailValue}>{detail.occurrenceCount}</span>
             </div>
             <div className={listStyles.detailActions}>
-              <Button type="primary" onClick={openHandle}>
-                {t('customsDict.action.handle')}
-              </Button>
+              {canWrite ? (
+                <Button type="primary" onClick={openHandle}>
+                  {t('customsDict.action.handle')}
+                </Button>
+              ) : null}
             </div>
           </div>
         )}

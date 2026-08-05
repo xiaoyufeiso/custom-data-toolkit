@@ -1,6 +1,11 @@
 from fastapi import APIRouter, Depends, Query, status
 
-from custom_data_toolkit.deps import CurrentAuthDep, SessionDep, require_session_csrf
+from custom_data_toolkit.deps import (
+    CurrentAuthDep,
+    SessionDep,
+    require_session_csrf,
+    require_writer,
+)
 from custom_data_toolkit.models.customs_dict import CustomsDictType
 from custom_data_toolkit.repositories.customs_dict_type_repository import (
     CustomsDictTypeRepository,
@@ -13,6 +18,8 @@ from custom_data_toolkit.routers.customs_dict_schemas import (
     CustomsDictTypeSuggestion,
     CustomsDictTypeUpdateRequest,
 )
+from custom_data_toolkit.services.audit_service import record_admin_audit
+from custom_data_toolkit.services.auth_service import AuthContext
 from custom_data_toolkit.services.customs_dict_type_service import CustomsDictTypeService
 
 router = APIRouter(prefix="/customs-dict/types", tags=["customs-dict"])
@@ -98,11 +105,18 @@ def list_type_suggestions(
 )
 def create_type(
     body: CustomsDictTypeCreateRequest,
-    auth: CurrentAuthDep,
+    auth: AuthContext = Depends(require_writer),
     _csrf: None = Depends(require_session_csrf),
     service: CustomsDictTypeService = CustomsDictTypeServiceDep,
 ) -> CustomsDictTypePublic:
     row = service.create(code=body.code, name=body.name, actor_id=auth.user.id)
+    record_admin_audit(
+        auth,
+        action="customs_dict_type.create",
+        resource_type="customs_dict_type",
+        resource_ids=[row.id],
+        summary={"code": row.code, "name": row.name},
+    )
     return _to_public(row, 0)
 
 
@@ -110,7 +124,7 @@ def create_type(
 def update_type(
     type_id: int,
     body: CustomsDictTypeUpdateRequest,
-    auth: CurrentAuthDep,
+    auth: AuthContext = Depends(require_writer),
     _csrf: None = Depends(require_session_csrf),
     service: CustomsDictTypeService = CustomsDictTypeServiceDep,
 ) -> CustomsDictTypePublic:
@@ -120,26 +134,47 @@ def update_type(
         code=body.code,
         actor_id=auth.user.id,
     )
+    record_admin_audit(
+        auth,
+        action="customs_dict_type.update",
+        resource_type="customs_dict_type",
+        resource_ids=[row.id],
+        summary={"code": row.code, "name": row.name},
+    )
     return _to_public(row, service.repository.count_mappings(row.code))
 
 
 @router.post("/{type_id}/enable", response_model=CustomsDictTypePublic)
 def enable_type(
     type_id: int,
-    auth: CurrentAuthDep,
+    auth: AuthContext = Depends(require_writer),
     _csrf: None = Depends(require_session_csrf),
     service: CustomsDictTypeService = CustomsDictTypeServiceDep,
 ) -> CustomsDictTypePublic:
     row = service.enable(type_id, actor_id=auth.user.id)
+    record_admin_audit(
+        auth,
+        action="customs_dict_type.enable",
+        resource_type="customs_dict_type",
+        resource_ids=[row.id],
+        summary={"code": row.code},
+    )
     return _to_public(row, service.repository.count_mappings(row.code))
 
 
 @router.post("/{type_id}/disable", response_model=CustomsDictTypePublic)
 def disable_type(
     type_id: int,
-    auth: CurrentAuthDep,
+    auth: AuthContext = Depends(require_writer),
     _csrf: None = Depends(require_session_csrf),
     service: CustomsDictTypeService = CustomsDictTypeServiceDep,
 ) -> CustomsDictTypePublic:
     row = service.disable(type_id, actor_id=auth.user.id)
+    record_admin_audit(
+        auth,
+        action="customs_dict_type.disable",
+        resource_type="customs_dict_type",
+        resource_ids=[row.id],
+        summary={"code": row.code},
+    )
     return _to_public(row, 0)

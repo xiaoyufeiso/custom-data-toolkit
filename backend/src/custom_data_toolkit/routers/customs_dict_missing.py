@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import Response
 
-from custom_data_toolkit.deps import CurrentAuthDep, require_session_csrf
+from custom_data_toolkit.deps import CurrentAuthDep, require_session_csrf, require_writer
 from custom_data_toolkit.routers.customs_dict import CustomsDictServiceDep, _to_public
 from custom_data_toolkit.routers.customs_dict_schemas import (
     CustomsDictMappingPublic,
@@ -10,6 +10,8 @@ from custom_data_toolkit.routers.customs_dict_schemas import (
     CustomsDictMissingPublic,
     CustomsDictMissingSuggestion,
 )
+from custom_data_toolkit.services.audit_service import record_admin_audit
+from custom_data_toolkit.services.auth_service import AuthContext
 from custom_data_toolkit.services.customs_dict_service import CustomsDictService
 
 missing_router = APIRouter(prefix="/customs-dict/missing", tags=["customs-dict"])
@@ -71,7 +73,7 @@ def list_missing_suggestions(
 @missing_router.post("/handle", response_model=CustomsDictMappingPublic)
 def handle_missing(
     body: CustomsDictMissingHandleRequest,
-    auth: CurrentAuthDep,
+    auth: AuthContext = Depends(require_writer),
     _csrf: None = Depends(require_session_csrf),
     service: CustomsDictService = CustomsDictServiceDep,
 ) -> CustomsDictMappingPublic:
@@ -80,6 +82,17 @@ def handle_missing(
         raw_value=body.raw_value,
         standard_value=body.standard_value,
         actor_id=auth.user.id,
+    )
+    record_admin_audit(
+        auth,
+        action="customs_dict_missing.handle",
+        resource_type="customs_dict_missing",
+        resource_ids=[mapping.id],
+        summary={
+            "dictType": mapping.dict_type,
+            "rawValue": mapping.raw_value,
+            "standardValue": mapping.standard_value,
+        },
     )
     return _to_public(mapping)
 

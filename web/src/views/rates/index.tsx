@@ -42,7 +42,7 @@ import {
   type Rate,
 } from '@/services/rate';
 import QueryListCard from '@/shared/components/queryListCard';
-import { useTranslate } from '@/shared/hooks';
+import { useCanWrite, useTranslate } from '@/shared/hooks';
 import listStyles from '@/shared/styles/listPage.module.less';
 import { getApiErrorCode, getApiErrorMessage } from '@/shared/utils/apiError';
 import CurrencyPicker from './CurrencyPicker';
@@ -120,6 +120,7 @@ const emptyForm: RateForm = {
 
 const RatesView = () => {
   const t = useTranslate();
+  const canWrite = useCanWrite();
   const [items, setItems] = useState<Rate[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -595,13 +596,13 @@ const RatesView = () => {
 
       <QueryListCard
         title={t('common.queryList')}
-        actions={(
+        actions={canWrite ? (
           <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
             {t('rates.action.create')}
           </Button>
-        )}
-        selectionCount={selectedRowKeys.length}
-        selectionActions={(
+        ) : undefined}
+        selectionCount={canWrite ? selectedRowKeys.length : 0}
+        selectionActions={canWrite ? (
           <>
             <Button
               type="secondary"
@@ -620,7 +621,7 @@ const RatesView = () => {
               {t('rates.batchDelete.button')}
             </Button>
           </>
-        )}
+        ) : undefined}
       >
         <BizTable
           /* remount 以清空 BizTable 内部 currentSort，保证三态循环可靠 */
@@ -629,14 +630,14 @@ const RatesView = () => {
           columns={columns}
           dataSource={items}
           rowClassName={() => listStyles.clickableRow}
-          rowSelection={{
+          rowSelection={canWrite ? {
             columnWidth: 32,
             selectedRowKeys,
             onChange: setSelectedRowKeys,
             getCheckboxProps: () => ({
               onClick: (event: React.MouseEvent) => event.stopPropagation(),
             }),
-          }}
+          } : undefined}
           onRow={(row: Rate) => ({
             onClick: () => openDetail(row),
           })}
@@ -764,9 +765,11 @@ const RatesView = () => {
               </span>
             </div>
             <div className={listStyles.detailActions}>
-              <Button type="primary" onClick={openEdit}>
-                {t('rates.action.edit')}
-              </Button>
+              {canWrite ? (
+                <Button type="primary" onClick={openEdit}>
+                  {t('rates.action.edit')}
+                </Button>
+              ) : null}
             </div>
           </div>
         ) : null}

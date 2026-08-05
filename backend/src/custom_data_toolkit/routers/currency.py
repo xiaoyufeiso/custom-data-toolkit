@@ -2,7 +2,12 @@ from typing import Literal
 
 from fastapi import APIRouter, Depends, Query, status
 
-from custom_data_toolkit.deps import CurrentAuthDep, SessionDep, require_session_csrf
+from custom_data_toolkit.deps import (
+    CurrentAuthDep,
+    SessionDep,
+    require_session_csrf,
+    require_writer,
+)
 from custom_data_toolkit.repositories.currency_repository import CurrencyRepository
 from custom_data_toolkit.routers.common_schemas import BatchIdsRequest
 from custom_data_toolkit.routers.currency_schemas import (
@@ -12,6 +17,8 @@ from custom_data_toolkit.routers.currency_schemas import (
     CurrencySuggestionPublic,
     CurrencyUpdateRequest,
 )
+from custom_data_toolkit.services.audit_service import record_admin_audit
+from custom_data_toolkit.services.auth_service import AuthContext
 from custom_data_toolkit.services.currency_service import CurrencyService
 
 router = APIRouter(prefix="/currencies", tags=["currencies"])
@@ -48,11 +55,18 @@ def list_currencies(
 @router.post("", response_model=CurrencyPublic, status_code=status.HTTP_201_CREATED)
 def create_currency(
     body: CurrencyCreateRequest,
-    _auth: CurrentAuthDep,
+    auth: AuthContext = Depends(require_writer),
     _csrf: None = Depends(require_session_csrf),
     service: CurrencyService = CurrencyServiceDep,
 ) -> CurrencyPublic:
     currency = service.create(name=body.name, code=body.code)
+    record_admin_audit(
+        auth,
+        action="currency.create",
+        resource_type="currency",
+        resource_ids=[currency.id],
+        summary={"name": currency.name, "code": currency.code},
+    )
     return _to_public(currency)
 
 
@@ -79,11 +93,18 @@ def list_currency_suggestions(
 @router.post("/batch-delete", status_code=status.HTTP_204_NO_CONTENT)
 def batch_delete_currencies(
     body: BatchIdsRequest,
-    _auth: CurrentAuthDep,
+    auth: AuthContext = Depends(require_writer),
     _csrf: None = Depends(require_session_csrf),
     service: CurrencyService = CurrencyServiceDep,
 ) -> None:
     service.delete_batch(body.ids)
+    record_admin_audit(
+        auth,
+        action="currency.batch_delete",
+        resource_type="currency",
+        resource_ids=body.ids,
+        summary={"count": len(body.ids)},
+    )
 
 
 @router.get("/{currency_id}", response_model=CurrencyPublic)
@@ -99,7 +120,7 @@ def get_currency(
 def update_currency(
     currency_id: int,
     body: CurrencyUpdateRequest,
-    _auth: CurrentAuthDep,
+    auth: AuthContext = Depends(require_writer),
     _csrf: None = Depends(require_session_csrf),
     service: CurrencyService = CurrencyServiceDep,
 ) -> CurrencyPublic:
@@ -111,14 +132,28 @@ def update_currency(
         update_name="name" in fields,
         update_code="code" in fields,
     )
+    record_admin_audit(
+        auth,
+        action="currency.update",
+        resource_type="currency",
+        resource_ids=[currency.id],
+        summary={"name": currency.name, "code": currency.code},
+    )
     return _to_public(currency)
 
 
 @router.delete("/{currency_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_currency(
     currency_id: int,
-    _auth: CurrentAuthDep,
+    auth: AuthContext = Depends(require_writer),
     _csrf: None = Depends(require_session_csrf),
     service: CurrencyService = CurrencyServiceDep,
 ) -> None:
     service.delete(currency_id)
+    record_admin_audit(
+        auth,
+        action="currency.delete",
+        resource_type="currency",
+        resource_ids=[currency_id],
+        summary={"count": 1},
+    )

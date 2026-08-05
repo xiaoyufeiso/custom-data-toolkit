@@ -29,7 +29,7 @@ import {
   type CustomsDictTypeSuggestion,
 } from '@/services/customsDict';
 import QueryListCard from '@/shared/components/queryListCard';
-import { useTranslate } from '@/shared/hooks';
+import { useCanWrite, useTranslate } from '@/shared/hooks';
 import listStyles from '@/shared/styles/listPage.module.less';
 import { getApiErrorCode, getApiErrorMessage } from '@/shared/utils/apiError';
 
@@ -45,6 +45,7 @@ type FormState = {
 
 const CustomsDictTypesView = () => {
   const t = useTranslate();
+  const canWrite = useCanWrite();
   const [items, setItems] = useState<CustomsDictTypeItem[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -353,13 +354,13 @@ const CustomsDictTypesView = () => {
 
       <QueryListCard
         title={t('common.queryList')}
-        actions={(
+        actions={canWrite ? (
           <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
             {t('customsDict.action.createType')}
           </Button>
-        )}
-        selectionCount={selectedRowKeys.length}
-        selectionActions={(
+        ) : undefined}
+        selectionCount={canWrite ? selectedRowKeys.length : 0}
+        selectionActions={canWrite ? (
           <Button
             danger
             loading={batchDisableLoading}
@@ -367,7 +368,7 @@ const CustomsDictTypesView = () => {
           >
             {t('customsDict.batchDisable.button')}
           </Button>
-        )}
+        ) : undefined}
       >
         <BizTable
           rowKey="id"
@@ -376,14 +377,14 @@ const CustomsDictTypesView = () => {
           tdLoading={loading}
           noData={{ text: t('customsDict.empty') }}
           rowClassName={() => listStyles.clickableRow}
-          rowSelection={{
+          rowSelection={canWrite ? {
             columnWidth: 32,
             selectedRowKeys,
             onChange: setSelectedRowKeys,
             getCheckboxProps: () => ({
               onClick: (event: React.MouseEvent) => event.stopPropagation(),
             }),
-          }}
+          } : undefined}
           onRow={(row: CustomsDictTypeItem) => ({
             onClick: () => openDetail(row),
           })}
@@ -470,9 +471,11 @@ const CustomsDictTypesView = () => {
               <span className={listStyles.detailValue}>{detail.mappingCount}</span>
             </div>
             <div className={listStyles.detailActions}>
-              <Button type="primary" onClick={openEdit}>
-                {t('customsDict.action.edit')}
-              </Button>
+              {canWrite ? (
+                <Button type="primary" onClick={openEdit}>
+                  {t('customsDict.action.edit')}
+                </Button>
+              ) : null}
             </div>
           </div>
         ) : null}

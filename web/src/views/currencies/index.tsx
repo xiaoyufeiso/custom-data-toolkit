@@ -30,7 +30,7 @@ import {
   type CurrencySuggestion,
 } from '@/services/currency';
 import QueryListCard from '@/shared/components/queryListCard';
-import { useTranslate } from '@/shared/hooks';
+import { useCanWrite, useTranslate } from '@/shared/hooks';
 import listStyles from '@/shared/styles/listPage.module.less';
 import { getApiErrorCode, getApiErrorMessage } from '@/shared/utils/apiError';
 
@@ -48,6 +48,7 @@ const emptyForm: FormState = { name: '', code: '' };
 
 const CurrenciesView = () => {
   const t = useTranslate();
+  const canWrite = useCanWrite();
   const [items, setItems] = useState<Currency[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -314,13 +315,13 @@ const CurrenciesView = () => {
 
       <QueryListCard
         title={t('common.queryList')}
-        actions={(
+        actions={canWrite ? (
           <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
             {t('currencies.action.create')}
           </Button>
-        )}
-        selectionCount={selectedRowKeys.length}
-        selectionActions={(
+        ) : undefined}
+        selectionCount={canWrite ? selectedRowKeys.length : 0}
+        selectionActions={canWrite ? (
           <Button
             danger
             loading={deleting}
@@ -328,21 +329,21 @@ const CurrenciesView = () => {
           >
             {t('currencies.batchDelete.button')}
           </Button>
-        )}
+        ) : undefined}
       >
         <BizTable
           rowKey="id"
           columns={columns}
           dataSource={items}
           rowClassName={() => listStyles.clickableRow}
-          rowSelection={{
+          rowSelection={canWrite ? {
             columnWidth: 32,
             selectedRowKeys,
             onChange: setSelectedRowKeys,
             getCheckboxProps: () => ({
               onClick: (event: React.MouseEvent) => event.stopPropagation(),
             }),
-          }}
+          } : undefined}
           onRow={(row: Currency) => ({
             onClick: () => openDetail(row),
           })}
@@ -426,9 +427,11 @@ const CurrenciesView = () => {
               <span className={listStyles.detailValue}>{detail.code || '—'}</span>
             </div>
             <div className={listStyles.detailActions}>
-              <Button type="primary" onClick={openEdit}>
-                {t('currencies.action.edit')}
-              </Button>
+              {canWrite ? (
+                <Button type="primary" onClick={openEdit}>
+                  {t('currencies.action.edit')}
+                </Button>
+              ) : null}
             </div>
           </div>
         ) : null}

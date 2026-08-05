@@ -1,7 +1,12 @@
 from fastapi import APIRouter, Depends, File, Query, UploadFile, status
 from fastapi.responses import Response
 
-from custom_data_toolkit.deps import CurrentAuthDep, SessionDep, require_session_csrf
+from custom_data_toolkit.deps import (
+    CurrentAuthDep,
+    SessionDep,
+    require_session_csrf,
+    require_writer,
+)
 from custom_data_toolkit.models.customs_dict import CustomsDictMapping
 from custom_data_toolkit.repositories.customs_dict_repository import CustomsDictRepository
 from custom_data_toolkit.routers.common_schemas import BatchIdsRequest
@@ -17,6 +22,8 @@ from custom_data_toolkit.routers.customs_dict_schemas import (
     CustomsDictMappingUpdateRequest,
     CustomsDictReplaySyncResponse,
 )
+from custom_data_toolkit.services.audit_service import record_admin_audit
+from custom_data_toolkit.services.auth_service import AuthContext
 from custom_data_toolkit.services.customs_dict_redis import (
     CustomsDictRedisStore,
     create_redis_client,
@@ -112,12 +119,19 @@ def list_mapping_suggestions(
     response_model=CustomsDictReplaySyncResponse,
 )
 def replay_sync(
-    _auth: CurrentAuthDep,
+    auth: AuthContext = Depends(require_writer),
     _csrf: None = Depends(require_session_csrf),
     service: CustomsDictService = CustomsDictServiceDep,
     dict_type: str = Query(..., alias="dictType"),
 ) -> CustomsDictReplaySyncResponse:
     result = service.replay_sync(dict_type=dict_type)
+    record_admin_audit(
+        auth,
+        action="customs_dict_mapping.replay_sync",
+        resource_type="customs_dict_mapping",
+        resource_ids=[],
+        summary={"dictType": dict_type, **{k: result[k] for k in result}},
+    )
     return CustomsDictReplaySyncResponse(**result)
 
 
@@ -127,11 +141,18 @@ def replay_sync(
 )
 def batch_disable_mappings(
     body: BatchIdsRequest,
-    auth: CurrentAuthDep,
+    auth: AuthContext = Depends(require_writer),
     _csrf: None = Depends(require_session_csrf),
     service: CustomsDictService = CustomsDictServiceDep,
 ) -> CustomsDictBatchDisableResponse:
     result = service.batch_disable(body.ids, actor_id=auth.user.id)
+    record_admin_audit(
+        auth,
+        action="customs_dict_mapping.batch_disable",
+        resource_type="customs_dict_mapping",
+        resource_ids=body.ids,
+        summary={"count": len(body.ids), **{k: result[k] for k in result}},
+    )
     return CustomsDictBatchDisableResponse(**result)
 
 
@@ -141,12 +162,19 @@ def batch_disable_mappings(
 )
 def batch_resync_mappings(
     body: BatchIdsRequest,
-    auth: CurrentAuthDep,
+    auth: AuthContext = Depends(require_writer),
     _csrf: None = Depends(require_session_csrf),
     service: CustomsDictService = CustomsDictServiceDep,
 ) -> CustomsDictBatchResyncResponse:
     _ = auth
     result = service.batch_resync(body.ids)
+    record_admin_audit(
+        auth,
+        action="customs_dict_mapping.batch_resync",
+        resource_type="customs_dict_mapping",
+        resource_ids=body.ids,
+        summary={"count": len(body.ids), **{k: result[k] for k in result}},
+    )
     return CustomsDictBatchResyncResponse(**result)
 
 
@@ -178,7 +206,7 @@ def export_mappings(
 
 @router.get("/import-template")
 def import_template(
-    _auth: CurrentAuthDep,
+    _writer: AuthContext = Depends(require_writer),
     service: CustomsDictService = CustomsDictServiceDep,
 ) -> Response:
     content = service.import_template_xlsx()
@@ -196,13 +224,24 @@ def import_template(
     response_model=CustomsDictImportResponse,
 )
 async def import_mappings(
-    auth: CurrentAuthDep,
+    auth: AuthContext = Depends(require_writer),
     _csrf: None = Depends(require_session_csrf),
     service: CustomsDictService = CustomsDictServiceDep,
     file: UploadFile = File(...),
 ) -> CustomsDictImportResponse:
     content = await file.read()
     result = service.import_mappings_xlsx(content=content, actor_id=auth.user.id)
+    record_admin_audit(
+        auth,
+        action="customs_dict_mapping.import",
+        resource_type="customs_dict_mapping",
+        resource_ids=[],
+        summary={
+            "created": int(result["created"]),
+            "updated": int(result["updated"]),
+            "failed": int(result["failed"]),
+        },
+    )
     return CustomsDictImportResponse(
         created=int(result["created"]),
         updated=int(result["updated"]),
@@ -230,7 +269,7 @@ def get_mapping(
 )
 def create_mapping(
     body: CustomsDictMappingCreateRequest,
-    auth: CurrentAuthDep,
+    auth: AuthContext = Depends(require_writer),
     _csrf: None = Depends(require_session_csrf),
     service: CustomsDictService = CustomsDictServiceDep,
 ) -> CustomsDictMappingPublic:
@@ -240,6 +279,17 @@ def create_mapping(
         standard_value=body.standard_value,
         actor_id=auth.user.id,
     )
+    record_admin_audit(
+        auth,
+        action="customs_dict_mapping.create",
+        resource_type="customs_dict_mapping",
+        resource_ids=[mapping.id],
+        summary={
+            "dictType": mapping.dict_type,
+            "rawValue": mapping.raw_value,
+            "standardValue": mapping.standard_value,
+        },
+    )
     return _to_public(mapping)
 
 
@@ -247,7 +297,7 @@ def create_mapping(
 def update_mapping(
     mapping_id: int,
     body: CustomsDictMappingUpdateRequest,
-    auth: CurrentAuthDep,
+    auth: AuthContext = Depends(require_writer),
     _csrf: None = Depends(require_session_csrf),
     service: CustomsDictService = CustomsDictServiceDep,
 ) -> CustomsDictMappingPublic:
@@ -257,35 +307,69 @@ def update_mapping(
         raw_value=body.raw_value,
         actor_id=auth.user.id,
     )
+    record_admin_audit(
+        auth,
+        action="customs_dict_mapping.update",
+        resource_type="customs_dict_mapping",
+        resource_ids=[mapping.id],
+        summary={
+            "dictType": mapping.dict_type,
+            "rawValue": mapping.raw_value,
+            "standardValue": mapping.standard_value,
+        },
+    )
     return _to_public(mapping)
 
 
 @router.post("/{mapping_id}/enable", response_model=CustomsDictMappingPublic)
 def enable_mapping(
     mapping_id: int,
-    auth: CurrentAuthDep,
+    auth: AuthContext = Depends(require_writer),
     _csrf: None = Depends(require_session_csrf),
     service: CustomsDictService = CustomsDictServiceDep,
 ) -> CustomsDictMappingPublic:
-    return _to_public(service.set_enabled(mapping_id, enabled=True, actor_id=auth.user.id))
+    mapping = service.set_enabled(mapping_id, enabled=True, actor_id=auth.user.id)
+    record_admin_audit(
+        auth,
+        action="customs_dict_mapping.enable",
+        resource_type="customs_dict_mapping",
+        resource_ids=[mapping.id],
+        summary={"rawValue": mapping.raw_value},
+    )
+    return _to_public(mapping)
 
 
 @router.post("/{mapping_id}/disable", response_model=CustomsDictMappingPublic)
 def disable_mapping(
     mapping_id: int,
-    auth: CurrentAuthDep,
+    auth: AuthContext = Depends(require_writer),
     _csrf: None = Depends(require_session_csrf),
     service: CustomsDictService = CustomsDictServiceDep,
 ) -> CustomsDictMappingPublic:
-    return _to_public(service.set_enabled(mapping_id, enabled=False, actor_id=auth.user.id))
+    mapping = service.set_enabled(mapping_id, enabled=False, actor_id=auth.user.id)
+    record_admin_audit(
+        auth,
+        action="customs_dict_mapping.disable",
+        resource_type="customs_dict_mapping",
+        resource_ids=[mapping.id],
+        summary={"rawValue": mapping.raw_value},
+    )
+    return _to_public(mapping)
 
 
 @router.post("/{mapping_id}/resync", response_model=CustomsDictMappingPublic)
 def resync_mapping(
     mapping_id: int,
-    auth: CurrentAuthDep,
+    auth: AuthContext = Depends(require_writer),
     _csrf: None = Depends(require_session_csrf),
     service: CustomsDictService = CustomsDictServiceDep,
 ) -> CustomsDictMappingPublic:
-    _ = auth
-    return _to_public(service.resync(mapping_id))
+    mapping = service.resync(mapping_id)
+    record_admin_audit(
+        auth,
+        action="customs_dict_mapping.resync",
+        resource_type="customs_dict_mapping",
+        resource_ids=[mapping.id],
+        summary={"rawValue": mapping.raw_value, "syncStatus": mapping.sync_status},
+    )
+    return _to_public(mapping)
