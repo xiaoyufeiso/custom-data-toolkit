@@ -1,3 +1,4 @@
+import axios from 'axios';
 import { useEffect, useState } from 'react';
 import { fetchMe } from '@/services/auth';
 
@@ -9,16 +10,19 @@ export function useCanWrite(): boolean {
   const [canWrite, setCanWrite] = useState(false);
 
   useEffect(() => {
-    let cancelled = false;
-    fetchMe()
+    const controller = new AbortController();
+    fetchMe(controller.signal)
       .then((me) => {
-        if (!cancelled) setCanWrite(me.role === 'admin' && me.enabled);
+        if (!controller.signal.aborted) {
+          setCanWrite(me.role === 'admin' && me.enabled);
+        }
       })
-      .catch(() => {
-        if (!cancelled) setCanWrite(false);
+      .catch((error: unknown) => {
+        if (controller.signal.aborted || axios.isCancel(error)) return;
+        if (!controller.signal.aborted) setCanWrite(false);
       });
     return () => {
-      cancelled = true;
+      controller.abort();
     };
   }, []);
 

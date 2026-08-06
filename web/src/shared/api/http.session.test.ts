@@ -10,6 +10,7 @@ import {
   vi,
 } from 'vitest';
 import { http as client } from '@/shared/api/http';
+import { bumpAuthGeneration } from '@/shared/auth/authGeneration';
 import { notifySessionUnauthorized } from '@/shared/auth/sessionGate';
 
 vi.mock('@/shared/auth/sessionGate', async (importOriginal) => {
@@ -51,6 +52,43 @@ describe('http session unauthorized interceptor', () => {
     await expect(client.get('/auth/me')).rejects.toBeDefined();
     expect(notifySessionUnauthorized).toHaveBeenCalledTimes(1);
     expect(sessionStorage.getItem('cdt_session_user')).toBeNull();
+  });
+
+  it('ignores stale Auth.Unauthorized after auth generation bump', async () => {
+    sessionStorage.setItem('cdt_session_user', JSON.stringify({ id: 1 }));
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let requestSeen = false;
+    server.use(
+      http.get('http://localhost/api/v1/auth/me', async () => {
+        requestSeen = true;
+        await gate;
+        return HttpResponse.json(
+          { code: 'Auth.Unauthorized', message: '请先登录。' },
+          { status: 401 },
+        );
+      }),
+    );
+
+    const pending = client.get('/auth/me');
+    // 等请求已发出并打上世代头后，再模拟 login 递增世代
+    await vi.waitFor(() => {
+      expect(requestSeen).toBe(true);
+    });
+    bumpAuthGeneration();
+    sessionStorage.setItem(
+      'cdt_session_user',
+      JSON.stringify({
+        id: 1, username: 'admin', role: 'admin', enabled: true,
+      }),
+    );
+    release();
+
+    await expect(pending).rejects.toBeDefined();
+    expect(notifySessionUnauthorized).not.toHaveBeenCalled();
+    expect(sessionStorage.getItem('cdt_session_user')).not.toBeNull();
   });
 
   it('does not kick on Auth.LoginFailed', async () => {

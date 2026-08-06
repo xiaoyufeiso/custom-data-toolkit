@@ -1,3 +1,4 @@
+import axios from 'axios';
 import { ReactNode, useEffect, useState } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { Spin } from 'tendata-ui';
@@ -12,17 +13,18 @@ const RequireAuth = ({ children }: Props) => {
   const [state, setState] = useState<'loading' | 'ok' | 'guest'>('loading');
 
   useEffect(() => {
-    let cancelled = false;
+    const controller = new AbortController();
     setState('loading');
-    fetchMe()
+    fetchMe(controller.signal)
       .then(() => {
-        if (!cancelled) setState('ok');
+        if (!controller.signal.aborted) setState('ok');
       })
-      .catch(() => {
-        if (!cancelled) setState('guest');
+      .catch((error: unknown) => {
+        if (controller.signal.aborted || axios.isCancel(error)) return;
+        if (!controller.signal.aborted) setState('guest');
       });
     return () => {
-      cancelled = true;
+      controller.abort();
     };
   }, [location.pathname]);
 

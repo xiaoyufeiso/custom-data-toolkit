@@ -50,6 +50,8 @@ export function useSessionGuard({
   useEffect(() => {
     if (!enabled) return undefined;
 
+    const controller = new AbortController();
+
     const kickToLogin = () => {
       clearSessionUser();
       setUser(null);
@@ -74,9 +76,11 @@ export function useSessionGuard({
     const sync = async () => {
       if (syncingRef.current) return;
       if (document.visibilityState === 'hidden') return;
+      if (controller.signal.aborted) return;
       syncingRef.current = true;
       try {
-        const me = await fetchMe();
+        const me = await fetchMe(controller.signal);
+        if (controller.signal.aborted) return;
         const known = userRef.current;
         if (!isSameAdminUser(known, me)) {
           if (known) {
@@ -88,8 +92,7 @@ export function useSessionGuard({
           setUser(me);
         }
       } catch {
-        // 401 Auth.Unauthorized 由 http 拦截器 notifySessionUnauthorized
-        // 其它错误不强制踢出，避免网络抖动误伤
+        // 取消 / 401 Auth.Unauthorized 由 http 拦截器处理；其它错误不强制踢出
       } finally {
         syncingRef.current = false;
       }
@@ -112,6 +115,7 @@ export function useSessionGuard({
     });
 
     return () => {
+      controller.abort();
       unregister();
       window.clearInterval(timer);
       document.removeEventListener('visibilitychange', onVisible);

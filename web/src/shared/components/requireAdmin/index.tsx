@@ -1,3 +1,4 @@
+import axios from 'axios';
 import { ReactNode, useEffect, useState } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { Spin, message } from 'tendata-ui';
@@ -14,11 +15,11 @@ const RequireAdmin = ({ children }: Props) => {
   const [state, setState] = useState<'loading' | 'ok' | 'guest' | 'forbidden'>('loading');
 
   useEffect(() => {
-    let cancelled = false;
+    const controller = new AbortController();
     setState('loading');
-    fetchMe()
+    fetchMe(controller.signal)
       .then((me) => {
-        if (cancelled) return;
+        if (controller.signal.aborted) return;
         if (me.role === 'admin' && me.enabled) {
           setState('ok');
           return;
@@ -26,11 +27,12 @@ const RequireAdmin = ({ children }: Props) => {
         setState('forbidden');
         message.error(t('adminUsers.message.forbidden'));
       })
-      .catch(() => {
-        if (!cancelled) setState('guest');
+      .catch((error: unknown) => {
+        if (controller.signal.aborted || axios.isCancel(error)) return;
+        if (!controller.signal.aborted) setState('guest');
       });
     return () => {
-      cancelled = true;
+      controller.abort();
     };
   }, [location.pathname, t]);
 
