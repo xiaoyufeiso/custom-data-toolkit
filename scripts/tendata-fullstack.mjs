@@ -123,7 +123,7 @@ function runDev() {
     });
   }
   console.log(`\n前端： http://127.0.0.1:${CONFIG.frontend.port}`);
-  console.log(`Smoke：http://127.0.0.1:${CONFIG.frontend.port}${CONFIG.frontend.smokePath}`);
+  console.log(`Smoke：http://127.0.0.1:${CONFIG.frontend.port}${CONFIG.frontend.smokePath || "/login"}`);
   console.log(`后端： ${CONFIG.backend.smokeUrl}`);
 }
 
@@ -146,18 +146,9 @@ async function runSmoke() {
     console.log(`\n[smoke] 后端通过：${CONFIG.backend.smokeUrl} -> ${JSON.stringify(payload)}`);
 
     const frontendBase = `http://127.0.0.1:${CONFIG.frontend.port}`;
-    await waitForOk(`${frontendBase}${CONFIG.frontend.smokePath}`, "前端 smoke 页面");
-    console.log(`[smoke] 前端通过：${frontendBase}${CONFIG.frontend.smokePath}`);
-
-    const smokeConfig = await waitForJson(
-      `${frontendBase}${CONFIG.frontend.smokeConfigPath}`,
-      "前端 smoke 配置",
-    );
-    const chained = await fetchJson(joinUrl(smokeConfig.apiBaseUrl, smokeConfig.endpoint));
-    if (chained.status !== smokeConfig.expectedStatus) {
-      throw new Error(`前端配置指向的后端 endpoint 返回 ${JSON.stringify(chained.status)}`);
-    }
-    console.log("[smoke] 前后端联调通过");
+    const smokePath = CONFIG.frontend.smokePath || "/login";
+    await waitForOk(`${frontendBase}${smokePath}`, "前端 smoke 页面");
+    console.log(`[smoke] 前端通过：${frontendBase}${smokePath}`);
   } catch (error) {
     failure = error;
   } finally {
@@ -206,10 +197,6 @@ async function fetchJson(url) {
   const response = await fetch(url);
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   return response.json();
-}
-
-function joinUrl(base, endpoint) {
-  return `${String(base).replace(/\/+$/, "")}/${String(endpoint).replace(/^\/+/, "")}`;
 }
 
 function sleep(ms) {

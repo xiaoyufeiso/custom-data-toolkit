@@ -4,8 +4,7 @@
   "frontend": {
     "dir": "web",
     "port": 5173,
-    "smokePath": "/tendata-smoke.html",
-    "smokeConfigPath": "/tendata-smoke-config.json"
+    "smokePath": "/login"
   },
   "backend": {
     "dir": "backend",

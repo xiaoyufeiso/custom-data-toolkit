@@ -1,5 +1,5 @@
-import { http } from '@/shared/api/http';
 import type { AdminRole, AdminUser } from '@/services/auth';
+import { http } from '@/shared/api/http';
 
 export type AdminUserItem = AdminUser & {
   createdAt: string;

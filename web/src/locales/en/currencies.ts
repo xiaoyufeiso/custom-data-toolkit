@@ -1,4 +1,3 @@
-
 const currencies = {
   'currencies.action.search': 'Query',
   'currencies.action.reset': 'Reset',

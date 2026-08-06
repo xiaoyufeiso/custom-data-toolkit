@@ -1,11 +1,13 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import {
+  afterEach, describe, expect, it, vi,
+} from 'vitest';
+import type { AdminUser } from '@/services/auth';
 import {
   isAdminOnlyPath,
   isSameAdminUser,
   notifySessionUnauthorized,
   registerSessionGate,
 } from '@/shared/auth/sessionGate';
-import type { AdminUser } from '@/services/auth';
 
 const admin: AdminUser = {
   id: 1,

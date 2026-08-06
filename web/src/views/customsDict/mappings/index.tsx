@@ -522,7 +522,10 @@ const CustomsDictMappingsView = () => {
 
   const importPanel = (
     <div>
-      <p style={{ marginTop: 0, marginBottom: 12, color: 'rgba(0, 0, 0, 0.45)', fontSize: 13 }}>
+      <p style={{
+        marginTop: 0, marginBottom: 12, color: 'rgba(0, 0, 0, 0.45)', fontSize: 13,
+      }}
+      >
         {t('customsDict.import.hintPrefix')}
         <a
           role="button"
@@ -666,7 +669,12 @@ const CustomsDictMappingsView = () => {
           background: bg,
         }}
       >
-        <div style={{ fontSize: 28, fontWeight: 700, lineHeight: 1.2, color }}>{value}</div>
+        <div style={{
+          fontSize: 28, fontWeight: 700, lineHeight: 1.2, color,
+        }}
+        >
+          {value}
+        </div>
         <div style={{ marginTop: 6, fontSize: 13, color: 'rgba(0, 0, 0, 0.55)' }}>{label}</div>
       </div>
     );

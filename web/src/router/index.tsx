@@ -1,10 +1,10 @@
 import React, { lazy, Suspense } from 'react';
 import { IndexRouteObject, NonIndexRouteObject, Navigate } from 'react-router-dom';
+import type { AdminRole } from '@/services/auth';
 import Loading from '@/shared/components/loading';
 import RequireAdmin from '@/shared/components/requireAdmin';
 import RequireAuth from '@/shared/components/requireAuth';
 import type { MessageId } from '@/shared/hooks';
-import type { AdminRole } from '@/services/auth';
 
 export interface RouteMeta {
   titleKey?: MessageId;

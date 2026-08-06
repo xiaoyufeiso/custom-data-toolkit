@@ -12,13 +12,13 @@ import {
 } from 'tendata-ui';
 import type { Currency } from '@/services/currency';
 import { useTranslate } from '@/shared/hooks';
+import styles from './CurrencyPicker.module.less';
 import {
   formatCurrencyOptionLabel,
   groupCurrenciesByCodeInitial,
   indexLettersFromGroups,
   type InitialKey,
 } from './currencyPickerUtils';
-import styles from './CurrencyPicker.module.less';
 
 type CurrencyPickerProps = {
   currencies: Currency[];

@@ -1,4 +1,3 @@
-
 const currencies = {
   'currencies.action.search': '查询',
   'currencies.action.reset': '重置',

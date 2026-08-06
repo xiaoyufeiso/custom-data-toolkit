@@ -1,10 +1,10 @@
 import {
   useEffect, useMemo, useState,
 } from 'react';
+import { AccountOutlined as IconUser } from '@tendata-ui/icon';
 import {
   Link, useLocation, useNavigate, useRoutes,
 } from 'react-router-dom';
-import { AccountOutlined as IconUser } from '@tendata-ui/icon';
 import {
   Breadcrumb,
   Dropdown,
@@ -185,7 +185,7 @@ const AppLayout = () => {
   const activeRoute = useMemo(
     () => routes
       .filter((route) => {
-        const path = route.path;
+        const { path } = route;
         return typeof path === 'string'
           && Boolean(route.meta?.titleKey)
           && (pathname === path || pathname.startsWith(`${path}/`));

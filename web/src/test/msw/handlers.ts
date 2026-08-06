@@ -12,13 +12,6 @@ import { TEST_API_ORIGIN } from '@/test/msw/apiBase';
  * - `onUnhandledRequest: 'error'` 仍在 setup.ts 中开启，作为"漏网请求"的安全网。
  */
 export const handlers: RequestHandler[] = [
-  http.get(`${TEST_API_ORIGIN}/api/auth/user/info`, () => (
-    HttpResponse.json({
-      id: 1,
-      name: 'Mock User',
-      email: 'mock@tendata.net',
-    })
-  )),
   // 业务页 useCanWrite：默认视为 admin，单测可 server.use 覆盖为 viewer
   http.get(`${TEST_API_ORIGIN}/api/v1/auth/me`, () => (
     HttpResponse.json({

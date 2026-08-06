@@ -5,7 +5,6 @@ import {
 } from 'vitest';
 import { DEFAULT_LOCALE } from '@/locales';
 import { configureAuth } from '@/shared/utils/request';
-import useCounterStore from '@/store/useCounterStore';
 import useLocaleStore from '@/store/useLocaleStore';
 import { TEST_LOGIN_URL } from '@/test/msw/apiBase';
 import { server } from '@/test/msw/server';
@@ -49,7 +48,6 @@ afterEach(() => {
   cleanup();
   server.resetHandlers();
   localStorage.clear();
-  useCounterStore.getState().reset();
   useLocaleStore.setState({ locale: DEFAULT_LOCALE });
   document.cookie = 'token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT';
   document.cookie = 'refresh_token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT';
