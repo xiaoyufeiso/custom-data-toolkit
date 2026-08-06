@@ -15,12 +15,15 @@
          Redis（海关字典正式 Hash + 缺失 ZSET，可与第三方共用）
 ```
 
-## 2. 环境配置结构（方便他人部署）
+## 2. 环境配置结构
 
 ```text
-backend/.env.example   → 仓库模板（变量名 + 占位 + 注释）
-backend/.env           → 运行时（gitignore；每人/每环境自备）
-deploy/env/README.md   → 给部署者的短说明
+backend/.env.example              → 仓库模板（变量名 + 占位 + 注释）
+backend/.env                      → 运行时（gitignore；每人/每环境自备）
+deploy/docker/compose.env.example → Compose 模板
+deploy/docker/compose.env         → Compose 运行时（gitignore）
+deploy/env/README.md              → 给部署者的短说明
+deploy/docker/README.md           → Docker / Compose 用法
 ```
 
 **以后遵循：**
@@ -57,6 +60,29 @@ deploy/env/README.md   → 给部署者的短说明
 ```
 
 具体命令以仓库 `README.md`、`scripts/` 与 `backend`/`web` 包脚本为准。
+
+### 3.1 Docker Compose（部署可选）
+
+文件：`docker-compose.yml`、说明：`deploy/docker/README.md`、环境模板：`deploy/docker/compose.env.example`。
+
+| Profile | 包含 |
+|---|---|
+| （默认） | 仅 `backend`（连外部 MySQL/Redis） |
+| `web` | 自带 Nginx 管理端（默认宿主机 8080） |
+| `mysql` / `redis` | Compose 内空库或 Redis |
+| `local-deps` | mysql + redis |
+| `full` | web + mysql + redis |
+
+生产推荐：外部库 +（公司网关挂静态 **或** `--profile web`）。  
+导出静态给网关：`./deploy/docker/export-web-static.sh`。
+
+```bash
+cp deploy/docker/compose.env.example deploy/docker/compose.env
+# 编辑 DATABASE_URL / REDIS_URL / 密码后
+docker compose --env-file deploy/docker/compose.env up -d --build
+# 演示全家桶（记得把 URL 主机改为 mysql / redis）：
+docker compose --env-file deploy/docker/compose.env --profile full up -d --build
+```
 
 ## 4. 迁移执行
 

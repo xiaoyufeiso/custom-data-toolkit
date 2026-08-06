@@ -61,6 +61,17 @@ pnpm start:uat
 
 配置约定：只提交 [`backend/.env.example`](backend/.env.example)；真实密钥放运行时 `.env` 或部署环境。详见 [`deploy/env/README.md`](deploy/env/README.md)、[`docs/operations.md`](docs/operations.md)。
 
+## Docker 部署（可选）
+
+详见 [`deploy/docker/README.md`](deploy/docker/README.md)。
+
+```bash
+cp deploy/docker/compose.env.example deploy/docker/compose.env
+# 编辑 DATABASE_URL / REDIS_URL 等
+docker compose --env-file deploy/docker/compose.env up -d --build
+# 可选：--profile web | mysql | redis | local-deps | full
+```
+
 ## 文档索引
 
 | 文档 | 说明 |

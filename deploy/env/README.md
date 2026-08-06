@@ -20,6 +20,8 @@ deploy/env/README.md     # 本说明：如何给他人部署
 6. 启动 uvicorn：`uv run uvicorn custom_data_toolkit.main:app --host 0.0.0.0 --port 8000`
 7. 前端按 `web/` 文档配置代理到后端
 
+**或使用 Docker：** 见 [`deploy/docker/README.md`](../docker/README.md)（Compose 默认仅 backend；`web` / `mysql` / `redis` 均为 profile 可选项）。
+
 ## 分层原则（以后遵循）
 
 | 层 | 放什么 | 是否进 Git |

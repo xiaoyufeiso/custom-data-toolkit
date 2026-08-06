@@ -6,6 +6,8 @@ dist/
 .env
 .env.*
 !.env.example
+deploy/docker/compose.env
+web-dist/
 node_modules/
 .venv/
 __pycache__/

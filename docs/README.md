@@ -28,7 +28,7 @@
 | 阶段 | 更新 / 产出 |
 |---|---|
 | Discover / 产品边界变化 | `product.md`；必要时新 ADR |
-| 架构与骨架 | `architecture.md`、`profile.json`；脚手架后裁剪见 skill |
+| 架构与骨架 | `architecture.md`；历史脚手架档案见根目录 `profile.json`（非运行时依赖） |
 | 开一个变更 | `openspec/changes/<id>/`（proposal、design、tasks、delta specs） |
 | 实现纵向切片 | 代码 + 测试；行为变 → OpenSpec；外部表 → `data-contract.md`；API → `api.md`/未来 OpenAPI；自有表 → migration |
 | Verify / Test | 对照 OpenSpec Scenario + `development.md` 清单；实跑测试 |
@@ -44,7 +44,7 @@
 | 产品范围、角色、词汇、稳定规则 | `product.md` |
 | 模块边界、依赖方向、安全架构 | `architecture.md` |
 | 本地命令、测试、分支、迁移流程 | `development.md` |
-| 部署、配置名、监控、备份、回滚 | `operations.md` |
+| 部署、配置名、监控、备份、回滚 | `operations.md`；Docker/Compose 细节见 `deploy/docker/README.md` |
 | API 请求/响应 | `api.md`（过渡）或 OpenAPI |
 | 应用自有库表 | Alembic + model |
 | 外部表语义 | `data-contract.md` |
