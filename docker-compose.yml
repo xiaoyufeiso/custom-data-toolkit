@@ -1,21 +1,4 @@
-# tendata-customs-tools — Docker Compose
-#
-# 默认：仅 backend（连外部 MySQL / Redis）
-# 可选项（--profile）：
-#   web         自带 Nginx 管理端（端口 WEB_PORT，默认 8080）
-#   mysql       Compose 内空库（导入 deploy/sql/schema.sql）
-#   redis       Compose 内 Redis
-#   local-deps  = mysql + redis
-#   full        = web + mysql + redis
-#
-# 示例：
-#   cp deploy/docker/compose.env.example deploy/docker/compose.env
-#   # 编辑 DATABASE_URL / REDIS_URL / 密码后：
-#   docker compose --env-file deploy/docker/compose.env up -d --build
-#   docker compose --env-file deploy/docker/compose.env --profile full up -d --build
-#
-# 说明见 deploy/docker/README.md
-
+# 用法见 deploy/docker/README.md
 name: tendata-customs-tools
 
 services:
@@ -23,6 +6,10 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      args:
+        PYTHON_VERSION: ${PYTHON_VERSION:-3.12}
+        HARBOR_REGISTRY: ${HARBOR_REGISTRY:-harbor-dev.tendata.com.cn}
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.tuna.tsinghua.edu.cn/simple}
     image: cdt-backend:local
     ports:
       - "${BACKEND_PORT:-8000}:8000"
@@ -36,7 +23,6 @@ services:
       DEBUG: ${DEBUG:-false}
       HOST: 0.0.0.0
       PORT: 8000
-      RUN_MIGRATIONS: ${RUN_MIGRATIONS:-true}
       DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL in deploy/docker/compose.env}
       REDIS_URL: ${REDIS_URL:?set REDIS_URL in deploy/docker/compose.env}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:8080,http://127.0.0.1:8080}

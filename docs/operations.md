@@ -52,50 +52,28 @@ deploy/docker/README.md           → Docker / Compose 用法
 ## 3. 构建与启动顺序
 
 ```text
-1. MySQL 可达；外部表已按 data-contract / schema.sql 对齐
-2. backend: alembic upgrade head
-3. 启动 backend（默认 8000）
-4. 启动 web（默认 5173）
-5. 健康检查 → 管理端登录 →（可选）用 API Key 测公开查询
+1. MySQL / Redis 可达，注入 DATABASE_URL / REDIS_URL
+2. 外部表按 data-contract / schema.sql 就绪
+3. alembic upgrade head（发布流程执行，容器启动不自动迁移）
+4. 启动 backend（8000）
+5. 发布管理端静态至网关（或 Compose profile web）
+6. 健康检查与冒烟
 ```
 
-具体命令以仓库 `README.md`、`scripts/` 与 `backend`/`web` 包脚本为准。
-
-### 3.1 Docker Compose（部署可选）
-
-文件：`docker-compose.yml`、说明：`deploy/docker/README.md`、环境模板：`deploy/docker/compose.env.example`。
-
-| Profile | 包含 |
-|---|---|
-| （默认） | 仅 `backend`（连外部 MySQL/Redis） |
-| `web` | 自带 Nginx 管理端（默认宿主机 8080） |
-| `mysql` / `redis` | Compose 内空库或 Redis |
-| `local-deps` | mysql + redis |
-| `full` | web + mysql + redis |
-
-生产推荐：外部库 +（公司网关挂静态 **或** `--profile web`）。  
-导出静态给网关：`./deploy/docker/export-web-static.sh`。
-
-```bash
-cp deploy/docker/compose.env.example deploy/docker/compose.env
-# 编辑 DATABASE_URL / REDIS_URL / 密码后
-docker compose --env-file deploy/docker/compose.env up -d --build
-# 演示全家桶（记得把 URL 主机改为 mysql / redis）：
-docker compose --env-file deploy/docker/compose.env --profile full up -d --build
-```
+Docker 构建、环境变量、网关与命令详见 [`deploy/docker/README.md`](../deploy/docker/README.md)。
 
 ## 4. 迁移执行
 
-- 发布前在目标环境执行 `alembic upgrade head`。
-- 外部表结构变更不由本应用随意改写；须先更新 `data-contract.md` 并与数据方确认。
-- 回滚：优先用 Alembic downgrade（若有）；否则按发布清单人工回退并记录。
+- 发布前执行 `alembic upgrade head`（流水线或运维）；容器启动不自动迁移。
+- 外部表变更须先更新 `data-contract.md` 并与数据方确认。
+- 回滚：优先 Alembic downgrade（若有）；否则按发布清单人工回退。
 
 ## 5. 健康检查
 
 | 路径 | 含义 |
 |---|---|
-| `GET /health`（以实现为准） | 进程存活 |
-| `GET /ready`（以实现为准） | 依赖（如 DB）就绪 |
+| `GET /api/v1/health` | 进程存活 |
+| `GET /api/v1/ready` | 依赖（含 DB）就绪 |
 
 ## 6. 日志与密钥
 

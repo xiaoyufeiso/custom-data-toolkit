@@ -10,3 +10,7 @@ tests
 .env.*
 !.env.example
 .git
+.gitignore
+dist
+*.egg-info
+.mypy_cache

@@ -1,92 +1,126 @@
 # Docker 部署说明
 
-给公司部署人员：用镜像/Compose 跑本项目。权威环境变量清单仍见 `backend/.env.example`；运维总述见 `docs/operations.md`。
+面向运维 / 发布：构建与运行 `tendata-customs-tools`。  
+变量语义清单见 `backend/.env.example`；总览见 `docs/operations.md`。
 
-## 组件一览
+## 1. 交付物
 
-| 组件 | 默认 | 如何启用 |
-|---|---|---|
-| `backend` | **始终构建** | `docker compose up` |
-| `web`（Nginx + 静态管理端） | 可选 | `--profile web` 或 `full` |
-| `mysql`（空库 + `schema.sql`） | 可选 | `--profile mysql` / `local-deps` / `full` |
-| `redis` | 可选 | `--profile redis` / `local-deps` / `full` |
-| 仅静态 `dist`（给现有网关） | 可选 | `./deploy/docker/export-web-static.sh` |
-
-**推荐生产：** 只起 `backend`（+ 可选不启 Compose 内 DB），MySQL/Redis 用公司已有实例；前端静态交给公司网关，或使用 `export-web-static.sh`。
-
-**本地演示：** `--profile full`，并在 `compose.env` 里把 `DATABASE_URL`/`REDIS_URL` 改成服务名 `mysql` / `redis`。
-
-## 前置条件
-
-- 构建机可访问公司 npm：`web/.npmrc`（`repo.tendata.net`），否则 `web` 镜像/`export-web-static` 装依赖会 404
-- MySQL / Redis：默认连外部；或用下文 profile 起空库
-- 本地用 `http://` 访问时务必 `APP_ENV=development`。设为 `production` 时 Session Cookie 带 `Secure`，浏览器在明文 HTTP 下不保存，会出现「提示登录成功却仍停在登录页 / 要点两次」
-
-## 快速开始
-
-```bash
-# 1. 环境文件
-cp deploy/docker/compose.env.example deploy/docker/compose.env
-# 编辑 compose.env：密码、DATABASE_URL、REDIS_URL、CORS、ADMIN_BOOTSTRAP_*
-
-# 2a. 仅后端（连外部库）
-docker compose --env-file deploy/docker/compose.env up -d --build
-
-# 2b. 后端 + 自带 Nginx 管理端
-docker compose --env-file deploy/docker/compose.env --profile web up -d --build
-
-# 2c. 一键演示（web + 空 MySQL + Redis）
-# 先把 compose.env 中 DATABASE_URL/REDIS_URL 改为：
-#   DATABASE_URL=mysql+pymysql://customs_app:change-me@mysql:3306/customs_data_toolkit
-#   REDIS_URL=redis://redis:6379/0
-docker compose --env-file deploy/docker/compose.env --profile full up -d --build
-```
-
-- 管理端（profile web/full）：http://localhost:8080  
-- 后端健康：http://localhost:8000/api/v1/health  
-- 对外 globiz：http://localhost:8000/rates/ （或经 web 反代的同名路径）
-
-## 可选：静态产物交给公司网关
-
-```bash
-chmod +x deploy/docker/export-web-static.sh
-./deploy/docker/export-web-static.sh
-# 产出目录 web-dist/
-```
-
-网关需配置（与 `deploy/docker/nginx.conf` 同思路）：
-
-- 站点根 → `web-dist/`
-- `/api/` → backend:8000
-- `/currencies/`、`/rates/`、`/openapi` → backend:8000  
-- 其余路径 SPA fallback → `index.html`  
-- 注意：globiz 的 `GET /` 与管理端首页冲突时，公开根路径请直连 backend 或单独域名
-
-## 环境变量
-
-| 文件 | 用途 |
+| 产物 | 说明 |
 |---|---|
-| `deploy/docker/compose.env.example` | Compose 模板（可提交） |
-| `deploy/docker/compose.env` | 运行时（gitignore，勿提交） |
-| `backend/.env.example` | 变量语义权威清单 |
+| 后端镜像 | `backend/Dockerfile`（Harbor `python-devel` 构建 / `python-runtime` 运行） |
+| 管理端静态（推荐） | `./deploy/docker/export-web-static.sh` → `web-dist/`，由公司网关托管 |
+| 管理端容器（可选） | Compose `--profile web`：Nginx 托管静态并反代 API |
 
-启用 Compose 内 MySQL/Redis 时，必须把 URL 主机名改成 `mysql` / `redis`，不能用 `127.0.0.1`（那是容器自己）。
+生产推荐：外部 MySQL / Redis + 后端镜像 + 网关静态；不必启用 Compose 内 `mysql` / `redis`。
 
-连宿主机库时可用 `host.docker.internal`（Docker Desktop；Linux 视版本而定，必要时加 `extra_hosts`）。
+## 2. 前置条件
 
-## 迁移
+- 构建机能拉取：
+  - `${HARBOR_REGISTRY}/basic/python-devel:3.12`
+  - `${HARBOR_REGISTRY}/basic/python-runtime:3.12`  
+  默认 `HARBOR_REGISTRY=harbor-dev.tendata.com.cn`
+- 构建管理端静态或 `web` 镜像时，构建机能访问公司 npm（`web/.npmrc`）
+- 已准备 MySQL、Redis，并注入运行时环境变量（见 §4）
+- 外部表 `currency` / `rate` 已按 `deploy/sql/schema.sql` 与 `docs/data-contract.md` 就绪
 
-容器入口默认 `alembic upgrade head`（`RUN_MIGRATIONS=true`）。  
-若由发布流水线迁库，设 `RUN_MIGRATIONS=false`。
+## 3. 构建后端镜像
 
-空库首次还需外部表：`deploy/sql/schema.sql`（Compose `mysql` profile 会自动执行该文件）。
+```bash
+docker build -t <registry>/tendata-customs-tools-backend:<tag> ./backend
+```
 
-## 常用命令
+可选 build-arg：`PYTHON_VERSION`、`HARBOR_REGISTRY`、`PIP_INDEX_URL`。
+
+镜像约定：
+
+- 运行用户 UID `1680`
+- 监听 `8000`
+- 工作目录 `/tendata`（含 `alembic.ini`、`migrations/`）
+- 启动命令为 uvicorn；`python-runtime` 入口负责 OTEL 注入
+- **进程启动时不执行数据库迁移**
+
+## 4. 运行时配置
+
+从 `deploy/docker/compose.env.example` 复制为环境配置（或由配置中心 / 编排注入同名变量）。勿将含真实密钥的文件提交仓库。
+
+| 变量 | 用途 |
+|---|---|
+| `DATABASE_URL` | MySQL（必填） |
+| `REDIS_URL` | Redis（必填） |
+| `APP_ENV` | `production`（HTTPS）或 `development`（HTTP；影响 Session Cookie `Secure`） |
+| `CORS_ALLOWED_ORIGINS` | 管理端前端 Origin |
+| `ADMIN_BOOTSTRAP_USERNAME` / `ADMIN_BOOTSTRAP_PASSWORD` | 空库首启管理员（生产须强密码） |
+| `PUBLIC_API_AUTH_ENABLED` | 对外 globiz 是否强制 `X-API-Key` |
+| `SESSION_*` | Session Cookie 名与 TTL |
+
+完整列表以 `backend/.env.example` 为准。
+
+## 5. 发布顺序
+
+```text
+1. 确认 MySQL / Redis 可达，注入环境变量
+2. 执行迁移：alembic upgrade head（流水线或运维；见 §6）
+3. 滚动发布后端容器 / 副本
+4. 发布管理端静态至网关（或更新 web 镜像）
+5. 探活与冒烟（见 §7）
+```
+
+Compose 示例（外部库已就绪时）：
+
+```bash
+cp deploy/docker/compose.env.example deploy/docker/compose.env
+# 填入生产/UAT 连接与密钥后：
+docker compose --env-file deploy/docker/compose.env up -d --build
+```
+
+可选 profile：`web`、`mysql`、`redis`、`local-deps`、`full`（见仓库根目录 `docker-compose.yml`）。启用 Compose 内数据库时，`DATABASE_URL` / `REDIS_URL` 主机名须为服务名 `mysql` / `redis`。
+
+## 6. 数据库迁移
+
+迁移在**发布流程中**执行，不由容器 ENTRYPOINT/CMD 自动触发。
+
+在已注入 `DATABASE_URL` 的后端容器内：
+
+```bash
+alembic upgrade head
+```
+
+镜像内路径：`/tendata/alembic.ini`，`script_location=migrations`。
+
+外部表结构变更须与数据方确认，并更新 `docs/data-contract.md`；应用迁移只管自有管理表。
+
+## 7. 健康检查与验收
+
+| 检查 | 地址 |
+|---|---|
+| 存活 | `GET /api/v1/health` |
+| 就绪（含 DB） | `GET /api/v1/ready` |
+| 对外汇率（示例） | `GET /rates/`（按 `PUBLIC_API_AUTH_ENABLED` 携带 API Key） |
+
+管理端：登录后访问货币 / 汇率列表。
+
+## 8. 网关（管理端静态）
+
+```bash
+./deploy/docker/export-web-static.sh
+# 产出 web-dist/
+```
+
+网关建议：
+
+| 路径 | 目标 |
+|---|---|
+| 站点根 / SPA | `web-dist/`（fallback `index.html`） |
+| `/api/` | backend:8000 |
+| `/currencies/`、`/rates/`、`/openapi` | backend:8000 |
+
+参考配置：`deploy/docker/nginx.conf`。  
+若 globiz 的 `GET /` 与管理端首页冲突，公开 API 使用独立域名或直连后端。
+
+## 9. 常用命令
 
 ```bash
 docker compose --env-file deploy/docker/compose.env ps
 docker compose --env-file deploy/docker/compose.env logs -f backend
 docker compose --env-file deploy/docker/compose.env down
-# 连同演示数据卷删除（慎用）：
-docker compose --env-file deploy/docker/compose.env --profile full down -v
 ```
