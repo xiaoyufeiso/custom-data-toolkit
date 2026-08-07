@@ -9,7 +9,7 @@ import {
   it,
   vi,
 } from 'vitest';
-import { http as client } from '@/shared/api/http';
+import { http as client, isStaleSessionUnauthorized } from '@/shared/api/http';
 import { bumpAuthGeneration } from '@/shared/auth/authGeneration';
 import { notifySessionUnauthorized } from '@/shared/auth/sessionGate';
 
@@ -89,6 +89,7 @@ describe('http session unauthorized interceptor', () => {
     await expect(pending).rejects.toBeDefined();
     expect(notifySessionUnauthorized).not.toHaveBeenCalled();
     expect(sessionStorage.getItem('cdt_session_user')).not.toBeNull();
+    expect(isStaleSessionUnauthorized(await pending.catch((e) => e))).toBe(true);
   });
 
   it('does not kick on Auth.LoginFailed', async () => {

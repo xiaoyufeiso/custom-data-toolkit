@@ -1,7 +1,9 @@
+# 构建参数
 ARG PYTHON_VERSION=3.12
 ARG HARBOR_REGISTRY=harbor-dev.tendata.com.cn
 ARG PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
 
+# Stage 1: 构建依赖并打包
 FROM ${HARBOR_REGISTRY}/basic/python-devel:${PYTHON_VERSION} AS builder
 
 ARG PYTHON_VERSION
@@ -35,6 +37,7 @@ fi
 uv pip install --python /tendata/app/bin/python --no-deps dist/*.whl
 EOF
 
+# Stage 2: 运行镜像（非 root）
 FROM ${HARBOR_REGISTRY}/basic/python-runtime:${PYTHON_VERSION} AS final
 
 ARG PYTHON_VERSION

@@ -3,6 +3,8 @@ import { ReactNode, useEffect, useState } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { Spin } from 'tendata-ui';
 import { fetchMe } from '@/services/auth';
+import { isStaleSessionUnauthorized } from '@/shared/api/http';
+import { loginPathWithRedirect } from '@/shared/auth/loginRedirect';
 
 type Props = {
   children: ReactNode;
@@ -15,14 +17,23 @@ const RequireAuth = ({ children }: Props) => {
   useEffect(() => {
     const controller = new AbortController();
     setState('loading');
-    fetchMe(controller.signal)
-      .then(() => {
-        if (!controller.signal.aborted) setState('ok');
-      })
-      .catch((error: unknown) => {
-        if (controller.signal.aborted || axios.isCancel(error)) return;
-        if (!controller.signal.aborted) setState('guest');
-      });
+
+    const verify = () => {
+      fetchMe(controller.signal)
+        .then(() => {
+          if (!controller.signal.aborted) setState('ok');
+        })
+        .catch((error: unknown) => {
+          if (controller.signal.aborted || axios.isCancel(error)) return;
+          if (isStaleSessionUnauthorized(error)) {
+            verify();
+            return;
+          }
+          if (!controller.signal.aborted) setState('guest');
+        });
+    };
+
+    verify();
     return () => {
       controller.abort();
     };
@@ -37,8 +48,12 @@ const RequireAuth = ({ children }: Props) => {
   }
 
   if (state === 'guest') {
-    const redirect = encodeURIComponent(location.pathname + location.search);
-    return <Navigate to={`/login?redirect=${redirect}`} replace />;
+    return (
+      <Navigate
+        to={loginPathWithRedirect(location.pathname, location.search)}
+        replace
+      />
+    );
   }
 
   return children;

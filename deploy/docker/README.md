@@ -19,7 +19,9 @@
   - `${HARBOR_REGISTRY}/basic/python-devel:3.12`
   - `${HARBOR_REGISTRY}/basic/python-runtime:3.12`  
   默认 `HARBOR_REGISTRY=harbor-dev.tendata.com.cn`
-- 构建管理端静态或 `web` 镜像时，构建机能访问公司 npm（`web/.npmrc`）
+- 构建管理端静态或 `web` 镜像时：
+  - 能拉取 `${HARBOR_REGISTRY}/basic/nodejs:20`
+  - 能访问公司 npm 源（`web/.npmrc` → `repo.tendata.net`；可用 `NPM_REGISTRY` build-arg 覆盖）
 - 已准备 MySQL、Redis，并注入运行时环境变量（见 §4）
 - 外部表 `currency` / `rate` 已按 `deploy/sql/schema.sql` 与 `docs/data-contract.md` 就绪
 
@@ -99,7 +101,21 @@ alembic upgrade head
 
 管理端：登录后访问货币 / 汇率列表。
 
-## 8. 网关（管理端静态）
+## 8. 管理端镜像与静态产物
+
+`web/Dockerfile` 为多阶段：
+
+- `base`：Harbor `nodejs:20`，创建 UID 1680 用户
+- `builder`：按锁文件装依赖（pnpm `--frozen-lockfile`）→ `pnpm build:pro` → `dist/`
+- `static`：仅供导出静态产物
+- `runtime`：Nginx 托管 `dist/` 并反代 API（目前无公司 nginx 基础镜像，暂用官方 `nginx:1.27-alpine`；非 root 待公司镜像就绪后再对齐）
+
+```bash
+# 构建管理端容器（Compose profile=web / full 时自动执行）
+docker compose --env-file deploy/docker/compose.env build web
+```
+
+导出静态产物给网关：
 
 ```bash
 ./deploy/docker/export-web-static.sh

@@ -28,6 +28,16 @@ function readAuthGeneration(config: { headers?: unknown } | undefined): number |
   return Number.isFinite(value) ? value : undefined;
 }
 
+/** 登录/退出后迟到的 Session 401：拦截器不踢出，但 promise 仍会 reject。 */
+export function isStaleSessionUnauthorized(error: unknown): boolean {
+  if (!axios.isAxiosError(error)) return false;
+  const status = error.response?.status;
+  const code = (error.response?.data as { code?: string } | undefined)?.code;
+  if (status !== 401 || code !== 'Auth.Unauthorized') return false;
+  const startedAt = readAuthGeneration(error.config);
+  return startedAt !== undefined && startedAt !== getAuthGeneration();
+}
+
 /** 管理端 Session Cookie 请求客户端（轻量，不走 Bearer token 模板层） */
 export const http = axios.create({
   baseURL: '/api/v1',

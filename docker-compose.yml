@@ -45,6 +45,9 @@ services:
       context: .
       dockerfile: web/Dockerfile
       target: runtime
+      args:
+        HARBOR_REGISTRY: ${HARBOR_REGISTRY:-harbor-dev.tendata.com.cn}
+        NPM_REGISTRY: ${NPM_REGISTRY:-https://repo.tendata.net/repository/npm-public/}
     image: cdt-web:local
     ports:
       - "${WEB_PORT:-8080}:80"

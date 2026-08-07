@@ -14,6 +14,7 @@ import {
   registerSessionGate,
   subscribeSessionBroadcast,
 } from '@/shared/auth/sessionGate';
+import { loginPathWithRedirect, DEFAULT_AFTER_LOGIN } from '@/shared/auth/loginRedirect';
 import { clearSessionUser } from '@/shared/auth/sessionUser';
 import { useTranslate } from '@/shared/hooks';
 
@@ -56,8 +57,10 @@ export function useSessionGuard({
       clearSessionUser();
       setUser(null);
       message.warning(t('common.session.expired'));
-      const redirect = encodeURIComponent(pathnameRef.current || '/currencies');
-      navigate(`/login?redirect=${redirect}`, { replace: true });
+      navigate(
+        loginPathWithRedirect(pathnameRef.current || DEFAULT_AFTER_LOGIN),
+        { replace: true },
+      );
     };
 
     const applySwitched = (me: AdminUser) => {

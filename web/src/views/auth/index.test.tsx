@@ -27,7 +27,6 @@ vi.mock('react-router-dom', async (importOriginal) => {
   return {
     ...original,
     useNavigate: () => navigateMock,
-    useSearchParams: () => [new URLSearchParams('redirect=/rates')],
   };
 });
 
@@ -75,6 +74,25 @@ describe('LoginView', () => {
     });
     expect(messageSuccess).toHaveBeenCalledWith('登录成功');
     expect(navigateMock).toHaveBeenCalledWith('/rates', { replace: true });
+  });
+
+  it('redirects to currencies when redirect param points to login', async () => {
+    const user = userEvent.setup();
+    loginMock.mockResolvedValueOnce({
+      id: 1,
+      username: 'admin',
+      role: 'admin',
+      enabled: true,
+    });
+
+    renderWithProviders(<LoginView />, { route: '/login?redirect=%2Flogin' });
+
+    await user.type(screen.getByLabelText('密码'), 'secret-pass');
+    await user.click(screen.getByRole('button', { name: '登录' }));
+
+    await waitFor(() => {
+      expect(navigateMock).toHaveBeenCalledWith('/currencies', { replace: true });
+    });
   });
 
   it('shows a generic failure message when login fails', async () => {

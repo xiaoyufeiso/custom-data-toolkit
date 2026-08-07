@@ -8,6 +8,7 @@ import {
   message,
 } from 'tendata-ui';
 import { login } from '@/services/auth';
+import { sanitizeLoginRedirect } from '@/shared/auth/loginRedirect';
 import { useTranslate } from '@/shared/hooks';
 import styles from './index.module.less';
 
@@ -28,8 +29,7 @@ const LoginView = () => {
     try {
       await login(values.username.trim(), values.password);
       message.success(t('auth.message.success'));
-      const target = params.get('redirect') || '/currencies';
-      navigate(target, { replace: true });
+      navigate(sanitizeLoginRedirect(params.get('redirect')), { replace: true });
     } catch {
       message.error(t('auth.message.failed'));
     } finally {

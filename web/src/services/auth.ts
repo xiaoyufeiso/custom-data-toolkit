@@ -21,6 +21,7 @@ export async function fetchCsrf(): Promise<string> {
 }
 
 export async function login(username: string, password: string): Promise<AdminUser> {
+  bumpAuthGeneration();
   await fetchCsrf();
   const { data } = await http.post<AdminUser>('/auth/login', { username, password });
   bumpAuthGeneration();
@@ -36,10 +37,10 @@ export async function fetchMe(signal?: AbortSignal): Promise<AdminUser> {
 }
 
 export async function logout(): Promise<void> {
+  bumpAuthGeneration();
   try {
     await http.post('/auth/logout');
   } finally {
-    bumpAuthGeneration();
     clearSessionUser();
     broadcastSessionChanged();
   }
