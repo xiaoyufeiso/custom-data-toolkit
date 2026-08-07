@@ -1,5 +1,5 @@
 # tendata-customs-tools frontend
-# 构建上下文须为仓库根目录（见 docker-compose.yml）。
+# 构建上下文：web/（见仓库根 docker-compose.yml）
 
 ARG HARBOR_REGISTRY=harbor-dev.tendata.com.cn
 ARG NPM_REGISTRY=https://repo.tendata.net/repository/npm-public/
@@ -26,20 +26,17 @@ ENV NODE_ENV=development \
 
 WORKDIR /app
 
-COPY web/package.json web/pnpm-lock.yaml ./
+COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
 
-COPY web/ ./
+COPY . .
 RUN pnpm build:pro
 
-# Stage 3: 静态导出
-FROM builder AS static
-
-# Stage 4: Nginx 运行（反代 API；目前用官方镜像，待公司 nginx 镜像）
+# Stage 3: Nginx 运行（反代 API；目前用官方镜像，待公司 nginx 镜像）
 FROM nginx:1.27-alpine AS runtime
 
 COPY --from=builder --chown=101:101 /app/dist /usr/share/nginx/html
-COPY deploy/docker/nginx.conf /etc/nginx/conf.d/default.conf
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 80
 

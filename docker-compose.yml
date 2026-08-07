@@ -42,8 +42,8 @@ services:
   web:
     profiles: ["web", "full"]
     build:
-      context: .
-      dockerfile: web/Dockerfile
+      context: ./web
+      dockerfile: Dockerfile
       target: runtime
       args:
         HARBOR_REGISTRY: ${HARBOR_REGISTRY:-harbor-dev.tendata.com.cn}

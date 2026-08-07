@@ -5,8 +5,8 @@
 ## 当前状态
 
 - 阶段：MVP 主链路与管理端 UI 组件库化已完成并归档；活跃仅两项 Deferred
-- 整体状态：用户/viewer/审计/globiz/Session/登录页 Form+i18n 均已落地
-- 最后更新：2026-08-05
+- 整体状态：用户/viewer/审计/globiz/Session/登录页 Form+i18n 均已落地；**Docker Compose 本地编排 + Harbor 前后端镜像已落地**；**登录 redirect 自指与退出后再登录竞态已修复**
+- 最后更新：2026-08-07
 
 ## 里程碑
 
@@ -23,6 +23,8 @@
 | 管理端操作审计 | 完成（已归档） |
 | 对外 API 对齐 globiz | 完成（已归档） |
 | 管理端 UI 组件库化 | 完成（已归档；API Key 页仍 deferred） |
+| Docker Compose 本地编排 + Harbor 镜像 | 完成 |
+| 登录 Session 竞态 / redirect 自指修复 | 完成 |
 
 ## 阻塞
 
@@ -32,8 +34,16 @@
 
 1. （可选）E5 Redis 友好错误文案；API 契约迁 OpenAPI
 2. （可选）恢复前端 API Key 管理 UI
+3. （可选）生产环境验证 Docker 全栈（`compose --profile full`）与公司 nginx 基础镜像对齐
 
 ## 日志（摘录）
+
+### 2026-08-07（Docker 部署 + 登录鉴权修复）
+
+- **Docker**：后端 Harbor `python-devel`/`python-runtime` 两阶段；前端 Harbor `nodejs:20` + pnpm 构建 + Nginx runtime；Compose profile `web`/`mysql`/`redis`/`full`；迁移不在容器内自动执行
+- **文档**：根 README 对外化；`deploy/docker/README.md`、`docs/operations.md` 运维向说明
+- **鉴权**：`authGeneration` 世代 bump 前移（login/logout）；`loginRedirect` 消毒禁止 `redirect=/login`；`RequireAuth` 忽略 stale 401 并重试；修复退出后再登录需点两次
+- **Git**：`origin/main` 推至 `4d86974`
 
 ### 2026-08-05（UI 组件库化收口并归档）
 

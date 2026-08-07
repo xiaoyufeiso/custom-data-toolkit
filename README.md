@@ -24,11 +24,11 @@
 ## 仓库结构
 
 ```text
-├─ web/          # 管理端前端
-├─ backend/      # FastAPI（src/custom_data_toolkit）
+├─ web/          # 管理端前端（Dockerfile、nginx.conf、export-static.sh）
+├─ backend/      # FastAPI（src/custom_data_toolkit；Dockerfile 构建上下文 backend/）
 ├─ docs/         # 产品 / 架构 / 开发 / 运维
 ├─ openspec/     # 行为 Spec 与变更
-├─ deploy/       # schema、对外 API 契约、环境与 Docker 说明
+├─ deploy/       # schema、对外 API 契约、Compose 环境模板与 Docker 说明
 ├─ scripts/      # 全栈联调脚本
 └─ README.md
 ```

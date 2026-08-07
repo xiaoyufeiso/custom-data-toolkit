@@ -24,6 +24,9 @@ deploy/docker/compose.env.example → Compose 模板
 deploy/docker/compose.env         → Compose 运行时（gitignore）
 deploy/env/README.md              → 给部署者的短说明
 deploy/docker/README.md           → Docker / Compose 用法
+web/Dockerfile                    → 管理端镜像（构建上下文 web/）
+web/nginx.conf                    → 管理端 Nginx（Compose web 或网关参考）
+web/export-static.sh              → 导出 web-dist/ 给网关
 ```
 
 **以后遵循：**

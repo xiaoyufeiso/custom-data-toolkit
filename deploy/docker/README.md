@@ -8,8 +8,8 @@
 | 产物 | 说明 |
 |---|---|
 | 后端镜像 | `backend/Dockerfile`（Harbor `python-devel` 构建 / `python-runtime` 运行） |
-| 管理端静态（推荐） | `./deploy/docker/export-web-static.sh` → `web-dist/`，由公司网关托管 |
-| 管理端容器（可选） | Compose `--profile web`：Nginx 托管静态并反代 API |
+| 管理端静态（推荐） | `./web/export-static.sh` → `web-dist/`，由公司网关托管 |
+| 管理端容器（可选） | Compose `--profile web`：Nginx 托管静态并反代 API（构建上下文 `web/`） |
 
 生产推荐：外部 MySQL / Redis + 后端镜像 + 网关静态；不必启用 Compose 内 `mysql` / `redis`。
 
@@ -103,22 +103,24 @@ alembic upgrade head
 
 ## 8. 管理端镜像与静态产物
 
-`web/Dockerfile` 为多阶段：
+`web/Dockerfile` 构建上下文为 **`web/`**，多阶段：
 
 - `base`：Harbor `nodejs:20`，创建 UID 1680 用户
-- `builder`：按锁文件装依赖（pnpm `--frozen-lockfile`）→ `pnpm build:pro` → `dist/`
-- `static`：仅供导出静态产物
-- `runtime`：Nginx 托管 `dist/` 并反代 API（目前无公司 nginx 基础镜像，暂用官方 `nginx:1.27-alpine`；非 root 待公司镜像就绪后再对齐）
+- `builder`：按锁文件装依赖 → `pnpm build:pro` → `dist/`（导出静态时用 `--target builder`）
+- `runtime`：Nginx 托管 `dist/` 并反代 API（`web/nginx.conf`；目前无公司 nginx 基础镜像，暂用官方 `nginx:1.27-alpine`）
 
 ```bash
-# 构建管理端容器（Compose profile=web / full 时自动执行）
+# 单独构建（在仓库根目录）
+docker build -t cdt-web:local ./web
+
+# 或 Compose profile=web / full
 docker compose --env-file deploy/docker/compose.env build web
 ```
 
 导出静态产物给网关：
 
 ```bash
-./deploy/docker/export-web-static.sh
+./web/export-static.sh
 # 产出 web-dist/
 ```
 
@@ -130,7 +132,7 @@ docker compose --env-file deploy/docker/compose.env build web
 | `/api/` | backend:8000 |
 | `/currencies/`、`/rates/`、`/openapi` | backend:8000 |
 
-参考配置：`deploy/docker/nginx.conf`。  
+参考配置：`web/nginx.conf`（Compose `web` 服务 runtime 阶段内置；网关可参考同文件）。
 若 globiz 的 `GET /` 与管理端首页冲突，公开 API 使用独立域名或直连后端。
 
 ## 9. 常用命令
